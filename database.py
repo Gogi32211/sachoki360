@@ -574,5 +574,39 @@ def get_payment_schedule(from_date: str = None, to_date: str = None):
                 'notes': term['notes'],
             })
 
+        # "other" vendors (guide, driver) — one entry per tour, due before bus_start
+        other_terms = [t for t in terms.values() if t['vendor_type'] == 'other']
+        if other_terms:
+            tour_rows = conn.execute(
+                "SELECT code, series, bus_start, bus_end FROM tours "
+                "WHERE bus_start <= ? AND bus_end >= ?",
+                (to_date, from_date)
+            ).fetchall()
+            for tour in tour_rows:
+                for term in other_terms:
+                    ref = date.fromisoformat(tour['bus_start'])
+                    if term['timing'] == 'before':
+                        due = ref - timedelta(days=term['days_offset'])
+                    else:
+                        ref_end = date.fromisoformat(tour['bus_end'])
+                        due = ref_end + timedelta(days=term['days_offset'])
+                    diff = (due - today).days
+                    schedule.append({
+                        'vendor_name': term['vendor_name'],
+                        'vendor_type': 'other',
+                        'service_type': 'other',
+                        'tour_code': tour['code'],
+                        'series': tour['series'],
+                        'first_service_date': tour['bus_start'],
+                        'last_service_date': tour['bus_end'],
+                        'nights': 0,
+                        'due_date': due.isoformat(),
+                        'timing': term['timing'],
+                        'days_offset': term['days_offset'],
+                        'days_until_due': diff,
+                        'status': 'overdue' if diff < 0 else ('due_soon' if diff <= 3 else 'upcoming'),
+                        'notes': term['notes'],
+                    })
+
         schedule.sort(key=lambda x: x['due_date'])
         return schedule
