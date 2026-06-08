@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import database as db
+from excel_parser import parse_all_excel
 
 app = FastAPI(title="GTC360 — GOGA of TOURS")
 
@@ -12,6 +13,12 @@ app = FastAPI(title="GTC360 — GOGA of TOURS")
 def startup():
     db.init_db()
     db.seed_db()
+    try:
+        parsed = parse_all_excel()
+        if parsed:
+            db.seed_excel_data(parsed)
+    except Exception as e:
+        print(f"Excel parse warning: {e}")
 
 
 class NoteUpdate(BaseModel):
@@ -83,3 +90,23 @@ def add_note(code: str, body: NoteUpdate):
 def add_log_note(log_id: int, body: NoteUpdate):
     db.update_log_notes(log_id, body.notes)
     return {"ok": True}
+
+
+@app.get("/api/financials")
+def financials():
+    return db.get_financials_all()
+
+
+@app.get("/api/financials/{code}")
+def financials_tour(code: str):
+    all_f = db.get_financials_all()
+    match = next((f for f in all_f if f['tour_code'] == code), None)
+    if not match:
+        raise HTTPException(404, "Not found")
+    match['meals'] = db.get_meals_for_tour(code)
+    return match
+
+
+@app.get("/api/restaurants")
+def restaurants():
+    return db.get_all_restaurants()
