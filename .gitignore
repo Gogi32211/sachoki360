@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+gtc360.db
+.env
