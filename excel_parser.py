@@ -1,6 +1,7 @@
 from datetime import date, datetime
 import openpyxl
 import os
+import re
 
 EXCEL_FILES = [
     "/root/.claude/uploads/24a9ba42-2faf-5339-ae9b-5a5487a67c79/af288247-LN_TOURS_BALANCE.xlsx",
@@ -35,7 +36,6 @@ def parse_sheet(ws):
         if len(row) > 1 and row[1] and isinstance(row[1], str) and '-' in row[1]:
             val = row[1].strip()
             # Match pattern like "LN-0608", "ZT-0615", "KT-0609", "DT1-0531", "DT2-0511"
-            import re
             if re.match(r'^(ZT|LN|KT|DT1|DT2)-\d{4}$', val):
                 tour_code = val
                 guide = row[2] if len(row) > 2 else None

@@ -408,6 +408,142 @@ function TourDetailView({ initialCode, onBack }) {
   );
 }
 
+// ── ACCOUNTING VIEW ────────────────────────────────────────────
+function AccountingView({ onSelectTour }) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // all, due, active, done
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('bus_start');
+
+  useEffect(() => {
+    fetch(`${API}/financials`)
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const filtered = data
+    .filter(t => {
+      if (filter === 'due') return t.due_gel > 0;
+      if (filter === 'active') return t.status === 'active';
+      if (filter === 'done') return t.status === 'done';
+      return true;
+    })
+    .filter(t => !search || t.tour_code.toLowerCase().includes(search.toLowerCase()) || (t.guide||'').toLowerCase().includes(search.toLowerCase()))
+    .sort((a,b) => {
+      if (sortBy === 'due_gel') return b.due_gel - a.due_gel;
+      if (sortBy === 'profit') return b.profit_gel - a.profit_gel;
+      return a.bus_start.localeCompare(b.bus_start);
+    });
+
+  const totalDue = data.reduce((s,t) => s + (t.due_gel||0), 0);
+  const totalPaid = data.reduce((s,t) => s + (t.paid_gel||0), 0);
+  const totalProfit = data.reduce((s,t) => s + (t.profit_gel||0), 0);
+  const totalSpent = data.reduce((s,t) => s + (t.spent_gel||0), 0);
+  const dueCount = data.filter(t => t.due_gel > 0).length;
+
+  const fmt = (n) => n ? Math.round(n).toLocaleString() + ' ₾' : '—';
+  const fmtU = (n) => n ? Math.round(n).toLocaleString() + ' $' : '—';
+
+  return (
+    <div className="p-4 max-w-screen-xl mx-auto">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="text-xs text-red-500 font-medium mb-1">გადასახდელი</div>
+          <div className="text-2xl font-bold text-red-700">{fmt(totalDue)}</div>
+          <div className="text-xs text-red-400 mt-1">{dueCount} ტური</div>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="text-xs text-green-500 font-medium mb-1">გადახდილია</div>
+          <div className="text-2xl font-bold text-green-700">{fmt(totalPaid)}</div>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="text-xs text-blue-500 font-medium mb-1">სულ მოგება</div>
+          <div className="text-2xl font-bold text-blue-700">{fmt(totalProfit)}</div>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="text-xs text-gray-500 font-medium mb-1">სულ დახარჯული</div>
+          <div className="text-2xl font-bold text-gray-700">{fmt(totalSpent)}</div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-4 items-center">
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="ტური ან გიდი..."
+          className="border rounded px-3 py-1.5 text-sm w-44"/>
+        <div className="flex gap-1">
+          {[['all','ყველა'],['due','გადასახდელი'],['active','აქტიური'],['done','დასრულ.']].map(([v,l]) => (
+            <button key={v} onClick={() => setFilter(v)}
+              className={`px-3 py-1.5 rounded text-sm ${filter===v ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>{l}</button>
+          ))}
+        </div>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+          className="border rounded px-3 py-1.5 text-sm ml-auto">
+          <option value="bus_start">თარიღით</option>
+          <option value="due_gel">გადასახდელი</option>
+          <option value="profit">მოგება</option>
+        </select>
+      </div>
+
+      {loading ? <Spinner/> : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  {['ტური','გიდი','ოთახები','გამგ.','დახარჯ.','ტ.ფასი','გადახდ.','გადასახ.','მოგება','სტ.'].map(h => (
+                    <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr><td colSpan="10" className="text-center py-12 text-gray-400">მონაცემები არ მოიძებნა</td></tr>
+                ) : filtered.map(t => (
+                  <tr key={t.tour_code} className={`border-b hover:bg-gray-50 ${t.due_gel > 0 ? 'bg-red-50/30' : ''}`}>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: t.color}}/>
+                        <button className="font-bold text-blue-600 hover:underline whitespace-nowrap"
+                          onClick={() => onSelectTour(t.tour_code)}>{t.tour_code}</button>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-gray-600 max-w-xs truncate">{t.guide || '—'}</td>
+                    <td className="px-3 py-2 text-gray-500 text-xs">{t.rooms || '—'}</td>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{t.bus_start}</td>
+                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{fmt(t.spent_gel)}</td>
+                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{fmtU(t.tour_price_usd)}</td>
+                    <td className="px-3 py-2 text-green-700 font-medium whitespace-nowrap">{fmt(t.paid_gel)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {t.due_gel > 0
+                        ? <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded font-bold">{fmt(t.due_gel)}</span>
+                        : <span className="text-green-600">✓</span>}
+                    </td>
+                    <td className={`px-3 py-2 font-medium whitespace-nowrap ${t.profit_gel > 0 ? 'text-green-700' : t.profit_gel < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                      {fmt(t.profit_gel)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        t.status==='active' ? 'bg-green-100 text-green-700' :
+                        t.status==='upcoming' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-500'}`}>
+                        {t.status==='active'?'აქტ.':t.status==='upcoming'?'მომ.':'დასრ.'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── APP ────────────────────────────────────────────────────────
 function App() {
   const [tab, setTab] = useState("day");
@@ -416,9 +552,10 @@ function App() {
   const handleSelectTour = code => { setSelectedTour(code); setTab("detail"); };
 
   const tabs = [
-    {id:"timeline", label:"📊 Timeline"},
-    {id:"day",      label:"📅 დღის ხედი"},
-    {id:"detail",   label:"🔍 ტურის დეტალი"},
+    {id:"timeline",   label:"📊 Timeline"},
+    {id:"day",        label:"📅 დღის ხედი"},
+    {id:"detail",     label:"🔍 ტურის დეტალი"},
+    {id:"accounting", label:"💰 ბუღალტერია"},
   ];
 
   return (
@@ -445,9 +582,10 @@ function App() {
       </header>
 
       <main className="max-w-screen-xl mx-auto">
-        {tab === "timeline" && <TimelineView onSelectTour={handleSelectTour}/>}
-        {tab === "day"      && <DayView onSelectTour={handleSelectTour}/>}
-        {tab === "detail"   && <TourDetailView initialCode={selectedTour} onBack={() => setTab("day")}/>}
+        {tab === "timeline"   && <TimelineView onSelectTour={handleSelectTour}/>}
+        {tab === "day"        && <DayView onSelectTour={handleSelectTour}/>}
+        {tab === "detail"     && <TourDetailView initialCode={selectedTour} onBack={() => setTab("day")}/>}
+        {tab === "accounting" && <AccountingView onSelectTour={handleSelectTour}/>}
       </main>
     </div>
   );
