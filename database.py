@@ -2,10 +2,17 @@ import json as _json
 import sqlite3
 from collections import defaultdict
 from contextlib import contextmanager
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from seed_data import SERIES, TOURS_2026
 
 DB_PATH = "gtc360.db"
+
+# Georgia (Tbilisi) is UTC+4 year-round — no daylight saving.
+TBILISI_TZ = timezone(timedelta(hours=4))
+
+def today_tbilisi() -> date:
+    """Current date in Tbilisi, regardless of the server's own timezone."""
+    return datetime.now(TBILISI_TZ).date()
 
 @contextmanager
 def get_db():
@@ -218,7 +225,7 @@ def sync_series_hotels(series_key: str):
 
 
 def get_tour_status(bus_start_str: str, bus_end_str: str) -> str:
-    today = date.today()
+    today = today_tbilisi()
     bs = date.fromisoformat(bus_start_str)
     be = date.fromisoformat(bus_end_str)
     if today < bs:
@@ -595,7 +602,7 @@ def _calc_amount(term: dict, series: str = '') -> float:
     return uprice
 
 def get_payment_schedule(from_date: str = None, to_date: str = None):
-    today = date.today()
+    today = today_tbilisi()
     if not from_date:
         from_date = (today - timedelta(days=14)).isoformat()
     if not to_date:

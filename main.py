@@ -94,7 +94,7 @@ def tour_detail(code: str):
 @app.get("/api/timeline")
 def timeline(from_date: str = None, to_date: str = None):
     if not from_date:
-        from_date = date.today().replace(day=1).isoformat()
+        from_date = db.today_tbilisi().replace(day=1).isoformat()
     if not to_date:
         d = date.fromisoformat(from_date)
         if d.month == 12:
@@ -106,7 +106,7 @@ def timeline(from_date: str = None, to_date: str = None):
 
 @app.get("/api/today")
 def today_info():
-    today = date.today()
+    today = db.today_tbilisi()
     yesterday = (today - timedelta(days=1)).isoformat()
     tomorrow = (today + timedelta(days=1)).isoformat()
     return {
