@@ -6,15 +6,15 @@ SERIES = {
         "duration": 9,
         "color": "#42A5F5",
         "nights": {
-            0: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "🍷 ხარება — მსუბუქი კერძი + ღვინო", "dinner": "🇨🇳 ჩინური ვახშამი", "border": None},
-            1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan / Armenia Marriott", "lunch": "🐟 სევანი — შემწვარი თევზი", "dinner": "🎵 სპეც. + დუდუკი", "border": "GEO→ARM: სადახლო"},
-            2: {"city": "Akhaltsikhe", "hotel": "Akhaltsikhe Inn 5★", "lunch": "🇦🇲 სომხ. ლავაში + ხორცი", "dinner": "🏨 სასტუმრო (ბუფეტი)", "border": "ARM→GEO: ბავრა"},
-            3: {"city": "Batumi", "hotel": "Best Western Premier / Le Méridien / Grandeur", "lunch": "🧀 ხაჭაპური + შემწვარი", "dinner": "🌊 დამოუკ. (ბათუმი)", "border": None},
-            4: {"city": "Mestia", "hotel": "Gistola Resort 5★", "lunch": "🥘 ადგილ. (ზუგდიდი)", "dinner": "⛰️ ადგილ. (მესტია)", "border": None},
-            5: {"city": "Mestia", "hotel": "Gistola Resort 5★", "lunch": "⛰️ ადგილ. (მ./უშგ.)", "dinner": "⛰️ ადგილ. (მესტია)", "border": None},
-            6: {"city": "Gori", "hotel": "Gori Inn", "lunch": "🏛️ ადგილ. (ქუთ.)", "dinner": "🏛️ ადგილ. (გორი)", "border": None},
-            7: {"city": "Gudauri", "hotel": "Marco Polo / Gudauri Lodge / Gudauri Inn", "lunch": "🏔️ ადგილ. (მცხ./ანან.)", "dinner": "🏔️ სასტ. ბუფეტი", "border": None},
-            8: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "🇨🇳 ჩინური (თბ.)", "dinner": "💃 პატარძეული + ცეკვა", "border": None, "notes": "CZ6040 22:50"},
+            0: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ ცეკვებით", "border": None},
+            1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan / Armenia Marriott", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: სადახლო"},
+            2: {"city": "Akhaltsikhe", "hotel": "Akhaltsikhe Inn 5★", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: ახალციხე ინნ", "border": "ARM→GEO: ბავრა"},
+            3: {"city": "Batumi", "hotel": "Best Western Premier / Le Méridien / Grandeur", "lunch": "ლანჩი: ზღაპარი", "dinner": "ვახშამი: საკუთარი ხარჯებით", "border": None},
+            4: {"city": "Mestia", "hotel": "Gistola Resort 5★", "lunch": "ლანჩი: დიარონი", "dinner": "ვახშამი: ლუშნუ ქორი", "border": None},
+            5: {"city": "Mestia", "hotel": "Gistola Resort 5★", "lunch": "ლანჩი: ენგური", "dinner": "ვახშამი: ლუიბასთან", "border": None},
+            6: {"city": "Gori", "hotel": "Gori Inn", "lunch": "ლანჩი: დიარონი", "dinner": "ვახშამი: გორი ინნ", "border": None},
+            7: {"city": "Gudauri", "hotel": "Marco Polo / Gudauri Lodge / Gudauri Inn", "lunch": "ლანჩი: სალობიე", "dinner": "ვახშამი: გუდაური ინნ", "border": None},
+            8: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "ლანჩი: დინ შენი", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": None, "notes": "CZ6040 22:50"},
         }
     },
     "LN": {
@@ -37,12 +37,12 @@ SERIES = {
         "duration": 6,
         "color": "#FF7043",
         "nights": {
-            0: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "🍷 ხარება — ღვინო", "dinner": "🇨🇳 ჩინური ვახშამი", "border": None},
-            1: {"city": "Yerevan", "hotel": "Aghababyan's / Radisson Blu Yerevan", "lunch": "🐟 სევანი — თევზი", "dinner": "🎵 სპეც. + დუდუკი", "border": "GEO→ARM: სადახლო"},
-            2: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "🇦🇲 ადგილ. (ეჩმ./ზვ.)", "dinner": "🏙️ ადგილ. (თბ.)", "border": "ARM→GEO: სადახლო"},
-            3: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "🏛️ ადგილ. (მცხ./გ.)", "dinner": "💃 პატარძეული + ცეკვა", "border": None},
-            4: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "🏔️ ადგილ. (ანან./კაზბ.)", "dinner": "🏙️ ადგილ. (თბ.)", "border": None},
-            5: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "🇨🇳 ჩინური (თბ.)", "dinner": "✈ ფრენა CZ6040 22:45", "border": None},
+            0: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ ცეკვებით", "border": None},
+            1: {"city": "Yerevan", "hotel": "Aghababyan's / Radisson Blu Yerevan", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: სადახლო"},
+            2: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": "ARM→GEO: სადახლო"},
+            3: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: მარკო პოლო", "border": None},
+            4: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "ლანჩი: სალობიე", "dinner": "ვახშამი: დინ შენი", "border": None},
+            5: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "ლანჩი: საკუთარი ხარჯებით", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": None},
         }
     },
     "DT1": {
@@ -50,12 +50,12 @@ SERIES = {
         "duration": 6,
         "color": "#AB47BC",
         "nights": {
-            0: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "🍷 ხარება — ღვინო", "dinner": "🇨🇳 ჩინური", "border": None},
-            1: {"city": "Yerevan", "hotel": "Radisson Blu / Armenia Marriott", "lunch": "🐟 სევანი — თევზი", "dinner": "🎵 სპეც. + დუდუკი", "border": "GEO→ARM: სადახლო"},
-            2: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "🇦🇲 ადგილ.", "dinner": "🏙️ ადგილ.", "border": "ARM→GEO: სადახლო"},
-            3: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "🏛️ ადგილ. (მცხ./გ.)", "dinner": "💃 პატარძეული + ცეკვა", "border": None},
-            4: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "🏔️ ადგილ. (კაზბ.)", "dinner": "🏙️ ადგილ.", "border": None},
-            5: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "🏙️ ადგილ. (თბ.)", "dinner": "✈ ფრენა", "border": None},
+            0: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ ცეკვებით", "border": None},
+            1: {"city": "Yerevan", "hotel": "Radisson Blu / Armenia Marriott", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: სადახლო"},
+            2: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": "ARM→GEO: სადახლო"},
+            3: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: სალობიე", "dinner": "ვახშამი: დინ შენი", "border": None},
+            4: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: ორქოს საბმისი", "border": None},
+            5: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "ლანჩი: ახალი აზია (ისანი)", "dinner": "ვახშამი: საკუთარი ხარჯებით", "border": None},
         }
     },
     "DT2": {
@@ -63,12 +63,12 @@ SERIES = {
         "duration": 6,
         "color": "#EC407A",
         "nights": {
-            0: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "🍷 ხარება", "dinner": "🇨🇳 ჩინური", "border": None},
-            1: {"city": "Yerevan", "hotel": "Radisson Blu / Armenia Marriott", "lunch": "🐟 სევანი", "dinner": "🎵 სპეც. + დუდუკი", "border": "GEO→ARM: სადახლო"},
-            2: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "🇦🇲 ადგილ.", "dinner": "🏙️ ადგილ.", "border": "ARM→GEO: სადახლო"},
-            3: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "🏛️ ადგილ.", "dinner": "💃 პატარძეული + ცეკვა", "border": None},
-            4: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "🏔️ ადგილ.", "dinner": "🏙️ ადგილ.", "border": None},
-            5: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "🏙️ ადგილ.", "dinner": "✈ ფრენა", "border": None},
+            0: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ ცეკვებით", "border": None},
+            1: {"city": "Yerevan", "hotel": "Radisson Blu / Armenia Marriott", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: სადახლო"},
+            2: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": "ARM→GEO: სადახლო"},
+            3: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: გურამიშვილის მარანი", "dinner": "ვახშამი: დინ შენი", "border": None},
+            4: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: ორქოს საბმისი", "border": None},
+            5: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "ლანჩი: საკუთარი ხარჯებით", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": None},
         }
     },
 }
