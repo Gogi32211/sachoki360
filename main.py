@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import database as db
 from excel_parser import parse_all_excel
 from sheets_sync import fetch_hotel_assignments
+from meals_sync import fetch_all_meals
 
 app = FastAPI(title="GTC360 — GOGA of TOURS")
 
@@ -36,6 +37,12 @@ def startup():
             db.update_hotels_from_sheets(assignments)
     except Exception as e:
         print(f"Sheets sync warning: {e}")
+    try:
+        meals_data = fetch_all_meals()
+        if meals_data:
+            db.sync_meals_from_financials(meals_data)
+    except Exception as e:
+        print(f"Meals sync warning: {e}")
 
 
 class NoteUpdate(BaseModel):
