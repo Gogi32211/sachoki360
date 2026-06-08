@@ -71,6 +71,12 @@ def init_db():
                 due_gel REAL DEFAULT 0,
                 FOREIGN KEY (tour_code) REFERENCES tours(code)
             );
+            CREATE TABLE IF NOT EXISTS payment_status (
+                tour_code   TEXT NOT NULL,
+                vendor_name TEXT NOT NULL,
+                paid        INTEGER DEFAULT 1,
+                PRIMARY KEY (tour_code, vendor_name)
+            );
         """)
         # Migrate: add new columns to payment_terms if missing
         for col, defn in [
@@ -101,7 +107,7 @@ _DEFAULT_PAYMENT_TERMS = [
     ("ოქროს საწმისი",                            "restaurant", "before", 1, "", 530.0, "GEL", ""),
     # Driver — series-specific costs (GEL)
     ("მძღოლი: კვება და სასტუმრო ტურში",         "other",      "before", 1, "", 0.0, "GEL",
-     '{"ZT":225,"KT":150,"DT1":150,"DT2":150,"LN":200}'),
+     '{"ZT":125,"KT":50,"DT1":50,"DT2":50,"LN":100}'),
     # Guide — series-specific costs (GEL)
     ("გიდი: ბილეთები, კვება და სასტუმრო ტურში", "other",      "before", 1, "", 0.0, "GEL",
      '{"ZT":1314,"KT":745,"DT1":745,"DT2":745,"LN":2115}'),
@@ -139,6 +145,11 @@ def seed_db():
             "UPDATE payment_terms SET series_prices=? WHERE vendor_name=?",
             ('{"ZT":1314,"KT":745,"DT1":745,"DT2":745,"LN":2115}',
              "გიდი: ბილეთები, კვება და სასტუმრო ტურში")
+        )
+        conn.execute(
+            "UPDATE payment_terms SET series_prices=? WHERE vendor_name=?",
+            ('{"ZT":125,"KT":50,"DT1":50,"DT2":50,"LN":100}',
+             "მძღოლი: კვება და სასტუმრო ტურში")
         )
 
         existing = {r["code"] for r in conn.execute("SELECT code FROM tours").fetchall()}
@@ -512,10 +523,19 @@ def _extract_restaurant(meal_str: str) -> str:
         return ''
     return meal_str.split(':', 1)[1].strip() if ':' in meal_str else meal_str.strip()
 
+# Dinners included with the hotel — not separate restaurant payments
+_HOTEL_DINNERS = {
+    'სომხეთი', 'ახალციხე ინნ', 'გორი ინნ', 'გუდაური ინნ',
+    'ლუიბასთან', 'ლუიზასთან', 'მარკო პოლო',
+}
+
 def _skip_vendor(name: str) -> bool:
     if not name or not name.strip() or name.strip() == '—':
         return True
-    return 'საკუთარი' in name
+    n = name.strip()
+    if 'საკუთარი' in n:
+        return True
+    return n in _HOTEL_DINNERS
 
 def get_payment_terms():
     with get_db() as conn:
@@ -602,10 +622,12 @@ def get_payment_schedule(from_date: str = None, to_date: str = None):
             vkey = vendor_name.lower().strip()
             if vkey not in terms:
                 return
-            k = (tour_code, vendor_name.strip())
+            vtype = terms[vkey]['vendor_type']
+            # Hotels: separate payment per night; others: one grouped payment
+            k = (tour_code, vendor_name.strip(), svc_date) if vtype == 'hotel' else (tour_code, vendor_name.strip())
             grouped[k]['dates'].add(svc_date)
             grouped[k]['series'] = series
-            grouped[k]['vendor_type'] = terms[vkey]['vendor_type']
+            grouped[k]['vendor_type'] = vtype
             grouped[k]['service_type'] = svc_type
 
         for log in logs:
@@ -613,8 +635,11 @@ def get_payment_schedule(from_date: str = None, to_date: str = None):
             collect(log['tour_code'], log['date'], _extract_restaurant(log['lunch']), 'lunch', log['series'])
             collect(log['tour_code'], log['date'], _extract_restaurant(log['dinner']), 'dinner', log['series'])
 
+        statuses = get_payment_statuses()
+
         schedule = []
-        for (tour_code, vendor_name), info in grouped.items():
+        for k, info in grouped.items():
+            tour_code, vendor_name = k[0], k[1]
             term = terms[vendor_name.lower().strip()]
             dates_sorted = sorted(info['dates'])
             if term['timing'] == 'before':
@@ -642,6 +667,7 @@ def get_payment_schedule(from_date: str = None, to_date: str = None):
                 'unit_price': term.get('unit_price') or 0,
                 'currency': term.get('currency') or 'GEL',
                 'total_amount': _calc_amount(term, info['series']),
+                'paid': statuses.get(tour_code, {}).get(vendor_name.strip(), False),
             })
 
         # "other" vendors (guide, driver) — one entry per tour, due before bus_start
@@ -679,7 +705,80 @@ def get_payment_schedule(from_date: str = None, to_date: str = None):
                         'unit_price': term.get('unit_price') or 0,
                         'currency': term.get('currency') or 'GEL',
                         'total_amount': _calc_amount(term, tour['series']),
+                        'paid': statuses.get(tour['code'], {}).get(term['vendor_name'].strip(), False),
                     })
 
         schedule.sort(key=lambda x: x['due_date'])
         return schedule
+
+
+def get_payment_statuses() -> dict:
+    """Return {tour_code: {vendor_name: True}} for all paid entries."""
+    result: dict = {}
+    with get_db() as conn:
+        for r in conn.execute(
+            "SELECT tour_code, vendor_name FROM payment_status WHERE paid=1"
+        ).fetchall():
+            result.setdefault(r['tour_code'], {})[r['vendor_name']] = True
+    return result
+
+
+def sync_payment_statuses(statuses: dict) -> int:
+    """Upsert (tour_code, vendor_name, paid=1) from {tour_code: {vendor_name: True}}."""
+    count = 0
+    with get_db() as conn:
+        for tour_code, vendors in statuses.items():
+            for vendor_name in vendors:
+                conn.execute("""
+                    INSERT INTO payment_status (tour_code, vendor_name, paid)
+                    VALUES (?,?,1)
+                    ON CONFLICT(tour_code, vendor_name) DO UPDATE SET paid=1
+                """, (tour_code, vendor_name.strip()))
+                count += 1
+    return count
+
+
+def get_tour_payment_summary(from_date: str = None, to_date: str = None):
+    """Group the payment schedule by tour, with each service carrying a paid flag."""
+    schedule = get_payment_schedule(from_date, to_date)
+    with get_db() as conn:
+        tour_rows = {r['code']: dict(r) for r in conn.execute(
+            "SELECT code, series, bus_start, bus_end FROM tours"
+        ).fetchall()}
+
+    tours: dict = {}
+    for item in schedule:
+        tc = item['tour_code']
+        if tc not in tours:
+            tr = tour_rows.get(tc, {})
+            tours[tc] = {
+                'tour_code': tc,
+                'series': item['series'],
+                'bus_start': tr.get('bus_start', ''),
+                'bus_end': tr.get('bus_end', ''),
+                'status': get_tour_status(tr['bus_start'], tr['bus_end']) if tr else 'upcoming',
+                'services': [],
+                'total_usd': 0.0,
+                'total_gel': 0.0,
+            }
+        tours[tc]['services'].append({
+            'vendor_name': item['vendor_name'],
+            'vendor_type': item['vendor_type'],
+            'due_date': item['due_date'],
+            'first_service_date': item['first_service_date'],
+            'total_amount': item['total_amount'],
+            'currency': item['currency'],
+            'paid': item.get('paid', False),
+        })
+        if item['total_amount'] > 0:
+            if item['currency'] == 'USD':
+                tours[tc]['total_usd'] += item['total_amount']
+            else:
+                tours[tc]['total_gel'] += item['total_amount']
+
+    for t in tours.values():
+        t['services'].sort(key=lambda s: (s['first_service_date'] or '', s['vendor_name']))
+
+    result = list(tours.values())
+    result.sort(key=lambda t: t['bus_start'])
+    return result

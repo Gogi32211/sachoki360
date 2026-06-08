@@ -7,8 +7,9 @@ import database as db
 from excel_parser import parse_all_excel
 from sheets_sync import fetch_hotel_assignments
 from meals_sync import fetch_all_meals
+from payments_sync import fetch_payment_statuses
 
-app = FastAPI(title="GTC360 — GOGA of TOURS")
+app = FastAPI(title="ki.360")
 
 
 @app.on_event("startup")
@@ -43,6 +44,12 @@ def startup():
             db.sync_meals_from_financials(meals_data)
     except Exception as e:
         print(f"Meals sync warning: {e}")
+    try:
+        statuses = fetch_payment_statuses()
+        if statuses:
+            db.sync_payment_statuses(statuses)
+    except Exception as e:
+        print(f"Payment status sync warning: {e}")
 
 
 class NoteUpdate(BaseModel):
@@ -164,6 +171,48 @@ def remove_payment_term(term_id: int):
 @app.get("/api/payments/schedule")
 def payment_schedule(from_date: str = None, to_date: str = None):
     return db.get_payment_schedule(from_date, to_date)
+
+@app.get("/api/payments/tour-summary")
+def payment_tour_summary(from_date: str = None, to_date: str = None):
+    return db.get_tour_payment_summary(from_date, to_date)
+
+@app.post("/api/sync-payment-status")
+def sync_payment_status():
+    try:
+        statuses = fetch_payment_statuses()
+        updated = db.sync_payment_statuses(statuses)
+        return {"ok": True, "updated": updated}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.get("/api/debug/payments-sync")
+def debug_payments_sync():
+    from payments_sync import SHEET_IDS, _parse_statuses
+    import requests as _req, zipfile, io as _io
+    result = {"db_statuses": db.get_payment_statuses(), "tests": {}}
+    for key, sheet_id in SHEET_IDS.items():
+        entry = {}
+        try:
+            r = _req.get(f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv", timeout=15)
+            parsed = _parse_statuses(r.text)
+            entry["csv"] = {"http": r.status_code, "bytes": len(r.content),
+                            "tours": {tc: list(v.keys()) for tc, v in parsed.items()}}
+        except Exception as e:
+            entry["csv"] = {"error": str(e)}
+        try:
+            r2 = _req.get(f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx", timeout=40)
+            entry["xlsx"] = {"http": r2.status_code, "bytes": len(r2.content),
+                             "content_type": r2.headers.get("Content-Type","")}
+            if r2.status_code == 200:
+                try:
+                    with zipfile.ZipFile(_io.BytesIO(r2.content)) as zf:
+                        entry["xlsx"]["zip_entries"] = zf.namelist()
+                except Exception as e2:
+                    entry["xlsx"]["zip_error"] = str(e2)
+        except Exception as e:
+            entry["xlsx"] = {"error": str(e)}
+        result["tests"][key] = entry
+    return result
 
 @app.get("/api/vendors")
 def get_vendors():
