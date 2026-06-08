@@ -260,10 +260,10 @@ function DayView({ onSelectTour }) {
                     <div className="flex items-start gap-3">
                       <div className="flex flex-col gap-1 items-start flex-shrink-0 pt-0.5">
                         <Badge series={t.series}/>
-                        <button className="font-bold text-gray-700 hover:text-blue-600 text-xs"
+                        <button className="font-bold text-gray-700 hover:text-blue-600 text-sm"
                           onClick={() => onSelectTour(t.code)}>{t.code}</button>
                       </div>
-                      <div className="flex-1 text-xs text-gray-700 space-y-0.5">
+                      <div className="flex-1 text-sm text-gray-700 space-y-0.5">
                         <div>🏨 {t.hotel && t.hotel.startsWith('? ')
                           ? <span className="text-orange-500 font-semibold">{t.hotel} ⚠</span>
                           : t.hotel}</div>
@@ -273,7 +273,7 @@ function DayView({ onSelectTour }) {
                           <div className="text-orange-600 font-medium">🚧 {t.border_crossing}</div>
                         )}
                       </div>
-                      <span className="text-xs text-gray-400 flex-shrink-0">Day {t.day_num}/{t.total_days}</span>
+                      <span className="text-sm text-gray-400 flex-shrink-0">Day {t.day_num}/{t.total_days}</span>
                     </div>
                   </div>
                 ))}
