@@ -264,7 +264,9 @@ function DayView({ onSelectTour }) {
                       <span className="ml-auto text-xs text-gray-400">Day {t.day_num}/{t.total_days}</span>
                     </div>
                     <div className="text-sm space-y-1 text-gray-700">
-                      <div>🏨 {t.hotel}</div>
+                      <div>🏨 {t.hotel && t.hotel.startsWith('? ')
+                        ? <span className="text-orange-500 font-semibold">{t.hotel} ⚠</span>
+                        : t.hotel}</div>
                       <div>🍽️ <span className="text-gray-400">L:</span> {t.lunch}</div>
                       <div>🌙 <span className="text-gray-400">V:</span> {t.dinner}</div>
                       {t.border_crossing && (
@@ -371,7 +373,11 @@ function TourDetailView({ initialCode, onBack }) {
                     <td className="px-3 py-2 font-bold text-gray-400 text-center">{day.day_num}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-xs">{day.date}</td>
                     <td className="px-3 py-2 font-medium text-sm">{day.city}</td>
-                    <td className="px-3 py-2 text-gray-600 text-xs max-w-xs">{day.hotel}</td>
+                    <td className="px-3 py-2 text-xs max-w-xs">
+                      {day.hotel && day.hotel.startsWith('? ')
+                        ? <span className="text-orange-500 font-semibold">{day.hotel} ⚠</span>
+                        : <span className="text-gray-600">{day.hotel}</span>}
+                    </td>
                     <td className="px-3 py-2 text-gray-600 text-xs">{day.lunch}</td>
                     <td className="px-3 py-2 text-gray-600 text-xs">{day.dinner}</td>
                     <td className="px-3 py-2 text-orange-600 text-xs whitespace-nowrap">{day.border_crossing}</td>
