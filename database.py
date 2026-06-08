@@ -1,3 +1,4 @@
+import json as _json
 import sqlite3
 from collections import defaultdict
 from contextlib import contextmanager
@@ -71,36 +72,53 @@ def init_db():
                 FOREIGN KEY (tour_code) REFERENCES tours(code)
             );
         """)
+        # Migrate: add new columns to payment_terms if missing
+        for col, defn in [
+            ("unit_price",    "REAL DEFAULT 0"),
+            ("currency",      "TEXT DEFAULT 'GEL'"),
+            ("series_prices", "TEXT DEFAULT ''"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE payment_terms ADD COLUMN {col} {defn}")
+            except Exception:
+                pass
 
+# (vendor_name, vendor_type, timing, days_offset, notes, unit_price, currency, series_prices)
 _DEFAULT_PAYMENT_TERMS = [
-    # Hotels — pay 1 day before check-in
-    ("Pullman Tbilisi",                        "hotel",      "before", 1, ""),
-    ("Radisson Blu Yerevan",                   "hotel",      "before", 1, ""),
-    ("Marco Polo Gudauri",                     "hotel",      "before", 1, ""),
-    ("Gistola Resort 5★",                      "hotel",      "before", 1, ""),
-    ("Gudauri Inn",                            "hotel",      "before", 1, ""),
-    ("Gudauri Lodge",                          "hotel",      "before", 1, ""),
-    # Restaurants — pay 1 day before service
-    ("დინ შენი",                               "restaurant", "before", 1, ""),
-    ("სალობიე",                                "restaurant", "before", 1, ""),
-    ("ზღაპარი",                                "restaurant", "before", 1, ""),
-    ("ლუშნუ ქორი",                             "restaurant", "before", 1, ""),
-    ("ენგური",                                 "restaurant", "before", 1, ""),
-    ("ოქროს საწმისი",                          "restaurant", "before", 1, ""),
-    # Guide & driver tour expenses — pay 1 day before tour starts
-    ("მძღოლი: კვება და სასტუმრო ტურში",       "other",      "before", 1, ""),
-    ("გიდი: ბილეთები, კვება და სასტუმრო ტურში", "other",    "before", 1, ""),
+    # Hotels — twin room price × 10 rooms
+    ("Pullman Tbilisi",                          "hotel",      "before", 1, "", 87.0,  "USD", ""),
+    ("Radisson Blu Yerevan",                     "hotel",      "before", 1, "", 135.0, "USD", ""),
+    ("Marco Polo Gudauri",                       "hotel",      "before", 1, "", 70.0,  "USD", ""),
+    ("Gistola Resort 5★",                        "hotel",      "before", 1, "", 100.0, "USD", ""),
+    ("Gudauri Inn",                              "hotel",      "before", 1, "", 0.0,   "USD", ""),
+    ("Gudauri Lodge",                            "hotel",      "before", 1, "", 0.0,   "USD", ""),
+    # Restaurants — flat price per 19+1 people (enter in Settings)
+    ("დინ შენი",                                 "restaurant", "before", 1, "", 0.0, "GEL", ""),
+    ("სალობიე",                                  "restaurant", "before", 1, "", 0.0, "GEL", ""),
+    ("ზღაპარი",                                  "restaurant", "before", 1, "", 0.0, "GEL", ""),
+    ("ლუშნუ ქორი",                               "restaurant", "before", 1, "", 0.0, "GEL", ""),
+    ("ენგური",                                   "restaurant", "before", 1, "", 0.0, "GEL", ""),
+    ("ოქროს საწმისი",                            "restaurant", "before", 1, "", 0.0, "GEL", ""),
+    # Driver — series-specific costs (GEL)
+    ("მძღოლი: კვება და სასტუმრო ტურში",         "other",      "before", 1, "", 0.0, "GEL",
+     '{"ZT":225,"KT":150,"DT1":150,"DT2":150,"LN":200}'),
+    # Guide — to be filled in
+    ("გიდი: ბილეთები, კვება და სასტუმრო ტურში", "other",      "before", 1, "", 0.0, "GEL", ""),
 ]
 
 
 def seed_db():
     with get_db() as conn:
-        for vendor_name, vendor_type, timing, days_offset, notes in _DEFAULT_PAYMENT_TERMS:
+        for vn, vtype, timing, days, notes, uprice, curr, sprices in _DEFAULT_PAYMENT_TERMS:
             conn.execute("""
-                INSERT INTO payment_terms (vendor_name, vendor_type, timing, days_offset, notes)
-                VALUES (?,?,?,?,?)
-                ON CONFLICT(vendor_name) DO NOTHING
-            """, (vendor_name, vendor_type, timing, days_offset, notes))
+                INSERT INTO payment_terms
+                    (vendor_name, vendor_type, timing, days_offset, notes, unit_price, currency, series_prices)
+                VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT(vendor_name) DO UPDATE SET
+                    unit_price   = CASE WHEN payment_terms.unit_price   = 0  THEN excluded.unit_price   ELSE payment_terms.unit_price   END,
+                    currency     = CASE WHEN payment_terms.unit_price   = 0  THEN excluded.currency     ELSE payment_terms.currency     END,
+                    series_prices= CASE WHEN payment_terms.series_prices= '' THEN excluded.series_prices ELSE payment_terms.series_prices END
+            """, (vn, vtype, timing, days, notes, uprice, curr, sprices))
 
         existing = {r["code"] for r in conn.execute("SELECT code FROM tours").fetchall()}
         for t in TOURS_2026:
@@ -476,17 +494,24 @@ def get_payment_terms():
             "SELECT * FROM payment_terms ORDER BY vendor_type, vendor_name"
         ).fetchall()]
 
-def upsert_payment_term(vendor_name: str, vendor_type: str, timing: str, days_offset: int, notes: str = ''):
+def upsert_payment_term(vendor_name: str, vendor_type: str, timing: str, days_offset: int,
+                        notes: str = '', unit_price: float = 0.0, currency: str = 'GEL',
+                        series_prices: str = ''):
     with get_db() as conn:
         conn.execute("""
-            INSERT INTO payment_terms (vendor_name, vendor_type, timing, days_offset, notes)
-            VALUES (?,?,?,?,?)
+            INSERT INTO payment_terms
+                (vendor_name, vendor_type, timing, days_offset, notes, unit_price, currency, series_prices)
+            VALUES (?,?,?,?,?,?,?,?)
             ON CONFLICT(vendor_name) DO UPDATE SET
-                vendor_type=excluded.vendor_type,
-                timing=excluded.timing,
-                days_offset=excluded.days_offset,
-                notes=excluded.notes
-        """, (vendor_name.strip(), vendor_type, timing, int(days_offset), notes))
+                vendor_type  =excluded.vendor_type,
+                timing       =excluded.timing,
+                days_offset  =excluded.days_offset,
+                notes        =excluded.notes,
+                unit_price   =excluded.unit_price,
+                currency     =excluded.currency,
+                series_prices=excluded.series_prices
+        """, (vendor_name.strip(), vendor_type, timing, int(days_offset),
+              notes, float(unit_price), currency, series_prices))
 
 def delete_payment_term(term_id: int):
     with get_db() as conn:
@@ -506,6 +531,19 @@ def get_all_vendors():
                 if n and not _skip_vendor(n):
                     meal_names.add(n)
         return {'hotels': hotels, 'restaurants': sorted(meal_names)}
+
+def _calc_amount(term: dict, series: str = '') -> float:
+    uprice = term.get('unit_price') or 0.0
+    vtype  = term.get('vendor_type', 'hotel')
+    sp_str = term.get('series_prices') or ''
+    if vtype == 'hotel':
+        return uprice * 10.0
+    if vtype == 'other' and sp_str and series:
+        try:
+            return float(_json.loads(sp_str).get(series, uprice))
+        except Exception:
+            pass
+    return uprice
 
 def get_payment_schedule(from_date: str = None, to_date: str = None):
     today = date.today()
@@ -572,6 +610,9 @@ def get_payment_schedule(from_date: str = None, to_date: str = None):
                 'days_until_due': diff,
                 'status': 'overdue' if diff < 0 else ('due_soon' if diff <= 3 else 'upcoming'),
                 'notes': term['notes'],
+                'unit_price': term.get('unit_price') or 0,
+                'currency': term.get('currency') or 'GEL',
+                'total_amount': _calc_amount(term, info['series']),
             })
 
         # "other" vendors (guide, driver) — one entry per tour, due before bus_start
@@ -606,6 +647,9 @@ def get_payment_schedule(from_date: str = None, to_date: str = None):
                         'days_until_due': diff,
                         'status': 'overdue' if diff < 0 else ('due_soon' if diff <= 3 else 'upcoming'),
                         'notes': term['notes'],
+                        'unit_price': term.get('unit_price') or 0,
+                        'currency': term.get('currency') or 'GEL',
+                        'total_amount': _calc_amount(term, tour['series']),
                     })
 
         schedule.sort(key=lambda x: x['due_date'])
