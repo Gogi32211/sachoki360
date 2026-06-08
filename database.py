@@ -93,12 +93,12 @@ _DEFAULT_PAYMENT_TERMS = [
     ("Gudauri Inn",                              "hotel",      "before", 1, "", 0.0,   "USD", ""),
     ("Gudauri Lodge",                            "hotel",      "before", 1, "", 0.0,   "USD", ""),
     # Restaurants — flat price per 19+1 people (enter in Settings)
-    ("დინ შენი",                                 "restaurant", "before", 1, "", 0.0, "GEL", ""),
-    ("სალობიე",                                  "restaurant", "before", 1, "", 0.0, "GEL", ""),
-    ("ზღაპარი",                                  "restaurant", "before", 1, "", 0.0, "GEL", ""),
-    ("ლუშნუ ქორი",                               "restaurant", "before", 1, "", 0.0, "GEL", ""),
-    ("ენგური",                                   "restaurant", "before", 1, "", 0.0, "GEL", ""),
-    ("ოქროს საწმისი",                            "restaurant", "before", 1, "", 0.0, "GEL", ""),
+    ("დინ შენი",                                 "restaurant", "before", 1, "", 600.0, "GEL", ""),
+    ("სალობიე",                                  "restaurant", "before", 1, "", 600.0, "GEL", ""),
+    ("ზღაპარი",                                  "restaurant", "before", 1, "", 600.0, "GEL", ""),
+    ("ლუშნუ ქორი",                               "restaurant", "before", 1, "", 600.0, "GEL", ""),
+    ("ენგური",                                   "restaurant", "before", 1, "", 600.0, "GEL", ""),
+    ("ოქროს საწმისი",                            "restaurant", "before", 1, "", 600.0, "GEL", ""),
     # Driver — series-specific costs (GEL)
     ("მძღოლი: კვება და სასტუმრო ტურში",         "other",      "before", 1, "", 0.0, "GEL",
      '{"ZT":225,"KT":150,"DT1":150,"DT2":150,"LN":200}'),
