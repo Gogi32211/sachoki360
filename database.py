@@ -202,6 +202,25 @@ def update_log_notes(log_id: int, notes: str):
     with get_db() as conn:
         conn.execute("UPDATE daily_log SET notes=? WHERE id=?", (notes, log_id))
 
+def update_hotels_from_sheets(assignments: dict):
+    """Update daily_log.hotel with actual booked hotel from Google Sheets.
+    assignments = {tour_code: {date_iso: hotel_name}}
+    Only overwrites rows that exist in daily_log — never inserts new rows.
+    """
+    updated = 0
+    with get_db() as conn:
+        for tour_code, date_hotels in assignments.items():
+            for date_iso, hotel in date_hotels.items():
+                if not hotel:
+                    continue
+                cur = conn.execute(
+                    "UPDATE daily_log SET hotel=? WHERE tour_code=? AND date=?",
+                    (hotel, tour_code, date_iso)
+                )
+                updated += cur.rowcount
+    print(f"[sheets_sync] Updated {updated} hotel records in daily_log")
+    return updated
+
 def seed_excel_data(parsed_tours: list):
     with get_db() as conn:
         for t in parsed_tours:
