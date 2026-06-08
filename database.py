@@ -38,6 +38,29 @@ def init_db():
                 notes TEXT DEFAULT '',
                 FOREIGN KEY (tour_code) REFERENCES tours(code)
             );
+            CREATE TABLE IF NOT EXISTS tour_meals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tour_code TEXT,
+                date DATE,
+                meal_type TEXT,
+                restaurant TEXT,
+                gel_amount REAL DEFAULT 0,
+                usd_amount REAL DEFAULT 0,
+                FOREIGN KEY (tour_code) REFERENCES tours(code)
+            );
+            CREATE TABLE IF NOT EXISTS tour_financials (
+                tour_code TEXT PRIMARY KEY,
+                guide TEXT DEFAULT '',
+                rooms TEXT DEFAULT '',
+                spent_gel REAL DEFAULT 0,
+                tour_price_gel REAL DEFAULT 0,
+                tour_price_usd REAL DEFAULT 0,
+                profit_gel REAL DEFAULT 0,
+                paid_gel REAL DEFAULT 0,
+                paid_cny REAL DEFAULT 0,
+                due_gel REAL DEFAULT 0,
+                FOREIGN KEY (tour_code) REFERENCES tours(code)
+            );
         """)
 
 def seed_db():
@@ -178,3 +201,72 @@ def update_tour_notes(code: str, notes: str):
 def update_log_notes(log_id: int, notes: str):
     with get_db() as conn:
         conn.execute("UPDATE daily_log SET notes=? WHERE id=?", (notes, log_id))
+
+def seed_excel_data(parsed_tours: list):
+    with get_db() as conn:
+        for t in parsed_tours:
+            code = t['tour_code']
+            # upsert financials
+            fin = t['financials']
+            conn.execute("""
+                INSERT OR REPLACE INTO tour_financials
+                (tour_code, guide, rooms, spent_gel, tour_price_gel, tour_price_usd, profit_gel, paid_gel, paid_cny, due_gel)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+            """, (code, t.get('guide',''), t.get('rooms',''),
+                  fin['spent_gel'], fin['tour_price_gel'], fin['tour_price_usd'],
+                  fin['profit_gel'], fin['paid_gel'], fin['paid_cny'], fin['due_gel']))
+            # clear and reinsert meals
+            conn.execute("DELETE FROM tour_meals WHERE tour_code=?", (code,))
+            for m in t['meals']:
+                conn.execute("""
+                    INSERT INTO tour_meals (tour_code, date, meal_type, restaurant, gel_amount, usd_amount)
+                    VALUES (?,?,?,?,?,?)
+                """, (code, m['date'], m['meal_type'], m['restaurant'], m['gel_amount'], m['usd_amount']))
+
+def get_financials_all():
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT tf.*, t.bus_start, t.bus_end, t.series
+            FROM tour_financials tf
+            JOIN tours t ON tf.tour_code = t.code
+            ORDER BY t.bus_start
+        """).fetchall()
+        result = []
+        for r in rows:
+            status = get_tour_status(r['bus_start'], r['bus_end'])
+            result.append({
+                'tour_code': r['tour_code'],
+                'series': r['series'],
+                'bus_start': r['bus_start'],
+                'guide': r['guide'],
+                'rooms': r['rooms'],
+                'spent_gel': r['spent_gel'],
+                'tour_price_gel': r['tour_price_gel'],
+                'tour_price_usd': r['tour_price_usd'],
+                'profit_gel': r['profit_gel'],
+                'paid_gel': r['paid_gel'],
+                'paid_cny': r['paid_cny'],
+                'due_gel': r['due_gel'],
+                'status': status,
+                'color': SERIES[r['series']]['color'] if r['series'] in SERIES else '#888',
+            })
+        return result
+
+def get_meals_for_tour(code: str):
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tour_meals WHERE tour_code=? ORDER BY date, meal_type",
+            (code,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+def get_all_restaurants():
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT restaurant, COUNT(*) as tour_count, SUM(gel_amount) as total_gel, meal_type
+            FROM tour_meals
+            WHERE restaurant NOT LIKE '%საკუთარი%' AND restaurant NOT LIKE '%სომხეთი%'
+            GROUP BY restaurant
+            ORDER BY total_gel DESC
+        """).fetchall()
+        return [dict(r) for r in rows]
