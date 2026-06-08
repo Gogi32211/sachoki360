@@ -1,4 +1,5 @@
 import sqlite3
+from collections import defaultdict
 from contextlib import contextmanager
 from datetime import date, timedelta
 from seed_data import SERIES, TOURS_2026
@@ -47,6 +48,14 @@ def init_db():
                 gel_amount REAL DEFAULT 0,
                 usd_amount REAL DEFAULT 0,
                 FOREIGN KEY (tour_code) REFERENCES tours(code)
+            );
+            CREATE TABLE IF NOT EXISTS payment_terms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vendor_name TEXT UNIQUE NOT NULL,
+                vendor_type TEXT DEFAULT 'hotel',
+                timing TEXT DEFAULT 'after',
+                days_offset INTEGER DEFAULT 7,
+                notes TEXT DEFAULT ''
             );
             CREATE TABLE IF NOT EXISTS tour_financials (
                 tour_code TEXT PRIMARY KEY,
@@ -341,3 +350,123 @@ def get_all_restaurants():
             ORDER BY total_gel DESC
         """).fetchall()
         return [dict(r) for r in rows]
+
+
+# ── PAYMENT TERMS ──────────────────────────────────────────────────
+
+def _extract_restaurant(meal_str: str) -> str:
+    if not meal_str:
+        return ''
+    return meal_str.split(':', 1)[1].strip() if ':' in meal_str else meal_str.strip()
+
+def _skip_vendor(name: str) -> bool:
+    if not name or not name.strip() or name.strip() == '—':
+        return True
+    return 'საკუთარი' in name
+
+def get_payment_terms():
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM payment_terms ORDER BY vendor_type, vendor_name"
+        ).fetchall()]
+
+def upsert_payment_term(vendor_name: str, vendor_type: str, timing: str, days_offset: int, notes: str = ''):
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO payment_terms (vendor_name, vendor_type, timing, days_offset, notes)
+            VALUES (?,?,?,?,?)
+            ON CONFLICT(vendor_name) DO UPDATE SET
+                vendor_type=excluded.vendor_type,
+                timing=excluded.timing,
+                days_offset=excluded.days_offset,
+                notes=excluded.notes
+        """, (vendor_name.strip(), vendor_type, timing, int(days_offset), notes))
+
+def delete_payment_term(term_id: int):
+    with get_db() as conn:
+        conn.execute("DELETE FROM payment_terms WHERE id=?", (term_id,))
+
+def get_all_vendors():
+    with get_db() as conn:
+        hotels = sorted({r['hotel'] for r in conn.execute(
+            "SELECT DISTINCT hotel FROM daily_log WHERE hotel != '' AND hotel IS NOT NULL"
+        ).fetchall()})
+        meal_names = set()
+        for row in conn.execute(
+            "SELECT DISTINCT lunch, dinner FROM daily_log WHERE lunch != '' OR dinner != ''"
+        ).fetchall():
+            for field in [row['lunch'], row['dinner']]:
+                n = _extract_restaurant(field)
+                if n and not _skip_vendor(n):
+                    meal_names.add(n)
+        return {'hotels': hotels, 'restaurants': sorted(meal_names)}
+
+def get_payment_schedule(from_date: str = None, to_date: str = None):
+    today = date.today()
+    if not from_date:
+        from_date = (today - timedelta(days=14)).isoformat()
+    if not to_date:
+        to_date = (today + timedelta(days=120)).isoformat()
+
+    with get_db() as conn:
+        terms_rows = conn.execute("SELECT * FROM payment_terms").fetchall()
+        if not terms_rows:
+            return []
+        terms = {r['vendor_name'].lower().strip(): dict(r) for r in terms_rows}
+
+        logs = conn.execute("""
+            SELECT dl.tour_code, dl.date, dl.hotel, dl.lunch, dl.dinner, t.series
+            FROM daily_log dl JOIN tours t ON dl.tour_code=t.code
+            WHERE dl.date BETWEEN ? AND ?
+            ORDER BY dl.date
+        """, (from_date, to_date)).fetchall()
+
+        grouped = defaultdict(lambda: {'dates': set(), 'series': '', 'vendor_type': 'hotel', 'service_type': 'hotel'})
+
+        def collect(tour_code, svc_date, vendor_name, svc_type, series):
+            if not vendor_name or _skip_vendor(vendor_name):
+                return
+            vkey = vendor_name.lower().strip()
+            if vkey not in terms:
+                return
+            k = (tour_code, vendor_name.strip())
+            grouped[k]['dates'].add(svc_date)
+            grouped[k]['series'] = series
+            grouped[k]['vendor_type'] = terms[vkey]['vendor_type']
+            grouped[k]['service_type'] = svc_type
+
+        for log in logs:
+            collect(log['tour_code'], log['date'], log['hotel'], 'hotel', log['series'])
+            collect(log['tour_code'], log['date'], _extract_restaurant(log['lunch']), 'lunch', log['series'])
+            collect(log['tour_code'], log['date'], _extract_restaurant(log['dinner']), 'dinner', log['series'])
+
+        schedule = []
+        for (tour_code, vendor_name), info in grouped.items():
+            term = terms[vendor_name.lower().strip()]
+            dates_sorted = sorted(info['dates'])
+            if term['timing'] == 'before':
+                ref = date.fromisoformat(dates_sorted[0])
+                due = ref - timedelta(days=term['days_offset'])
+            else:
+                ref = date.fromisoformat(dates_sorted[-1])
+                due = ref + timedelta(days=term['days_offset'])
+            diff = (due - today).days
+            schedule.append({
+                'vendor_name': vendor_name,
+                'vendor_type': term['vendor_type'],
+                'service_type': info['service_type'],
+                'tour_code': tour_code,
+                'series': info['series'],
+                'first_service_date': dates_sorted[0],
+                'last_service_date': dates_sorted[-1],
+                'nights': len(dates_sorted),
+                'due_date': due.isoformat(),
+                'timing': term['timing'],
+                'days_offset': term['days_offset'],
+                'days_until_due': diff,
+                'status': 'overdue' if diff < 0 else ('due_soon' if diff <= 3 else 'upcoming'),
+                'notes': term['notes'],
+            })
+
+        schedule.sort(key=lambda x: x['due_date'])
+        return schedule

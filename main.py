@@ -36,6 +36,13 @@ def startup():
 class NoteUpdate(BaseModel):
     notes: str
 
+class PaymentTermIn(BaseModel):
+    vendor_name: str
+    vendor_type: str = 'hotel'
+    timing: str = 'after'
+    days_offset: int = 7
+    notes: str = ''
+
 
 @app.get("/", response_class=HTMLResponse)
 def root():
@@ -122,6 +129,29 @@ def financials_tour(code: str):
 @app.get("/api/restaurants")
 def restaurants():
     return db.get_all_restaurants()
+
+
+@app.get("/api/payment-terms")
+def list_payment_terms():
+    return db.get_payment_terms()
+
+@app.post("/api/payment-terms")
+def save_payment_term(body: PaymentTermIn):
+    db.upsert_payment_term(body.vendor_name, body.vendor_type, body.timing, body.days_offset, body.notes)
+    return {"ok": True}
+
+@app.delete("/api/payment-terms/{term_id}")
+def remove_payment_term(term_id: int):
+    db.delete_payment_term(term_id)
+    return {"ok": True}
+
+@app.get("/api/payments/schedule")
+def payment_schedule(from_date: str = None, to_date: str = None):
+    return db.get_payment_schedule(from_date, to_date)
+
+@app.get("/api/vendors")
+def get_vendors():
+    return db.get_all_vendors()
 
 
 @app.post("/api/sync-hotels")
