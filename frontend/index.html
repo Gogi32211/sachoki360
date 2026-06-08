@@ -641,6 +641,11 @@ function PaymentsView() {
                         <span className="text-xs font-bold text-gray-700 w-16 flex-shrink-0">{item.tour_code}</span>
                         <span className="text-sm flex-shrink-0">{vendorIcon(item.vendor_type)}</span>
                         <span className="text-sm font-medium flex-1 min-w-0 truncate">{item.vendor_name}</span>
+                        {item.total_amount > 0 && (
+                          <span className={`text-xs font-bold flex-shrink-0 ${item.currency==='USD' ? 'text-blue-600' : 'text-emerald-600'}`}>
+                            {item.currency==='USD' ? '$' : '₾'}{item.total_amount.toFixed(0)}
+                          </span>
+                        )}
                         <span className="text-xs text-gray-400 flex-shrink-0">
                           {item.first_service_date}
                           {item.nights > 1 && `→${item.nights}ღ`}

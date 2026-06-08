@@ -92,18 +92,19 @@ _DEFAULT_PAYMENT_TERMS = [
     ("Gistola Resort 5★",                        "hotel",      "before", 1, "", 100.0, "USD", ""),
     ("Gudauri Inn",                              "hotel",      "before", 1, "", 0.0,   "USD", ""),
     ("Gudauri Lodge",                            "hotel",      "before", 1, "", 0.0,   "USD", ""),
-    # Restaurants — flat price per 19+1 people (enter in Settings)
-    ("დინ შენი",                                 "restaurant", "before", 1, "", 600.0, "GEL", ""),
-    ("სალობიე",                                  "restaurant", "before", 1, "", 600.0, "GEL", ""),
-    ("ზღაპარი",                                  "restaurant", "before", 1, "", 600.0, "GEL", ""),
-    ("ლუშნუ ქორი",                               "restaurant", "before", 1, "", 600.0, "GEL", ""),
-    ("ენგური",                                   "restaurant", "before", 1, "", 600.0, "GEL", ""),
-    ("ოქროს საწმისი",                            "restaurant", "before", 1, "", 600.0, "GEL", ""),
+    # Restaurants — flat price per 19+1 people
+    ("დინ შენი",                                 "restaurant", "before", 1, "", 700.0, "GEL", ""),
+    ("სალობიე",                                  "restaurant", "before", 1, "", 430.0, "GEL", ""),
+    ("ზღაპარი",                                  "restaurant", "before", 1, "", 400.0, "GEL", ""),
+    ("ლუშნუ ქორი",                               "restaurant", "before", 1, "", 580.0, "GEL", ""),
+    ("ენგური",                                   "restaurant", "before", 1, "", 410.0, "GEL", ""),
+    ("ოქროს საწმისი",                            "restaurant", "before", 1, "", 530.0, "GEL", ""),
     # Driver — series-specific costs (GEL)
     ("მძღოლი: კვება და სასტუმრო ტურში",         "other",      "before", 1, "", 0.0, "GEL",
      '{"ZT":225,"KT":150,"DT1":150,"DT2":150,"LN":200}'),
-    # Guide — to be filled in
-    ("გიდი: ბილეთები, კვება და სასტუმრო ტურში", "other",      "before", 1, "", 0.0, "GEL", ""),
+    # Guide — series-specific costs (GEL)
+    ("გიდი: ბილეთები, კვება და სასტუმრო ტურში", "other",      "before", 1, "", 0.0, "GEL",
+     '{"ZT":1314,"KT":745,"DT1":745,"DT2":745,"LN":2115}'),
 ]
 
 
@@ -119,6 +120,26 @@ def seed_db():
                     currency     = CASE WHEN payment_terms.unit_price   = 0  THEN excluded.currency     ELSE payment_terms.currency     END,
                     series_prices= CASE WHEN payment_terms.series_prices= '' THEN excluded.series_prices ELSE payment_terms.series_prices END
             """, (vn, vtype, timing, days, notes, uprice, curr, sprices))
+
+        # Force-update known restaurant prices and guide series_prices
+        _restaurant_prices = [
+            ("დინ შენი",      700.0),
+            ("სალობიე",       430.0),
+            ("ზღაპარი",       400.0),
+            ("ლუშნუ ქორი",    580.0),
+            ("ენგური",        410.0),
+            ("ოქროს საწმისი", 530.0),
+        ]
+        for rname, rprice in _restaurant_prices:
+            conn.execute(
+                "UPDATE payment_terms SET unit_price=? WHERE vendor_name=? AND vendor_type='restaurant'",
+                (rprice, rname)
+            )
+        conn.execute(
+            "UPDATE payment_terms SET series_prices=? WHERE vendor_name=?",
+            ('{"ZT":1314,"KT":745,"DT1":745,"DT2":745,"LN":2115}',
+             "გიდი: ბილეთები, კვება და სასტუმრო ტურში")
+        )
 
         existing = {r["code"] for r in conn.execute("SELECT code FROM tours").fetchall()}
         for t in TOURS_2026:
