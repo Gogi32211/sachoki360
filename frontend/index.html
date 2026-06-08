@@ -229,8 +229,8 @@ function DayView({ onSelectTour }) {
   });
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
+    <div className="p-4 max-w-2xl mx-auto">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <button onClick={() => changeDay(-1)} className="px-3 py-2 bg-white border rounded hover:bg-gray-50">◀</button>
         <input type="date" value={selDate} onChange={e => setSelDate(e.target.value)}
           className="border rounded px-3 py-2 text-sm"/>
@@ -241,37 +241,39 @@ function DayView({ onSelectTour }) {
       </div>
 
       {loading ? <Spinner/> : tours.length === 0 ? (
-        <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
-          <div className="text-5xl mb-3">📭</div>
-          <div>ამ დღეს ტურები არ არის</div>
+        <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
+          <div className="text-4xl mb-2">📭</div>
+          <div className="text-sm">ამ დღეს ტურები არ არის</div>
         </div>
       ) : (
         <>
           {Object.entries(grouped).map(([city, cts]) => (
-            <div key={city} className="mb-6">
-              <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+            <div key={city} className="mb-4">
+              <h3 className="font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5 text-sm">
                 📍 {city}
-                <span className="text-sm font-normal text-gray-400">({cts.length} ჯგ.)</span>
+                <span className="font-normal text-gray-400">({cts.length} ჯგ.)</span>
               </h3>
-              <div className="grid gap-3">
+              <div className="grid gap-1.5">
                 {cts.map(t => (
-                  <div key={t.code} className="bg-white rounded-lg shadow-sm border-l-4 p-4"
+                  <div key={t.code} className="bg-white rounded-lg shadow-sm border-l-4 px-3 py-2"
                     style={{borderLeftColor: t.color}}>
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <Badge series={t.series}/>
-                      <button className="font-bold text-blue-600 hover:underline text-sm"
-                        onClick={() => onSelectTour(t.code)}>{t.code}</button>
-                      <span className="ml-auto text-xs text-gray-400">Day {t.day_num}/{t.total_days}</span>
-                    </div>
-                    <div className="text-sm space-y-1 text-gray-700">
-                      <div>🏨 {t.hotel && t.hotel.startsWith('? ')
-                        ? <span className="text-orange-500 font-semibold">{t.hotel} ⚠</span>
-                        : t.hotel}</div>
-                      <div>🍽️ <span className="text-gray-400">L:</span> {t.lunch}</div>
-                      <div>🌙 <span className="text-gray-400">V:</span> {t.dinner}</div>
-                      {t.border_crossing && (
-                        <div className="text-orange-600 font-medium">🚧 {t.border_crossing}</div>
-                      )}
+                    <div className="flex items-start gap-3">
+                      <div className="flex flex-col gap-1 items-start flex-shrink-0 pt-0.5">
+                        <Badge series={t.series}/>
+                        <button className="font-bold text-blue-600 hover:underline text-xs"
+                          onClick={() => onSelectTour(t.code)}>{t.code}</button>
+                      </div>
+                      <div className="flex-1 text-xs text-gray-700 space-y-0.5">
+                        <div>🏨 {t.hotel && t.hotel.startsWith('? ')
+                          ? <span className="text-orange-500 font-semibold">{t.hotel} ⚠</span>
+                          : t.hotel}</div>
+                        <div>🍽️ <span className="text-gray-400">L:</span> {t.lunch}</div>
+                        <div>🌙 <span className="text-gray-400">V:</span> {t.dinner}</div>
+                        {t.border_crossing && (
+                          <div className="text-orange-600 font-medium">🚧 {t.border_crossing}</div>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">Day {t.day_num}/{t.total_days}</span>
                     </div>
                   </div>
                 ))}
@@ -554,7 +556,7 @@ function AccountingView({ onSelectTour }) {
 function PaymentsView() {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('due_soon');
 
   const load = () => {
     setLoading(true);
