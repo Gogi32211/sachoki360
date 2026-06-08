@@ -779,7 +779,13 @@ def get_tour_payment_summary(from_date: str = None, to_date: str = None):
     for t in tours.values():
         t['services'].sort(key=lambda s: (s['first_service_date'] or '', s['vendor_name']))
 
-    # Only current (active) and future (upcoming) tours — hide finished ones
-    result = [t for t in tours.values() if t['status'] != 'done']
+    # Show a tour only while it still has an upcoming payment (due today or later).
+    # Tours whose payments are all in the past are treated as finished and hidden.
+    today_iso = date.today().isoformat()
+    result = [
+        t for t in tours.values()
+        if t['status'] != 'done'
+        and any((s['due_date'] or '') >= today_iso for s in t['services'])
+    ]
     result.sort(key=lambda t: t['bus_start'])
     return result
