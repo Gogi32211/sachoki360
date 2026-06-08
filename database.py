@@ -74,19 +74,22 @@ def init_db():
 
 _DEFAULT_PAYMENT_TERMS = [
     # Hotels — pay 1 day before check-in
-    ("Pullman Tbilisi",      "hotel",      "before", 1, ""),
-    ("Radisson Blu Yerevan", "hotel",      "before", 1, ""),
-    ("Marco Polo Gudauri",   "hotel",      "before", 1, ""),
-    ("Gistola Resort 5★",    "hotel",      "before", 1, ""),
-    ("Gudauri Inn",          "hotel",      "before", 1, ""),
-    ("Gudauri Lodge",        "hotel",      "before", 1, ""),
+    ("Pullman Tbilisi",                        "hotel",      "before", 1, ""),
+    ("Radisson Blu Yerevan",                   "hotel",      "before", 1, ""),
+    ("Marco Polo Gudauri",                     "hotel",      "before", 1, ""),
+    ("Gistola Resort 5★",                      "hotel",      "before", 1, ""),
+    ("Gudauri Inn",                            "hotel",      "before", 1, ""),
+    ("Gudauri Lodge",                          "hotel",      "before", 1, ""),
     # Restaurants — pay 1 day before service
-    ("დინ შენი",             "restaurant", "before", 1, ""),
-    ("სალობიე",              "restaurant", "before", 1, ""),
-    ("ზღაპარი",              "restaurant", "before", 1, ""),
-    ("ლუშნუ ქორი",           "restaurant", "before", 1, ""),
-    ("ენგური",               "restaurant", "before", 1, ""),
-    ("ოქროს საწმისი",        "restaurant", "before", 1, ""),
+    ("დინ შენი",                               "restaurant", "before", 1, ""),
+    ("სალობიე",                                "restaurant", "before", 1, ""),
+    ("ზღაპარი",                                "restaurant", "before", 1, ""),
+    ("ლუშნუ ქორი",                             "restaurant", "before", 1, ""),
+    ("ენგური",                                 "restaurant", "before", 1, ""),
+    ("ოქროს საწმისი",                          "restaurant", "before", 1, ""),
+    # Guide & driver tour expenses — pay 1 day before tour starts
+    ("მძღოლი: კვება და სასტუმრო ტურში",       "other",      "before", 1, ""),
+    ("გიდი: ბილეთები, კვება და სასტუმრო ტურში", "other",    "before", 1, ""),
 ]
 
 
