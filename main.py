@@ -20,10 +20,11 @@ def startup():
             db.seed_excel_data(parsed)
     except Exception as e:
         print(f"Excel parse warning: {e}")
-    try:
-        db.sync_series_meals("LN")
-    except Exception as e:
-        print(f"Meal sync warning: {e}")
+    for series in ("ZT", "LN", "KT", "DT1", "DT2"):
+        try:
+            db.sync_series_meals(series)
+        except Exception as e:
+            print(f"Meal sync warning ({series}): {e}")
     try:
         assignments = fetch_hotel_assignments()
         if assignments:
