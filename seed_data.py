@@ -22,14 +22,14 @@ SERIES = {
         "duration": 8,
         "color": "#66BB6A",
         "nights": {
-            0: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "🍷 ხარება — ღვინო", "dinner": "🇨🇳 ჩინური ვახშამი", "border": None},
-            1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan / Armenia Marriott", "lunch": "🐟 სევანი — თევზი", "dinner": "🎵 სპეც. + დუდუკი", "border": "GEO→ARM: სადახლო"},
-            2: {"city": "Akhaltsikhe", "hotel": "Akhaltsikhe Inn 5★", "lunch": "🇦🇲 სომხ. ლავაში", "dinner": "🏨 სასტ. ბუფეტი", "border": "ARM→GEO: ბავრა"},
-            3: {"city": "Batumi", "hotel": "Best Western Premier / Le Méridien", "lunch": "🧀 ხაჭაპური", "dinner": "🌊 დამოუკ.", "border": None},
-            4: {"city": "Gori", "hotel": "Gori Inn", "lunch": "🏛️ ადგილ. (ქუთ./მარტვ.)", "dinner": "🏛️ ადგილ. (გორი)", "border": None},
-            5: {"city": "Gudauri", "hotel": "Marco Polo / Gudauri Lodge", "lunch": "🏔️ ადგილ. (სტ.მ./ანან./კაზბ.)", "dinner": "🏔️ სასტ. ბუფეტი", "border": None},
-            6: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria", "lunch": "🍖 ცხვ. წვნ. თიხ.ქვ.", "dinner": "💃 პატარძეული + ცეკვა", "border": None},
-            7: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "🗺️ დამოუკ. ძვ.ქ.", "dinner": "🇨🇳 ჩინური", "border": None, "notes": "CZ6040 22:50"},
+            0: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria / Radisson Blu Iveria", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ ცეკვებით", "border": None},
+            1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan / Armenia Marriott", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: სადახლო"},
+            2: {"city": "Akhaltsikhe", "hotel": "Akhaltsikhe Inn 5★", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: ახალციხე ინნ", "border": "ARM→GEO: ბავრა"},
+            3: {"city": "Batumi", "hotel": "Best Western Premier / Le Méridien", "lunch": "ლანჩი: ზღაპარი", "dinner": "ვახშამი: საკუთარი ხარჯებით", "border": None},
+            4: {"city": "Gori", "hotel": "Gori Inn", "lunch": "ლანჩი: მარტვილი", "dinner": "ვახშამი: გორი ინნ", "border": None},
+            5: {"city": "Gudauri", "hotel": "Marco Polo / Gudauri Lodge", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: მარკო პოლო", "border": None},
+            6: {"city": "Tbilisi", "hotel": "Hualing / Pine Astoria", "lunch": "ლანჩი: სალობიე", "dinner": "ვახშამი: დინ შენი", "border": None},
+            7: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "ლანჩი: საკუთარი ხარჯებით", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": None, "notes": "CZ6040 22:50"},
         }
     },
     "KT": {

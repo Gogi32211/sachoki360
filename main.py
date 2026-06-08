@@ -21,6 +21,10 @@ def startup():
     except Exception as e:
         print(f"Excel parse warning: {e}")
     try:
+        db.sync_series_meals("LN")
+    except Exception as e:
+        print(f"Meal sync warning: {e}")
+    try:
         assignments = fetch_hotel_assignments()
         if assignments:
             db.update_hotels_from_sheets(assignments)

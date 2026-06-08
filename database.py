@@ -86,6 +86,27 @@ def seed_db():
                      info.get("lunch",""), info.get("dinner",""), info.get("border") or "")
                 )
 
+def sync_series_meals(series_key: str):
+    """Update lunch/dinner in daily_log for all tours of a given series from SERIES definition."""
+    nights = SERIES[series_key]["nights"]
+    with get_db() as conn:
+        tours = conn.execute(
+            "SELECT code, bus_start FROM tours WHERE series=?", (series_key,)
+        ).fetchall()
+        updated = 0
+        for t in tours:
+            bs = date.fromisoformat(t["bus_start"])
+            for offset, info in nights.items():
+                day_date = (bs + timedelta(days=offset)).isoformat()
+                cur = conn.execute(
+                    "UPDATE daily_log SET lunch=?, dinner=? WHERE tour_code=? AND date=?",
+                    (info.get("lunch", ""), info.get("dinner", ""), t["code"], day_date)
+                )
+                updated += cur.rowcount
+    print(f"[sync_meals] Updated {updated} meal records for series {series_key}")
+    return updated
+
+
 def get_tour_status(bus_start_str: str, bus_end_str: str) -> str:
     today = date.today()
     bs = date.fromisoformat(bus_start_str)
