@@ -779,6 +779,7 @@ def get_tour_payment_summary(from_date: str = None, to_date: str = None):
     for t in tours.values():
         t['services'].sort(key=lambda s: (s['first_service_date'] or '', s['vendor_name']))
 
-    result = list(tours.values())
+    # Only current (active) and future (upcoming) tours — hide finished ones
+    result = [t for t in tours.values() if t['status'] != 'done']
     result.sort(key=lambda t: t['bus_start'])
     return result
