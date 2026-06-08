@@ -54,6 +54,9 @@ class PaymentTermIn(BaseModel):
     timing: str = 'after'
     days_offset: int = 7
     notes: str = ''
+    unit_price: float = 0.0
+    currency: str = 'GEL'
+    series_prices: str = ''
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -149,7 +152,8 @@ def list_payment_terms():
 
 @app.post("/api/payment-terms")
 def save_payment_term(body: PaymentTermIn):
-    db.upsert_payment_term(body.vendor_name, body.vendor_type, body.timing, body.days_offset, body.notes)
+    db.upsert_payment_term(body.vendor_name, body.vendor_type, body.timing, body.days_offset,
+                           body.notes, body.unit_price, body.currency, body.series_prices)
     return {"ok": True}
 
 @app.delete("/api/payment-terms/{term_id}")
