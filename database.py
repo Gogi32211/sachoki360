@@ -385,6 +385,39 @@ def get_meals_for_tour(code: str):
         ).fetchall()
         return [dict(r) for r in rows]
 
+def sync_meals_from_financials(meals_data: dict) -> int:
+    """
+    Replace tour_meals rows with data from financial sheets.
+    Also updates daily_log.lunch / daily_log.dinner.
+    """
+    total = 0
+    with get_db() as conn:
+        for tour_code, meals in meals_data.items():
+            if not meals:
+                continue
+            conn.execute("DELETE FROM tour_meals WHERE tour_code=?", (tour_code,))
+            for m in meals:
+                conn.execute(
+                    "INSERT INTO tour_meals (tour_code, date, meal_type, restaurant, gel_amount, usd_amount) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (tour_code, m["date"], m["meal_type"], m["restaurant"],
+                     m.get("gel_amount", 0), m.get("usd_amount", 0))
+                )
+                total += 1
+                if m["meal_type"] == "lunch":
+                    conn.execute(
+                        "UPDATE daily_log SET lunch=? WHERE tour_code=? AND date=?",
+                        (m["restaurant"], tour_code, m["date"])
+                    )
+                elif m["meal_type"] == "dinner":
+                    conn.execute(
+                        "UPDATE daily_log SET dinner=? WHERE tour_code=? AND date=?",
+                        (m["restaurant"], tour_code, m["date"])
+                    )
+    print(f"[sync_meals_financials] Synced {total} meal records for {len(meals_data)} tours")
+    return total
+
+
 def get_all_restaurants():
     with get_db() as conn:
         rows = conn.execute("""
