@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GTC360 — GOGA of TOURS</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+* { font-family: 'Noto Sans Georgian', sans-serif; }
+.gantt-scroll { overflow-x: auto; }
+.bar { border-radius: 4px; height: 22px; cursor: pointer; display: flex; align-items: center;
+       padding: 0 6px; font-size: 11px; color: white; font-weight: 600;
+       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.15s; }
+.bar:hover { opacity: 0.8; }
+.spinner { border: 3px solid #e5e7eb; border-top: 3px solid #3b82f6; border-radius: 50%;
+           width: 32px; height: 32px; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+const API = window.location.origin + "/api";
+
+const SERIES_COLORS = {
+  ZT: "#42A5F5", LN: "#66BB6A", KT: "#FF7043", DT1: "#AB47BC", DT2: "#EC407A"
+};
+
+const pad2 = n => String(n).padStart(2, "0");
+const toISO = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+
+function Badge({ series }) {
+  return (
+    <span className="px-2 py-0.5 rounded text-white text-xs font-bold"
+      style={{ background: SERIES_COLORS[series] || "#888" }}>{series}</span>
+  );
+}
+
+function Spinner() {
+  return <div className="flex justify-center p-10"><div className="spinner"/></div>;
+}
+
+// ── TIMELINE VIEW ──────────────────────────────────────────────
+function TimelineView({ onSelectTour }) {
+  const [tours, setTours] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [viewDate, setViewDate] = useState(new Date());
+  const [filters, setFilters] = useState({ZT:true,LN:true,KT:true,DT1:true,DT2:true});
+  const [popup, setPopup] = useState(null);
+  const scrollRef = useRef(null);
+  const today = new Date();
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month, daysInMonth);
+
+  const MONTH_NAMES = ["იანვარი","თებერვალი","მარტი","აპრილი","მაისი","ივნისი",
+    "ივლისი","აგვისტო","სექტემბერი","ოქტომბერი","ნოემბერი","დეკემბერი"];
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API}/timeline?from_date=${toISO(monthStart)}&to_date=${toISO(monthEnd)}`)
+      .then(r => r.json()).then(d => { setTours(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [year, month]);
+
+  const filtered = tours.filter(t => filters[t.series]);
+
+  const DAY_W = 34, ROW_H = 30, LABEL_W = 130;
+
+  const barProps = (tour) => {
+    const bs = new Date(tour.bus_start + "T00:00:00");
+    const be = new Date(tour.bus_end + "T00:00:00");
+    const s = Math.max(0, Math.round((bs - monthStart) / 86400000));
+    const e = Math.min(daysInMonth, Math.round((be - monthStart) / 86400000));
+    if (e <= 0 || s >= daysInMonth) return null;
+    return { left: s * DAY_W, width: Math.max((e - s) * DAY_W - 2, 10) };
+  };
+
+  const handleBarClick = async (tour, e) => {
+    e.stopPropagation();
+    const checkDate = toISO(today);
+    try {
+      const data = await fetch(`${API}/tours/${checkDate}`).then(r => r.json());
+      const info = data.find(d => d.code === tour.code);
+      setPopup({ tour, info, x: Math.min(e.clientX, window.innerWidth-280), y: Math.min(e.clientY+12, window.innerHeight-220) });
+    } catch { setPopup({ tour, info: null, x: e.clientX, y: e.clientY+12 }); }
+  };
+
+  const scrollToToday = () => {
+    if (today.getFullYear() === year && today.getMonth() === month) {
+      if (scrollRef.current) scrollRef.current.scrollLeft = (today.getDate()-1) * DAY_W - 200;
+    } else { setViewDate(new Date()); }
+  };
+
+  return (
+    <div className="p-4" onClick={() => setPopup(null)}>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <button onClick={() => setViewDate(new Date(year, month-1, 1))}
+          className="px-3 py-1.5 bg-white border rounded hover:bg-gray-50 text-sm">◀</button>
+        <span className="font-semibold text-lg min-w-48 text-center">{MONTH_NAMES[month]} {year}</span>
+        <button onClick={() => setViewDate(new Date(year, month+1, 1))}
+          className="px-3 py-1.5 bg-white border rounded hover:bg-gray-50 text-sm">▶</button>
+        <button onClick={scrollToToday}
+          className="px-3 py-1.5 bg-amber-400 text-white rounded text-sm font-medium hover:bg-amber-500">📅 დღეს</button>
+        <div className="flex gap-2 flex-wrap">
+          {Object.keys(SERIES_COLORS).map(s => (
+            <label key={s} className="flex items-center gap-1 cursor-pointer text-sm select-none">
+              <input type="checkbox" checked={filters[s]}
+                onChange={e => setFilters(f => ({...f, [s]: e.target.checked}))} className="rounded"/>
+              <span className="px-2 py-0.5 rounded text-white text-xs font-bold"
+                style={{background: SERIES_COLORS[s]}}>{s}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {loading ? <Spinner/> : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div ref={scrollRef} className="gantt-scroll">
+            <div style={{ minWidth: LABEL_W + daysInMonth * DAY_W }}>
+              <div className="flex border-b bg-gray-50 sticky top-0 z-10">
+                <div style={{width:LABEL_W,minWidth:LABEL_W}}
+                  className="text-xs font-semibold text-gray-500 p-2 border-r shrink-0">ტური</div>
+                {Array.from({length: daysInMonth}, (_, i) => {
+                  const isTd = today.getFullYear()===year && today.getMonth()===month && today.getDate()===i+1;
+                  return (
+                    <div key={i} style={{width:DAY_W,minWidth:DAY_W}}
+                      className={`text-center text-xs py-2 border-r shrink-0 ${isTd?"bg-amber-100 font-bold text-amber-700":"text-gray-400"}`}>
+                      {i+1}
+                    </div>
+                  );
+                })}
+              </div>
+              {filtered.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">ამ თვეში ტურები არ არის</div>
+              ) : filtered.map(tour => {
+                const bp = barProps(tour);
+                return (
+                  <div key={tour.code} className="flex border-b hover:bg-gray-50" style={{height:ROW_H}}>
+                    <div style={{width:LABEL_W,minWidth:LABEL_W}}
+                      className="text-xs font-medium px-2 flex items-center border-r cursor-pointer hover:text-blue-600 truncate shrink-0"
+                      onClick={() => onSelectTour(tour.code)}>{tour.code}</div>
+                    <div className="relative flex-1">
+                      {today.getFullYear()===year && today.getMonth()===month && (
+                        <div className="absolute inset-y-0 bg-amber-50"
+                          style={{left:(today.getDate()-1)*DAY_W, width:DAY_W}}/>
+                      )}
+                      {bp && (
+                        <div className="bar absolute top-1"
+                          style={{left:bp.left, width:bp.width, background:tour.color}}
+                          onClick={e => handleBarClick(tour, e)}>{tour.code}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {popup && (
+        <div className="fixed z-50 bg-white border shadow-2xl rounded-xl p-4 text-sm w-64"
+          style={{left:popup.x, top:popup.y}} onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-2 mb-2">
+            <Badge series={popup.tour.series}/>
+            <span className="font-bold">{popup.tour.code}</span>
+            <button className="ml-auto text-gray-400 hover:text-gray-700" onClick={() => setPopup(null)}>✕</button>
+          </div>
+          <div className="text-xs text-gray-400 mb-3">{popup.tour.bus_start} → {popup.tour.bus_end}</div>
+          {popup.info ? (
+            <div className="space-y-1 text-xs">
+              <div>📍 <strong>{popup.info.city}</strong></div>
+              <div>🏨 {popup.info.hotel}</div>
+              <div>🍽️ {popup.info.lunch}</div>
+              <div>🌙 {popup.info.dinner}</div>
+              {popup.info.border_crossing && <div className="text-orange-600">🚧 {popup.info.border_crossing}</div>}
+            </div>
+          ) : <div className="text-xs text-gray-400">დღეს არ არის აქტიური</div>}
+          <button className="mt-3 text-blue-600 text-xs hover:underline"
+            onClick={() => { setPopup(null); onSelectTour(popup.tour.code); }}>სრული itinerary →</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DAY VIEW ───────────────────────────────────────────────────
+function DayView({ onSelectTour }) {
+  const [selDate, setSelDate] = useState(toISO(new Date()));
+  const [tours, setTours] = useState([]);
+  const [borders, setBorders] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(d => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API}/tours/${d}`).then(r => r.json()),
+      fetch(`${API}/border/${d}`).then(r => r.json()),
+    ]).then(([t, b]) => { setTours(t); setBorders(b); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(selDate); }, [selDate]);
+
+  const changeDay = delta => {
+    const d = new Date(selDate + "T00:00:00");
+    d.setDate(d.getDate() + delta);
+    setSelDate(toISO(d));
+  };
+
+  const grouped = {};
+  for (const t of tours) {
+    const c = t.city || "სხვა";
+    if (!grouped[c]) grouped[c] = [];
+    grouped[c].push(t);
+  }
+
+  const displayDate = new Date(selDate + "T00:00:00").toLocaleDateString("ka-GE", {
+    weekday:"long", year:"numeric", month:"long", day:"numeric"
+  });
+
+  return (
+    <div className="p-4 max-w-4xl mx-auto">
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        <button onClick={() => changeDay(-1)} className="px-3 py-2 bg-white border rounded hover:bg-gray-50">◀</button>
+        <input type="date" value={selDate} onChange={e => setSelDate(e.target.value)}
+          className="border rounded px-3 py-2 text-sm"/>
+        <button onClick={() => changeDay(1)} className="px-3 py-2 bg-white border rounded hover:bg-gray-50">▶</button>
+        <button onClick={() => setSelDate(toISO(new Date()))}
+          className="px-3 py-2 bg-amber-400 text-white rounded text-sm font-medium hover:bg-amber-500">📅 დღეს</button>
+        <span className="text-gray-500 text-sm">{displayDate}</span>
+      </div>
+
+      {loading ? <Spinner/> : tours.length === 0 ? (
+        <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
+          <div className="text-5xl mb-3">📭</div>
+          <div>ამ დღეს ტურები არ არის</div>
+        </div>
+      ) : (
+        <>
+          {Object.entries(grouped).map(([city, cts]) => (
+            <div key={city} className="mb-6">
+              <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                📍 {city}
+                <span className="text-sm font-normal text-gray-400">({cts.length} ჯგ.)</span>
+              </h3>
+              <div className="grid gap-3">
+                {cts.map(t => (
+                  <div key={t.code} className="bg-white rounded-lg shadow-sm border-l-4 p-4"
+                    style={{borderLeftColor: t.color}}>
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <Badge series={t.series}/>
+                      <button className="font-bold text-blue-600 hover:underline text-sm"
+                        onClick={() => onSelectTour(t.code)}>{t.code}</button>
+                      <span className="ml-auto text-xs text-gray-400">Day {t.day_num}/{t.total_days}</span>
+                    </div>
+                    <div className="text-sm space-y-1 text-gray-700">
+                      <div>🏨 {t.hotel}</div>
+                      <div>🍽️ <span className="text-gray-400">L:</span> {t.lunch}</div>
+                      <div>🌙 <span className="text-gray-400">V:</span> {t.dinner}</div>
+                      {t.border_crossing && (
+                        <div className="text-orange-600 font-medium">🚧 {t.border_crossing}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {borders.length > 0 && (
+            <div className="mt-4 bg-orange-50 border border-orange-200 rounded-xl p-4">
+              <h3 className="font-bold text-orange-700 mb-2 text-sm">🚧 დღის საზ.კვ.</h3>
+              {borders.map((b, i) => (
+                <div key={i} className="text-sm text-orange-800 mb-1">
+                  • <strong>{b.tour_code}</strong>: {b.border_crossing}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── TOUR DETAIL VIEW ───────────────────────────────────────────
+function TourDetailView({ initialCode, onBack }) {
+  const [search, setSearch] = useState(initialCode || "");
+  const [tour, setTour] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [editNotes, setEditNotes] = useState({});
+  const [saving, setSaving] = useState({});
+
+  const loadTour = code => {
+    if (!code) return;
+    setLoading(true);
+    fetch(`${API}/tour/${code.toUpperCase()}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setTour(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { if (initialCode) loadTour(initialCode); }, [initialCode]);
+
+  const saveNote = async (logId, notes) => {
+    setSaving(s => ({...s, [logId]: true}));
+    await fetch(`${API}/log/${logId}/note`, {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({notes})
+    });
+    setSaving(s => ({...s, [logId]: false}));
+    setEditNotes(n => { const x={...n}; delete x[logId]; return x; });
+    loadTour(tour.code);
+  };
+
+  const STATUS = {active:"bg-green-100 text-green-700", upcoming:"bg-blue-100 text-blue-700", done:"bg-gray-100 text-gray-500"};
+  const STATUS_GEO = {active:"აქტიური", upcoming:"მომავალი", done:"დასრულებული"};
+
+  return (
+    <div className="p-4 max-w-5xl mx-auto">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <button onClick={onBack} className="px-3 py-2 bg-white border rounded hover:bg-gray-50 text-sm">← უკან</button>
+        <form onSubmit={e => { e.preventDefault(); loadTour(search); }} className="flex gap-2">
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="კოდი: ZT-0601 ..."
+            className="border rounded px-3 py-2 text-sm w-44"/>
+          <button type="submit"
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">ძებნა</button>
+        </form>
+      </div>
+
+      {loading ? <Spinner/> : !tour ? (
+        <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
+          <div className="text-5xl mb-3">🔍</div>
+          <div>ჩაწერე ტურის კოდი ძებნის ველში</div>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-xl shadow p-5 mb-5">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge series={tour.series}/>
+              <h2 className="text-xl font-bold">{tour.code}</h2>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS[tour.status]}`}>
+                {STATUS_GEO[tour.status]}
+              </span>
+            </div>
+            <div className="text-sm text-gray-500 mt-1">{tour.series_name}</div>
+            <div className="text-sm text-gray-600 mt-1">📅 {tour.bus_start} → {tour.bus_end}</div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>{["დღე","თარიღი","ქალაქი","სასტუმრო","სადილი","ვახშამი","საზ.კვ.","შენიშვნა"].map(h => (
+                  <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {tour.days.map(day => (
+                  <tr key={day.log_id} className="border-b hover:bg-gray-50">
+                    <td className="px-3 py-2 font-bold text-gray-400 text-center">{day.day_num}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-500 text-xs">{day.date}</td>
+                    <td className="px-3 py-2 font-medium text-sm">{day.city}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs max-w-xs">{day.hotel}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{day.lunch}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{day.dinner}</td>
+                    <td className="px-3 py-2 text-orange-600 text-xs whitespace-nowrap">{day.border_crossing}</td>
+                    <td className="px-3 py-2">
+                      {editNotes[day.log_id] !== undefined ? (
+                        <div className="flex gap-1">
+                          <textarea value={editNotes[day.log_id]}
+                            onChange={e => setEditNotes(n => ({...n, [day.log_id]: e.target.value}))}
+                            className="border rounded px-2 py-1 text-xs w-28 h-10 resize-none"/>
+                          <button onClick={() => saveNote(day.log_id, editNotes[day.log_id])}
+                            disabled={saving[day.log_id]}
+                            className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:opacity-50">
+                            {saving[day.log_id] ? "…" : "✓"}
+                          </button>
+                          <button onClick={() => setEditNotes(n => { const x={...n}; delete x[day.log_id]; return x; })}
+                            className="px-2 py-1 bg-gray-200 rounded text-xs">✕</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-400 truncate max-w-20">{day.notes}</span>
+                          <button onClick={() => setEditNotes(n => ({...n, [day.log_id]: day.notes || ""}))}
+                            className="text-blue-400 hover:text-blue-600 text-xs shrink-0">✏️</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── APP ────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState("day");
+  const [selectedTour, setSelectedTour] = useState(null);
+
+  const handleSelectTour = code => { setSelectedTour(code); setTab("detail"); };
+
+  const tabs = [
+    {id:"timeline", label:"📊 Timeline"},
+    {id:"day",      label:"📅 დღის ხედი"},
+    {id:"detail",   label:"🔍 ტურის დეტალი"},
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <header className="bg-slate-900 text-white shadow-lg">
+        <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="font-bold text-lg">
+              შპს ჯი-თი-სი 360 (GTC360)&nbsp;
+              <span className="text-slate-500 font-normal">|</span>&nbsp;
+              GOGA of TOURS
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              ს/კ: 405605661 &nbsp;|&nbsp; GE16BG0000000544098839
+            </div>
+          </div>
+          <div className="text-xs text-slate-400">
+            {new Date().toLocaleDateString("ka-GE",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}
+          </div>
+        </div>
+        <div className="border-t border-slate-700">
+          <div className="max-w-screen-xl mx-auto px-4 flex">
+            {tabs.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`px-5 py-3 text-sm font-medium transition-colors ${
+                  tab === t.id ? "border-b-2 border-amber-400 text-white" : "text-slate-400 hover:text-white"
+                }`}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-screen-xl mx-auto">
+        {tab === "timeline" && <TimelineView onSelectTour={handleSelectTour}/>}
+        {tab === "day"      && <DayView onSelectTour={handleSelectTour}/>}
+        {tab === "detail"   && <TourDetailView initialCode={selectedTour} onBack={() => setTab("day")}/>}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
