@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import database as db
 from excel_parser import parse_all_excel
+from sheets_sync import fetch_hotel_assignments
 
 app = FastAPI(title="GTC360 — GOGA of TOURS")
 
@@ -19,6 +20,12 @@ def startup():
             db.seed_excel_data(parsed)
     except Exception as e:
         print(f"Excel parse warning: {e}")
+    try:
+        assignments = fetch_hotel_assignments()
+        if assignments:
+            db.update_hotels_from_sheets(assignments)
+    except Exception as e:
+        print(f"Sheets sync warning: {e}")
 
 
 class NoteUpdate(BaseModel):
@@ -110,3 +117,14 @@ def financials_tour(code: str):
 @app.get("/api/restaurants")
 def restaurants():
     return db.get_all_restaurants()
+
+
+@app.post("/api/sync-hotels")
+def sync_hotels():
+    """Re-read Google Sheets and update hotel assignments. Read-only on the sheet."""
+    try:
+        assignments = fetch_hotel_assignments()
+        updated = db.update_hotels_from_sheets(assignments)
+        return {"ok": True, "tours": len(assignments), "records_updated": updated}
+    except Exception as e:
+        raise HTTPException(500, str(e))
