@@ -202,23 +202,54 @@ def update_log_notes(log_id: int, notes: str):
     with get_db() as conn:
         conn.execute("UPDATE daily_log SET notes=? WHERE id=?", (notes, log_id))
 
+HOTEL_CITY = {
+    'Pullman Tbilisi':          'Tbilisi',
+    'Hualing Tbilisi':          'Tbilisi',
+    'Pine Astoria Tbilisi':     'Tbilisi',
+    'Radisson Blu Tbilisi':     'Tbilisi',
+    'Gino Paradise':            'Tbilisi',
+    'Radisson Blu Yerevan':     'Yerevan',
+    "Aghababyan's Yerevan":     'Yerevan',
+    'Armenia Marriott Yerevan': 'Yerevan',
+    'Akhaltsikhe Inn':          'Akhaltsikhe',
+    'Greenwood Batumi':         'Batumi',
+    'Best Western Batumi':      'Batumi',
+    'Radisson Blu Batumi':      'Batumi',
+    'Gistola Resort Mestia':    'Mestia',
+    'Marco Polo Gudauri':       'Gudauri',
+    'Gudauri Inn':              'Gudauri',
+    'Gudauri Lodge':            'Gudauri',
+    'Gori Inn':                 'Gori',
+    'Covasar Sevan':            'Sevan',
+    'Crowne Plaza Borjomi':     'Borjomi',
+    'Kutaisi Inn':              'Kutaisi',
+}
+
+def _city_from_hotel(hotel: str) -> str:
+    """Return city name for a known hotel, or empty string."""
+    return HOTEL_CITY.get(hotel, '')
+
 def update_hotels_from_sheets(assignments: dict):
-    """Update daily_log.hotel with actual booked hotel from Google Sheets.
-    assignments = {tour_code: {date_iso: hotel_name}}
-    Only overwrites rows that exist in daily_log — never inserts new rows.
-    """
+    """Update daily_log.hotel (and city) from Google Sheets. Read-only on sheet."""
     updated = 0
     with get_db() as conn:
         for tour_code, date_hotels in assignments.items():
             for date_iso, hotel in date_hotels.items():
                 if not hotel:
                     continue
-                cur = conn.execute(
-                    "UPDATE daily_log SET hotel=? WHERE tour_code=? AND date=?",
-                    (hotel, tour_code, date_iso)
-                )
+                city = _city_from_hotel(hotel)
+                if city:
+                    cur = conn.execute(
+                        "UPDATE daily_log SET hotel=?, city=? WHERE tour_code=? AND date=?",
+                        (hotel, city, tour_code, date_iso)
+                    )
+                else:
+                    cur = conn.execute(
+                        "UPDATE daily_log SET hotel=? WHERE tour_code=? AND date=?",
+                        (hotel, tour_code, date_iso)
+                    )
                 updated += cur.rowcount
-    print(f"[sheets_sync] Updated {updated} hotel records in daily_log")
+    print(f"[sheets_sync] Updated {updated} hotel+city records in daily_log")
     return updated
 
 def seed_excel_data(parsed_tours: list):
