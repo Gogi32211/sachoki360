@@ -379,6 +379,14 @@ def update_hotels_from_sheets(assignments: dict):
             for date_iso, hotel in date_hotels.items():
                 if not hotel:
                     continue
+                # Don't let a generic "Hualing Tbilisi" entry override "Hualing Preference 5★"
+                if hotel == 'Hualing Tbilisi':
+                    row = conn.execute(
+                        "SELECT hotel FROM daily_log WHERE tour_code=? AND date=?",
+                        (tour_code, date_iso)
+                    ).fetchone()
+                    if row and row['hotel'] == 'Hualing Preference 5★':
+                        continue
                 city = _city_from_hotel(hotel)
                 if city:
                     cur = conn.execute(

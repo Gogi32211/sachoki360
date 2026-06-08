@@ -50,11 +50,11 @@ SERIES = {
         "duration": 6,
         "color": "#AB47BC",
         "nights": {
-            0: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ ცეკვებით", "border": None},
-            1: {"city": "Yerevan", "hotel": "Aghababyan's Yerevan", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: სადახლო"},
+            0: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ + ცეკვა / სიმღერა", "border": None},
+            1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: სადახლო"},
             2: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": "ARM→GEO: სადახლო"},
             3: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: სალობიე", "dinner": "ვახშამი: დინ შენი", "border": None},
-            4: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: ორქოს საბმისი", "border": None},
+            4: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: ოქროს საწმისი", "border": None},
             5: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "ლანჩი: ახალი აზია (ისანი)", "dinner": "ვახშამი: საკუთარი ხარჯებით", "border": None},
         }
     },
@@ -63,11 +63,11 @@ SERIES = {
         "duration": 6,
         "color": "#EC407A",
         "nights": {
-            0: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ ცეკვებით", "border": None},
+            0: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ხარება", "dinner": "ვახშამი: კტვ + ცეკვა / სიმღერა", "border": None},
             1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: სადახლო"},
             2: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": "ARM→GEO: სადახლო"},
             3: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: გურამიშვილის მარანი", "dinner": "ვახშამი: დინ შენი", "border": None},
-            4: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: ორქოს საბმისი", "border": None},
+            4: {"city": "Tbilisi", "hotel": "Hualing Preference 5★", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: ოქროს საწმისი", "border": None},
             5: {"city": "✈ Tbilisi→Urumqi", "hotel": "—", "lunch": "ლანჩი: საკუთარი ხარჯებით", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": None},
         }
     },
