@@ -116,6 +116,29 @@ def sync_series_meals(series_key: str):
     return updated
 
 
+def sync_series_hotels(series_key: str):
+    """Reset hotel/city in daily_log for all tours of a series to seed_data defaults."""
+    nights = SERIES[series_key]["nights"]
+    with get_db() as conn:
+        tours = conn.execute(
+            "SELECT code, bus_start FROM tours WHERE series=?", (series_key,)
+        ).fetchall()
+        updated = 0
+        for t in tours:
+            bs = date.fromisoformat(t["bus_start"])
+            for offset, info in nights.items():
+                day_date = (bs + timedelta(days=offset)).isoformat()
+                hotel = info.get("hotel", "")
+                city = info.get("city", "")
+                cur = conn.execute(
+                    "UPDATE daily_log SET hotel=?, city=? WHERE tour_code=? AND date=?",
+                    (hotel, city, t["code"], day_date)
+                )
+                updated += cur.rowcount
+    print(f"[sync_hotels] Reset {updated} hotel records for series {series_key}")
+    return updated
+
+
 def get_tour_status(bus_start_str: str, bus_end_str: str) -> str:
     today = date.today()
     bs = date.fromisoformat(bus_start_str)
@@ -233,30 +256,52 @@ def update_log_notes(log_id: int, notes: str):
         conn.execute("UPDATE daily_log SET notes=? WHERE id=?", (notes, log_id))
 
 HOTEL_CITY = {
+    # Tbilisi
     'Pullman Tbilisi':          'Tbilisi',
     'Hualing Tbilisi':          'Tbilisi',
+    'Hualing Preference 5★':    'Tbilisi',
+    'Pine Astoria':             'Tbilisi',
     'Pine Astoria Tbilisi':     'Tbilisi',
     'Radisson Blu Tbilisi':     'Tbilisi',
     'Gino Paradise':            'Tbilisi',
+    # Yerevan
     'Radisson Blu Yerevan':     'Yerevan',
     "Aghababyan's Yerevan":     'Yerevan',
     'Armenia Marriott Yerevan': 'Yerevan',
+    # Akhaltsikhe
+    'Akhaltsikhe Inn 5★':       'Akhaltsikhe',
     'Akhaltsikhe Inn':          'Akhaltsikhe',
+    # Batumi
     'Greenwood Batumi':         'Batumi',
     'Best Western Batumi':      'Batumi',
     'Radisson Blu Batumi':      'Batumi',
+    # Mestia
+    'Gistola Resort 5★':        'Mestia',
     'Gistola Resort Mestia':    'Mestia',
+    # Gori
+    'Gori Inn':                 'Gori',
+    # Gudauri
     'Marco Polo Gudauri':       'Gudauri',
     'Gudauri Inn':              'Gudauri',
     'Gudauri Lodge':            'Gudauri',
-    'Gori Inn':                 'Gori',
+    # Other
     'Covasar Sevan':            'Sevan',
     'Crowne Plaza Borjomi':     'Borjomi',
     'Kutaisi Inn':              'Kutaisi',
 }
 
+_UNCERTAIN_CITY_MAP = {
+    'Mestia': 'Mestia', 'Gori': 'Gori', 'Gudauri': 'Gudauri',
+    'Akhaltsikhe': 'Akhaltsikhe', 'Yerevan': 'Yerevan',
+}
+
 def _city_from_hotel(hotel: str) -> str:
-    """Return city name for a known hotel, or empty string."""
+    """Return city name for a known hotel, or empty string. Handles '? City' uncertain markers."""
+    if not hotel:
+        return ''
+    if hotel.startswith('? '):
+        first_word = hotel[2:].split()[0] if hotel[2:].strip() else ''
+        return _UNCERTAIN_CITY_MAP.get(first_word, HOTEL_CITY.get(hotel[2:].strip(), ''))
     return HOTEL_CITY.get(hotel, '')
 
 def update_hotels_from_sheets(assignments: dict):

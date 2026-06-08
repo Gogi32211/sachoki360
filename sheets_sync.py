@@ -21,63 +21,102 @@ SKIP_HOTELS = {
     'el resort', 'el resort sheki',
 }
 
-# Normalise hotel names from various spellings in the sheet
+# Confirmed hotel name map (specific hotel name → canonical)
 HOTEL_MAP = {
+    # Tbilisi
     'pullman': 'Pullman Tbilisi',
     'pullman tbilisi': 'Pullman Tbilisi',
     'hualing': 'Hualing Tbilisi',
     'hualing tbilisi': 'Hualing Tbilisi',
-    'pine astoria': 'Pine Astoria Tbilisi',
-    'pine tbilisi': 'Pine Astoria Tbilisi',
+    'gino': 'Gino Paradise',
+    'gino - 75 usd': 'Gino Paradise',
+    'pine astoria': 'Pine Astoria',
+    'pine tbilisi': 'Pine Astoria',
+    'pine': 'Pine Astoria',
     'redisson tbilisi': 'Radisson Blu Tbilisi',
     'radisson tbilisi': 'Radisson Blu Tbilisi',
     'radisson blu tbilisi': 'Radisson Blu Tbilisi',
+    # Yerevan
     'radisson yerevan': 'Radisson Blu Yerevan',
     'radisson blu yerevan': 'Radisson Blu Yerevan',
-    'radisson blu hotel batumi': 'Radisson Blu Batumi',
     'aghababayan': "Aghababyan's Yerevan",
     'agababayan': "Aghababyan's Yerevan",
     'agababayans': "Aghababyan's Yerevan",
     'armenia marriott': 'Armenia Marriott Yerevan',
-    'akhaltsikhe': 'Akhaltsikhe Inn',
-    'akhaltsikhe inn': 'Akhaltsikhe Inn',
+    # Akhaltsikhe — "akhaltsikhe inn" confirmed, "akhaltsikhe" alone is uncertain
+    'akhaltsikhe inn': 'Akhaltsikhe Inn 5★',
+    # Batumi
     'greenwood batumi': 'Greenwood Batumi',
     'bw batumi': 'Best Western Batumi',
     'best western batumi': 'Best Western Batumi',
-    'gistola': 'Gistola Resort Mestia',
-    'mestia': 'Gistola Resort Mestia',
-    'gori': 'Gori Inn',
+    'radisson blu hotel batumi': 'Radisson Blu Batumi',
+    # Mestia — "gistola" confirmed, "mestia" alone is uncertain
+    'gistola': 'Gistola Resort 5★',
+    'gistola resort': 'Gistola Resort 5★',
+    'gistola resort mestia': 'Gistola Resort 5★',
+    # Gori — "gori inn" confirmed, "gori" alone is uncertain
     'gori inn': 'Gori Inn',
+    # Gudauri — "marco polo" / "gudauri inn" confirmed, "gudauri" alone is uncertain
     'marco polo': 'Marco Polo Gudauri',
     'marco polo gudauri': 'Marco Polo Gudauri',
     'gudauri inn': 'Gudauri Inn',
     'gudauri lodge': 'Gudauri Lodge',
+    # Other
     'covasar sevan': 'Covasar Sevan',
     'crown plaza borjomi': 'Crowne Plaza Borjomi',
     'crown plaa bojomi': 'Crowne Plaza Borjomi',
     'kutaisi inn': 'Kutaisi Inn',
 }
 
+# City-only names without a specific hotel → hotel not yet confirmed
+UNCERTAIN_CITY = {'mestia', 'gori', 'gudauri', 'akhaltsikhe', 'yerevan'}
+
 
 def _clean(name: str) -> str:
-    """Strip booking-status suffixes and normalise hotel name."""
+    """Strip booking-status suffixes, detect uncertainty, and normalise hotel name."""
     s = name.strip()
     # Remove trailing status markers
     for suffix in (' Rok', ' rok', ' R-no staff rooms', ' R', ' r',
                    ' ok', ' Ok', ' - revised', ' -revised',
                    ' cancelled', ' Cancelled', ' cacnelled',
+                   ' - cancelled', ' - paid', ' Rok- Paid',
                    ' sent', ' paid', ' Paid'):
         if s.endswith(suffix):
             s = s[: -len(suffix)].strip()
     # Remove parenthetical notes like " (ბუქინგიდან)"
     s = re.sub(r'\s*\(.*?\)\s*', '', s).strip()
+
+    # Multiple hotel options separated by "/" → hotel not confirmed
+    multi = '/' in s
+    if multi:
+        s = s.split('/')[0].strip()
+
+    # Strip room count info: "8 twin", "3 twin", "- 1 double", etc.
+    s = re.sub(r'\s*[-–]\s*\d+\s*(twin|double|single|suite|room)\b.*', '', s, flags=re.IGNORECASE).strip()
+    s = re.sub(r'\s+\d+\s*(twin|double|single|suite|room)\b.*', '', s, flags=re.IGNORECASE).strip()
+
+    if not s:
+        return ''
+
     # Check skip list
     if s.lower() in SKIP_HOTELS or any(s.lower().startswith(k) for k in SKIP_HOTELS):
         return ''
-    # Normalise via map
-    key = s.lower().rstrip('.')
+
+    key = s.lower().strip()
+
+    # Check confirmed hotel map
     if key in HOTEL_MAP:
-        return HOTEL_MAP[key]
+        normalized = HOTEL_MAP[key]
+        return ('? ' + normalized) if multi else normalized
+
+    # Check uncertain city-only names
+    if key in UNCERTAIN_CITY:
+        return '? ' + s.title()
+
+    # Multi-option fallback (confirmed hotel not in map)
+    if multi:
+        return '? ' + s.title()
+
     # Fall back: title-case cleaned string
     return s.title() if s else ''
 
@@ -90,10 +129,8 @@ def _parse_date(cell: str):
     for fmt in ('%m/%d/%y', '%m/%d/%Y', '%d/%m/%y', '%d/%m/%Y'):
         try:
             d = datetime.strptime(s, fmt).date()
-            # Sanity: must be 2026
             if d.year == 2026:
                 return d
-            # strptime with %y maps 26 → 2026 already, but double-check
             if d.year == 26:
                 return d.replace(year=2026)
             return None
@@ -107,6 +144,7 @@ def fetch_hotel_assignments() -> dict:
     Download the Google Sheet as CSV (read-only) and return:
     {tour_code: {date_iso: hotel_name}}
     Only includes GEO/ARM hotels; skips AZ/Flight rows.
+    Hotels not yet confirmed are prefixed with "? ".
     """
     try:
         resp = requests.get(CSV_URL, timeout=20)
@@ -119,20 +157,16 @@ def fetch_hotel_assignments() -> dict:
     rows = list(reader)
 
     assignments: dict = {}
-    # col_index → tour_code for current block
     active_cols: dict = {}
-    # track which sections are cancelled
     cancelled_section = False
 
     for row in rows:
-        # Detect cancelled sections
         row_text = ' '.join(row).lower()
         if 'cancelled' in row_text and 'for cancell' in row_text:
             cancelled_section = True
         if 'done 2026' in row_text:
             cancelled_section = False
 
-        # Look for tour code cells in this row
         new_cols: dict = {}
         for j, cell in enumerate(row):
             c = cell.strip()
@@ -150,7 +184,6 @@ def fetch_hotel_assignments() -> dict:
         if not active_cols or cancelled_section:
             continue
 
-        # Try to parse as date/hotel data row
         found_any_date = False
         for col_idx, tour_code in active_cols.items():
             if col_idx >= len(row):
@@ -164,9 +197,7 @@ def fetch_hotel_assignments() -> dict:
             if hotel:
                 assignments[tour_code][date_obj.isoformat()] = hotel
 
-        # If no dates found in expected columns, clear active block
         if not found_any_date:
-            # Only reset if row has substantial content (not blank)
             non_empty = sum(1 for c in row if c.strip())
             if non_empty > 2:
                 active_cols = {}
