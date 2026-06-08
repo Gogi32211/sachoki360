@@ -72,8 +72,27 @@ def init_db():
             );
         """)
 
+_DEFAULT_PAYMENT_TERMS = [
+    # Hotels — pay 1 day before check-in
+    ("Pullman Tbilisi",      "hotel",      "before", 1, ""),
+    ("Radisson Blu Yerevan", "hotel",      "before", 1, ""),
+    ("Marco Polo Gudauri",   "hotel",      "before", 1, ""),
+    ("Gistola Resort 5★",    "hotel",      "before", 1, ""),
+    # Restaurants — pay 1 day before service
+    ("დინ შენი",             "restaurant", "before", 1, ""),
+    ("სალობიე",              "restaurant", "before", 1, ""),
+]
+
+
 def seed_db():
     with get_db() as conn:
+        for vendor_name, vendor_type, timing, days_offset, notes in _DEFAULT_PAYMENT_TERMS:
+            conn.execute("""
+                INSERT INTO payment_terms (vendor_name, vendor_type, timing, days_offset, notes)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT(vendor_name) DO NOTHING
+            """, (vendor_name, vendor_type, timing, days_offset, notes))
+
         existing = {r["code"] for r in conn.execute("SELECT code FROM tours").fetchall()}
         for t in TOURS_2026:
             if t["code"] in existing:
