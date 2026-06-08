@@ -22,6 +22,11 @@ def startup():
         print(f"Excel parse warning: {e}")
     for series in ("ZT", "LN", "KT", "DT1", "DT2"):
         try:
+            db.sync_series_hotels(series)
+        except Exception as e:
+            print(f"Hotel sync warning ({series}): {e}")
+    for series in ("ZT", "LN", "KT", "DT1", "DT2"):
+        try:
             db.sync_series_meals(series)
         except Exception as e:
             print(f"Meal sync warning ({series}): {e}")
