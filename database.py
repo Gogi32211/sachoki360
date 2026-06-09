@@ -166,7 +166,8 @@ def seed_db():
             series = t["series"]
             bus_start = date.fromisoformat(t["bus_start"])
             duration = SERIES[series]["duration"]
-            bus_end = bus_start + timedelta(days=duration)
+            # Tour ends on the Tbilisi→Urumqi flight day = last itinerary day
+            bus_end = bus_start + timedelta(days=duration - 1)
             conn.execute(
                 "INSERT INTO tours (code, series, bus_start, bus_end) VALUES (?,?,?,?)",
                 (t["code"], series, bus_start.isoformat(), bus_end.isoformat())
