@@ -589,6 +589,44 @@ def get_all_vendors():
                     meal_names.add(n)
         return {'hotels': hotels, 'restaurants': sorted(meal_names)}
 
+_RATE_CACHE = {"rate": None, "ts": 0.0}
+
+def _rate_from_meals(default: float = 2.68) -> float:
+    """Fallback: GEL per 1 USD derived (median) from the financial meal pairs."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT gel_amount, usd_amount FROM tour_meals "
+            "WHERE usd_amount > 0 AND gel_amount > 0"
+        ).fetchall()
+    rates = sorted(r['gel_amount'] / r['usd_amount'] for r in rows)
+    if not rates:
+        return default
+    return round(rates[len(rates) // 2], 4)
+
+def get_exchange_rate(default: float = 2.68) -> float:
+    """Official USD→GEL rate from the National Bank of Georgia (cached ~6h)."""
+    import time
+    now = time.time()
+    if _RATE_CACHE["rate"] and now - _RATE_CACHE["ts"] < 6 * 3600:
+        return _RATE_CACHE["rate"]
+    try:
+        import requests
+        url = "https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/?currencies=USD"
+        resp = requests.get(url, timeout=10, headers={
+            "User-Agent": "Mozilla/5.0", "Accept": "application/json"})
+        resp.raise_for_status()
+        cur = resp.json()[0]["currencies"][0]
+        rate = round(float(cur["rate"]) / float(cur.get("quantity", 1) or 1), 4)
+        if rate > 0:
+            _RATE_CACHE["rate"] = rate
+            _RATE_CACHE["ts"] = now
+            return rate
+    except Exception as e:
+        print(f"[exchange_rate] NBG fetch failed: {e}")
+    # Fallback to last known good, then to meal-derived rate
+    return _RATE_CACHE["rate"] or _rate_from_meals(default)
+
+
 def _calc_amount(term: dict, series: str = '') -> float:
     uprice = term.get('unit_price') or 0.0
     vtype  = term.get('vendor_type', 'hotel')

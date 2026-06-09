@@ -9,6 +9,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
 * { font-family: 'Noto Sans Georgian', sans-serif; }
 .gantt-scroll { overflow-x: auto; }
@@ -31,7 +32,16 @@ const SERIES_COLORS = {
   ZT: "#42A5F5", LN: "#66BB6A", KT: "#FF7043", DT1: "#AB47BC", DT2: "#EC407A"
 };
 
+// Approx tour price (USD) for a 19+1 group — revenue from clients.
+const TOUR_PRICE = { ZT: 20300, LN: 17350, KT: 13600, DT1: 13300, DT2: 13300 };
+
 const pad2 = n => String(n).padStart(2, "0");
+const addDays = (iso, n) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + n);
+  return toISO(dt);
+};
 const toISO = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
 
 function Badge({ series }) {
@@ -626,7 +636,7 @@ function PaymentsView() {
       </div>
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
-        {groupBy === 'date' && [['all','ყველა'],['overdue','ვადაგადასული'],['due_soon','3 დღეში'],['due_5','5 დღეში'],['due_10','10 დღეში'],['upcoming','მომდევნო']].map(([v,l]) => (
+        {groupBy === 'date' && [['all','ყველა'],['overdue','ვადაგადასული'],['due_soon','3 დღე ჯამურად'],['due_5','5 დღე ჯამურად'],['due_10','10 დღე ჯამურად'],['upcoming','მომდევნო']].map(([v,l]) => (
           <button key={v} onClick={() => setFilter(v)}
             className={`px-3 py-1 rounded text-xs ${filter===v ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>{l}</button>
         ))}
@@ -754,7 +764,314 @@ function PaymentsView() {
   );
 }
 
-// ── SETTINGS VIEW ──────────────────────────────────────────────
+// ── PREPAYMENT STATS VIEW ──────────────────────────────────────
+// Bar chart with a FIXED (non-scrolling) Y axis on the left and a
+// horizontally scrollable plot area on the right.
+function ScrollBarChart({ labels, datasets, height = 320, colWidth = 46,
+                          yTitle = 'USD ($)', highlightLabel = null,
+                          centerLabel = null, tooltipLabel = null }) {
+  const axisRef = useRef(null), mainRef = useRef(null);
+  const axisChart = useRef(null), mainChart = useRef(null);
+  const scrollRef = useRef(null);
+
+  const dataKey = JSON.stringify([labels, datasets.map(d => d.data)]);
+
+  useEffect(() => {
+    if (!window.Chart || !mainRef.current || !axisRef.current) return;
+    const allVals = datasets.flatMap(d => d.data);
+    const maxVal = Math.max(0, ...allVals);
+    const fixedMax = Math.max(1, Math.ceil(maxVal / 1000) * 1000);
+
+    if (axisChart.current) axisChart.current.destroy();
+    if (mainChart.current) mainChart.current.destroy();
+
+    const xCommon = { maxRotation: 90, minRotation: 60, autoSkip: false, font: { size: 10 } };
+
+    // Left: axis only (bars invisible, x labels invisible but laid out for alignment)
+    axisChart.current = new Chart(axisRef.current, {
+      type: 'bar',
+      data: { labels, datasets: datasets.map(d => ({ ...d, backgroundColor: 'rgba(0,0,0,0)', borderColor: 'rgba(0,0,0,0)' })) },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: {
+          x: { ticks: { ...xCommon, color: 'rgba(0,0,0,0)' }, grid: { display: false } },
+          y: { beginAtZero: true, max: fixedMax, title: { display: true, text: yTitle, font: { size: 11 } }, ticks: { font: { size: 11 } } },
+        },
+      },
+    });
+
+    // Right: real bars, y ticks hidden (the fixed axis provides them)
+    mainChart.current = new Chart(mainRef.current, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: tooltipLabel ? { callbacks: { label: tooltipLabel } } : {},
+        },
+        scales: {
+          x: { ticks: { ...xCommon, color: (ctx) => (labels[ctx.index] === highlightLabel ? '#dc2626' : '#6b7280') }, grid: { display: false } },
+          y: { beginAtZero: true, max: fixedMax, ticks: { display: false }, grid: { display: true } },
+        },
+      },
+    });
+
+    if (scrollRef.current && centerLabel) {
+      let idx = labels.findIndex(d => d >= centerLabel);
+      if (idx < 0) idx = labels.length - 1;
+      const sc = scrollRef.current;
+      const colW = sc.scrollWidth / Math.max(labels.length, 1);
+      sc.scrollLeft = Math.max(0, (idx + 0.5) * colW - sc.clientWidth / 2);
+    }
+
+    return () => {
+      if (axisChart.current) axisChart.current.destroy();
+      if (mainChart.current) mainChart.current.destroy();
+    };
+  }, [dataKey, height, colWidth]);
+
+  const chartWidth = Math.max(720, labels.length * colWidth);
+  return (
+    <div className="flex">
+      <div style={{ width: 64, height }} className="flex-shrink-0"><canvas ref={axisRef}/></div>
+      <div className="overflow-x-auto flex-1" ref={scrollRef}>
+        <div style={{ width: chartWidth, height }}><canvas ref={mainRef}/></div>
+      </div>
+    </div>
+  );
+}
+
+function PrepayStatsView() {
+  const [schedule, setSchedule] = useState([]);
+  const [rate, setRate] = useState(2.68);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Whole season — include finished tours too, for a complete picture.
+    Promise.all([
+      fetch(`${API}/payments/schedule?from_date=2026-01-01&to_date=2026-12-31`).then(r => r.json()),
+      fetch(`${API}/exchange-rate`).then(r => r.json()).catch(() => ({rate: 2.68})),
+    ]).then(([sched, rt]) => {
+      setSchedule(sched);
+      if (rt && rt.rate) setRate(rt.rate);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const today = toISO(new Date());
+
+  // ── Aggregate by due date ──
+  const byDate = {};
+  schedule.forEach(p => {
+    if (!p.total_amount || p.total_amount <= 0) return;
+    if (!byDate[p.due_date]) byDate[p.due_date] = { gel: 0, usd: 0 };
+    if (p.currency === 'USD') byDate[p.due_date].usd += p.total_amount;
+    else byDate[p.due_date].gel += p.total_amount;
+  });
+  const dates     = Object.keys(byDate).sort();
+  const usdArr    = dates.map(d => Math.round(byDate[d].usd));
+  const gelArr    = dates.map(d => byDate[d].gel);
+  const gelUsdArr = dates.map(d => Math.round(byDate[d].gel / rate));
+  const totalGel  = gelArr.reduce((a, b) => a + b, 0);
+  const totalUsd  = usdArr.reduce((a, b) => a + b, 0);
+
+  // ── Aggregate by tour (total prepayment per tour, in USD) ──
+  const byTour = {};
+  schedule.forEach(p => {
+    if (!p.total_amount || p.total_amount <= 0) return;
+    const usd = p.currency === 'USD' ? p.total_amount : p.total_amount / rate;
+    if (!byTour[p.tour_code]) byTour[p.tour_code] = { usd: 0, first: p.first_service_date || '' };
+    byTour[p.tour_code].usd += usd;
+    if (p.first_service_date && p.first_service_date < byTour[p.tour_code].first)
+      byTour[p.tour_code].first = p.first_service_date;
+  });
+  const tourCodes  = Object.keys(byTour).sort((a, b) =>
+    (byTour[a].first || '').localeCompare(byTour[b].first || '') || a.localeCompare(b));
+  const tourUsd    = tourCodes.map(c => Math.round(byTour[c].usd));
+  const tourColors = tourCodes.map(c => SERIES_COLORS[c.split('-')[0]] || '#888');
+
+  const dailyTip = c => c.datasetIndex === 1
+    ? `ლარი: ₾${Math.round(gelArr[c.dataIndex]).toLocaleString()} (≈$${c.parsed.y.toLocaleString()})`
+    : `დოლარი: $${c.parsed.y.toLocaleString()}`;
+  const tourTip = c => `${c.label}: $${c.parsed.y.toLocaleString()}`;
+
+  return (
+    <div className="p-4 max-w-5xl mx-auto">
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+          <div className="text-xs text-blue-600 mb-0.5">სულ საჭირო (დოლარი)</div>
+          <div className="text-2xl font-bold text-blue-700">${totalUsd.toLocaleString()}</div>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+          <div className="text-xs text-emerald-600 mb-0.5">სულ საჭირო (ლარი)</div>
+          <div className="text-2xl font-bold text-emerald-700">₾{Math.round(totalGel).toLocaleString()}</div>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+          <div className="text-xs text-gray-500 mb-0.5">კურსი ₾/$ (ეროვნ. ბანკი)</div>
+          <div className="text-2xl font-bold text-gray-700">{rate}</div>
+        </div>
+      </div>
+
+      {loading ? <Spinner/> : dates.length === 0 ? (
+        <div className="text-center py-16 text-gray-400 text-sm">წინასწარი გადასახდელი არ არის</div>
+      ) : (
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="flex items-center gap-4 mb-3">
+              <div className="text-sm font-semibold text-gray-700">დღიური წინასწარი გადასახდელი</div>
+              <span className="flex items-center gap-1 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm" style={{background:'#3b82f6'}}/>დოლარი $</span>
+              <span className="flex items-center gap-1 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm" style={{background:'#10b981'}}/>ლარი ₾ (→$)</span>
+              <span className="text-xs text-red-500">წითელი = დღეს</span>
+            </div>
+            <ScrollBarChart
+              labels={dates}
+              datasets={[
+                { label: 'დოლარი $', data: usdArr, backgroundColor: '#3b82f6', borderRadius: 3 },
+                { label: 'ლარი ₾ (→$)', data: gelUsdArr, backgroundColor: '#10b981', borderRadius: 3 },
+              ]}
+              highlightLabel={today} centerLabel={today} tooltipLabel={dailyTip}/>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="text-sm font-semibold text-gray-700 mb-3">წინასწარი ხარჯი ტურების მიხედვით (USD-ში)</div>
+            <ScrollBarChart
+              labels={tourCodes}
+              datasets={[{ label: 'წინასწარი ხარჯი $', data: tourUsd, backgroundColor: tourColors, borderRadius: 3 }]}
+              colWidth={40} tooltipLabel={tourTip}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── CASH FLOW VIEW (client revenue: advances + balances) ───────
+function CashFlowView() {
+  const [tours, setTours] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tableFilter, setTableFilter] = useState('upcoming');
+
+  useEffect(() => {
+    fetch(`${API}/tours`).then(r => r.json())
+      .then(d => { setTours(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const today = toISO(new Date());
+
+  // 60% advance on tour start day; 40% balance 10 days after tour end.
+  const byDate = {};
+  const byDateEvents = {};
+  let totalAdv = 0, totalBal = 0;
+  tours.forEach(t => {
+    const price = TOUR_PRICE[t.series] || 0;
+    if (!price) return;
+    const adv = Math.round(price * 0.6), bal = Math.round(price * 0.4);
+    const advDate = addDays(t.bus_start, -1);
+    const balDate = addDays(t.bus_end, 10);
+    (byDate[advDate] = byDate[advDate] || { adv: 0, bal: 0 }).adv += adv;
+    (byDate[balDate] = byDate[balDate] || { adv: 0, bal: 0 }).bal += bal;
+    (byDateEvents[advDate] = byDateEvents[advDate] || []).push({ code: t.code, series: t.series, type: 'advance', amount: adv });
+    (byDateEvents[balDate] = byDateEvents[balDate] || []).push({ code: t.code, series: t.series, type: 'balance', amount: bal });
+    totalAdv += adv; totalBal += bal;
+  });
+  const dates   = Object.keys(byDate).sort();
+  const advArr  = dates.map(d => byDate[d].adv);
+  const balArr  = dates.map(d => byDate[d].bal);
+
+  const eventDates = Object.keys(byDateEvents).sort();
+  const shownDates = eventDates.filter(d => tableFilter === 'all' || d >= today);
+  Object.values(byDateEvents).forEach(evs =>
+    evs.sort((a, b) => (a.type === b.type ? a.code.localeCompare(b.code) : a.type === 'advance' ? -1 : 1)));
+
+  const tip = c => c.datasetIndex === 0
+    ? `ავანსი (60%): $${c.parsed.y.toLocaleString()}`
+    : `ბალანსი (40%): $${c.parsed.y.toLocaleString()}`;
+
+  return (
+    <div className="p-4 max-w-5xl mx-auto">
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-3">
+          <div className="text-xs text-teal-600 mb-0.5">სულ ავანსები (60%)</div>
+          <div className="text-2xl font-bold text-teal-700">${totalAdv.toLocaleString()}</div>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <div className="text-xs text-amber-600 mb-0.5">სულ ბალანსები (40%)</div>
+          <div className="text-2xl font-bold text-amber-700">${totalBal.toLocaleString()}</div>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+          <div className="text-xs text-gray-500 mb-0.5">სულ შემოსავალი</div>
+          <div className="text-2xl font-bold text-gray-700">${(totalAdv + totalBal).toLocaleString()}</div>
+        </div>
+      </div>
+
+      {loading ? <Spinner/> : dates.length === 0 ? (
+        <div className="text-center py-16 text-gray-400 text-sm">მონაცემები არ არის</div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center gap-4 mb-3 flex-wrap">
+            <div className="text-sm font-semibold text-gray-700">შემოსავლის მოძრაობა დღეების მიხედვით</div>
+            <span className="flex items-center gap-1 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm" style={{background:'#14b8a6'}}/>ავანსი 60% (ტურის დაწყება)</span>
+            <span className="flex items-center gap-1 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm" style={{background:'#f59e0b'}}/>ბალანსი 40% (დასრულება +10 დღე)</span>
+            <span className="text-xs text-red-500">წითელი = დღეს</span>
+          </div>
+          <ScrollBarChart
+            labels={dates}
+            datasets={[
+              { label: 'ავანსი 60%', data: advArr, backgroundColor: '#14b8a6', borderRadius: 3 },
+              { label: 'ბალანსი 40%', data: balArr, backgroundColor: '#f59e0b', borderRadius: 3 },
+            ]}
+            highlightLabel={today} centerLabel={today} tooltipLabel={tip}/>
+        </div>
+      )}
+
+      {!loading && eventDates.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm p-4 mt-6">
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <div className="text-sm font-semibold text-gray-700">თარიღების მიხედვით — რომელი ტურის ფული შემოდის</div>
+            <div className="ml-auto flex gap-2">
+              {[['upcoming','მომავალი'],['all','ყველა']].map(([v,l]) => (
+                <button key={v} onClick={() => setTableFilter(v)}
+                  className={`px-3 py-1 rounded text-xs ${tableFilter===v ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            {shownDates.map(d => {
+              const evs = byDateEvents[d];
+              const tot = evs.reduce((s, e) => s + e.amount, 0);
+              const isToday = d === today;
+              return (
+                <div key={d} className={`border rounded-lg overflow-hidden ${isToday ? 'border-red-300' : 'border-gray-200'}`}>
+                  <div className={`px-3 py-1.5 flex items-center gap-2 text-xs ${isToday ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-600'}`}>
+                    <span className="font-bold">{d}</span>
+                    {isToday && <span className="font-bold">დღეს</span>}
+                    <span className="ml-auto font-bold text-gray-800">$ {tot.toLocaleString()}</span>
+                  </div>
+                  <div className="divide-y">
+                    {evs.map((e, i) => (
+                      <div key={i} className="px-3 py-2 flex items-center gap-2">
+                        <Badge series={e.series}/>
+                        <span className="text-xs font-bold text-gray-700 w-20 flex-shrink-0">{e.code}</span>
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded flex-shrink-0 ${e.type==='advance' ? 'bg-teal-100 text-teal-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {e.type==='advance' ? 'ავანსი 60%' : 'ბალანსი 40%'}
+                        </span>
+                        <span className="ml-auto text-sm font-bold text-gray-800">${e.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsView() {
   const EMPTY = {vendor_name:'', vendor_type:'hotel', timing:'after', days_offset:7, notes:'', unit_price:0, currency:'GEL', series_prices:''};
   const [terms, setTerms] = useState([]);
@@ -932,6 +1249,8 @@ function App() {
     {id:"day",        label:"📅 დღის ხედი"},
     {id:"detail",     label:"🔍 ტურის დეტალი"},
     {id:"payments",   label:"💳 წინასწარ გადასახდელი"},
+    {id:"prepaystat", label:"📈 წინასტატი"},
+    {id:"cashflow",   label:"💵 ავანსი/ბალანსი"},
     {id:"settings",   label:"⚙️ პარამეტრები"},
   ];
 
@@ -963,6 +1282,8 @@ function App() {
         {tab === "day"        && <DayView onSelectTour={handleSelectTour}/>}
         {tab === "detail"     && <TourDetailView initialCode={selectedTour} onBack={() => setTab("day")}/>}
         {tab === "payments"   && <PaymentsView/>}
+        {tab === "prepaystat" && <PrepayStatsView/>}
+        {tab === "cashflow"   && <CashFlowView/>}
         {tab === "settings"   && <SettingsView/>}
       </main>
     </div>

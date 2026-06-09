@@ -1,7 +1,9 @@
 import os
+import base64
+import secrets
 from datetime import date, timedelta
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 import database as db
 from excel_parser import parse_all_excel
@@ -10,6 +12,23 @@ from meals_sync import fetch_all_meals
 from payments_sync import fetch_payment_statuses
 
 app = FastAPI(title="ki.360")
+
+# ── Basic auth gate ────────────────────────────────────────────
+APP_USER = os.environ.get("APP_USER", "360")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "vai2211")
+
+
+@app.middleware("http")
+async def basic_auth(request, call_next):
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Basic "):
+        try:
+            user, _, pwd = base64.b64decode(auth[6:]).decode("utf-8").partition(":")
+            if secrets.compare_digest(user, APP_USER) and secrets.compare_digest(pwd, APP_PASSWORD):
+                return await call_next(request)
+        except Exception:
+            pass
+    return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="ki.360"'})
 
 
 @app.on_event("startup")
@@ -175,6 +194,10 @@ def payment_schedule(from_date: str = None, to_date: str = None):
 @app.get("/api/payments/tour-summary")
 def payment_tour_summary(from_date: str = None, to_date: str = None):
     return db.get_tour_payment_summary(from_date, to_date)
+
+@app.get("/api/exchange-rate")
+def exchange_rate():
+    return {"rate": db.get_exchange_rate()}
 
 @app.post("/api/sync-payment-status")
 def sync_payment_status():
