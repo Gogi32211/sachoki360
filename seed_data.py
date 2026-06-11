@@ -135,7 +135,6 @@ TOURS_2026 = [
     {"code": "KT-0428", "series": "KT", "bus_start": "2026-05-01"},
     {"code": "KT-0505", "series": "KT", "bus_start": "2026-05-08"},
     {"code": "KT-0519", "series": "KT", "bus_start": "2026-05-22"},
-    {"code": "KT-0526", "series": "KT", "bus_start": "2026-05-29"},
     {"code": "KT-0602", "series": "KT", "bus_start": "2026-06-05"},
     {"code": "KT-0609", "series": "KT", "bus_start": "2026-06-12"},
     {"code": "KT-0616", "series": "KT", "bus_start": "2026-06-19"},

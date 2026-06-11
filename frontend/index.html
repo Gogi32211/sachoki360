@@ -982,7 +982,8 @@ function CashFlowView() {
   const balArr  = dates.map(d => byDate[d].bal);
 
   const eventDates = Object.keys(byDateEvents).sort();
-  const shownDates = eventDates.filter(d => tableFilter === 'all' || d >= today);
+  // "upcoming" also shows the previous 3 days so recent items aren't missed
+  const shownDates = eventDates.filter(d => tableFilter === 'all' || d >= addDays(today, -3));
   Object.values(byDateEvents).forEach(evs =>
     evs.sort((a, b) => (a.type === b.type ? a.code.localeCompare(b.code) : a.type === 'advance' ? -1 : 1)));
 
