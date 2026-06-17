@@ -151,6 +151,9 @@ def startup():
 class NoteUpdate(BaseModel):
     notes: str
 
+class SettingUpdate(BaseModel):
+    value: str
+
 class PaymentTermIn(BaseModel):
     vendor_name: str
     vendor_type: str = 'hotel'
@@ -160,6 +163,16 @@ class PaymentTermIn(BaseModel):
     unit_price: float = 0.0
     currency: str = 'GEL'
     series_prices: str = ''
+
+
+@app.get("/api/settings/{key}")
+def get_setting_api(key: str):
+    return {"value": db.get_setting(key, "")}
+
+@app.post("/api/settings/{key}")
+def set_setting_api(key: str, body: SettingUpdate):
+    db.set_setting(key, body.value)
+    return {"ok": True}
 
 
 @app.get("/", response_class=HTMLResponse)

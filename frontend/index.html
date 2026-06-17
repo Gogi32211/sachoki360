@@ -843,6 +843,153 @@ function ScrollBarChart({ labels, datasets, height = 320, colWidth = 46,
   );
 }
 
+// ── BUS PAYMENTS VIEW ─────────────────────────────────────────
+function BusView() {
+  const [tours, setTours] = useState([]);
+  const [offset, setOffset] = useState(10);
+  const [editOffset, setEditOffset] = useState('10');
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('upcoming');
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API}/tours`).then(r => r.json()),
+      fetch(`${API}/settings/bus_offset`).then(r => r.json()).catch(() => ({value: '10'})),
+    ]).then(([ts, s]) => {
+      setTours(ts);
+      const n = parseInt(s.value) || 10;
+      setOffset(n);
+      setEditOffset(String(n));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const saveOffset = () => {
+    const n = parseInt(editOffset);
+    if (isNaN(n) || n < 0) return;
+    setOffset(n);
+    fetch(`${API}/settings/bus_offset`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({value: String(n)}),
+    });
+  };
+
+  const today = toISO(new Date());
+
+  const rows = tours.map(t => {
+    const dueDate = addDays(t.bus_end, offset);
+    const diff = Math.round((new Date(dueDate + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+    const status = diff < 0 ? 'overdue' : diff <= 3 ? 'due_soon' : 'upcoming';
+    return { ...t, dueDate, diff, status };
+  });
+
+  const filtered = rows.filter(r => {
+    if (filter === 'overdue')  return r.status === 'overdue';
+    if (filter === 'due_soon') return r.status === 'due_soon';
+    if (filter === 'due_10')   return r.diff >= 0 && r.diff <= 10;
+    if (filter === 'upcoming') return r.diff >= -3;
+    return true;
+  }).sort((a, b) => filter === 'overdue' ? b.dueDate.localeCompare(a.dueDate) : a.dueDate.localeCompare(b.dueDate));
+
+  const overdueCnt  = rows.filter(r => r.status === 'overdue').length;
+  const soonCnt     = rows.filter(r => r.status === 'due_soon').length;
+  const upcomingCnt = rows.filter(r => r.status === 'upcoming').length;
+
+  const rowBg  = s => s === 'overdue' ? 'bg-red-50' : s === 'due_soon' ? 'bg-orange-50' : '';
+  const badge  = s => s === 'overdue'
+    ? 'bg-red-100 text-red-700'
+    : s === 'due_soon'
+    ? 'bg-orange-100 text-orange-700'
+    : 'bg-blue-100 text-blue-700';
+  const label  = (s, d) => d < 0
+    ? `${Math.abs(d)} დღე ვადაგადასული!`
+    : d === 0 ? 'დღეს!'
+    : d === 1 ? 'ხვალ'
+    : `${d} დღეში`;
+
+  return (
+    <div className="p-4 max-w-5xl mx-auto">
+      {/* N parameter */}
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-4 flex items-center gap-3 flex-wrap">
+        <span className="text-sm font-semibold text-gray-700">ავტობუსის ინვოისის ვადა:</span>
+        <span className="text-sm text-gray-500">ტურის დასრულებიდან</span>
+        <input type="number" value={editOffset} min="0" max="90"
+          onChange={e => setEditOffset(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && saveOffset()}
+          className="border rounded px-3 py-1.5 text-sm w-20 font-bold text-center"/>
+        <span className="text-sm text-gray-500">დღის შემდეგ</span>
+        <button onClick={saveOffset}
+          className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700">
+          შენახვა
+        </button>
+        <span className="text-xs text-gray-400 ml-2">ამჟამად: N = {offset}</span>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 cursor-pointer" onClick={() => setFilter('overdue')}>
+          <div className="text-xs text-red-500 mb-0.5">ვადაგადასული</div>
+          <div className="text-2xl font-bold text-red-700">{overdueCnt}</div>
+        </div>
+        <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5 cursor-pointer" onClick={() => setFilter('due_soon')}>
+          <div className="text-xs text-orange-500 mb-0.5">3 დღეში</div>
+          <div className="text-2xl font-bold text-orange-600">{soonCnt}</div>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 cursor-pointer" onClick={() => setFilter('upcoming')}>
+          <div className="text-xs text-blue-500 mb-0.5">მომდევნო</div>
+          <div className="text-2xl font-bold text-blue-700">{upcomingCnt}</div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2 mb-3 flex-wrap">
+        {[['all','ყველა'],['overdue','ვადაგადასული'],['due_soon','3 დღე'],['due_10','10 დღე'],['upcoming','მომდევნო']].map(([v,l]) => (
+          <button key={v} onClick={() => setFilter(v)}
+            className={`px-3 py-1 rounded text-xs ${filter===v ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>{l}</button>
+        ))}
+      </div>
+
+      {loading ? <Spinner/> : filtered.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <div className="text-4xl mb-2">🚌</div>
+          <div className="text-sm">გადახდები არ არის</div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                {['სერია','ტური','დაწყება','დასრულება',`გადახდა (+${offset}დ)`, 'სტატუსი'].map(h => (
+                  <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(r => (
+                <tr key={r.code} className={`border-b hover:bg-gray-50 ${rowBg(r.status)}`}>
+                  <td className="px-4 py-2.5"><Badge series={r.series}/></td>
+                  <td className="px-4 py-2.5 font-bold text-gray-800">{r.code}</td>
+                  <td className="px-4 py-2.5 text-gray-500 text-xs">{r.bus_start}</td>
+                  <td className="px-4 py-2.5 text-gray-500 text-xs">{r.bus_end}</td>
+                  <td className="px-4 py-2.5 font-semibold text-gray-800">{r.dueDate}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge(r.status)}`}>
+                      {label(r.status, r.diff)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-400">
+            სულ: {filtered.length} ტური
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PrepayStatsView() {
   const [schedule, setSchedule] = useState([]);
   const [rate, setRate] = useState(2.68);
@@ -1251,6 +1398,7 @@ function App() {
     {id:"detail",     label:"🔍 ტურის დეტალი"},
     {id:"payments",   label:"💳 წინასწარ გადასახდელი"},
     {id:"prepaystat", label:"📈 წინასტატი"},
+    {id:"buses",      label:"🚌 ავტობუსები"},
     {id:"cashflow",   label:"💵 ავანსი/ბალანსი"},
     {id:"settings",   label:"⚙️ პარამეტრები"},
   ];
@@ -1284,6 +1432,7 @@ function App() {
         {tab === "detail"     && <TourDetailView initialCode={selectedTour} onBack={() => setTab("day")}/>}
         {tab === "payments"   && <PaymentsView/>}
         {tab === "prepaystat" && <PrepayStatsView/>}
+        {tab === "buses"      && <BusView/>}
         {tab === "cashflow"   && <CashFlowView/>}
         {tab === "settings"   && <SettingsView/>}
       </main>

@@ -84,6 +84,10 @@ def init_db():
                 paid        INTEGER DEFAULT 1,
                 PRIMARY KEY (tour_code, vendor_name)
             );
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT ''
+            );
         """)
         # Migrate: add new columns to payment_terms if missing
         for col, defn in [
@@ -834,3 +838,18 @@ def get_tour_payment_summary(from_date: str = None, to_date: str = None):
     ]
     result.sort(key=lambda t: t['bus_start'])
     return result
+
+
+def get_setting(key: str, default: str = '') -> str:
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else default
+
+
+def set_setting(key: str, value: str):
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, str(value))
+        )
