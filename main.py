@@ -3,7 +3,8 @@ import secrets
 import threading
 from datetime import date, timedelta
 from fastapi import FastAPI, HTTPException, Request, Form
-from fastapi.responses import HTMLResponse, Response, RedirectResponse
+from fastapi.responses import HTMLResponse, Response, RedirectResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import database as db
 from excel_parser import parse_all_excel
@@ -12,6 +13,10 @@ from meals_sync import fetch_all_meals
 from payments_sync import fetch_payment_statuses
 
 app = FastAPI(title="ki.360")
+
+_static_dir = os.path.join(os.path.dirname(__file__), "frontend", "static")
+if os.path.isdir(_static_dir):
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 APP_USER = os.environ.get("APP_USER", "360")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "vai2211")
