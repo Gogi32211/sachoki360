@@ -1,6 +1,7 @@
 import os
 import base64
 import secrets
+import threading
 from datetime import date, timedelta
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
@@ -31,16 +32,8 @@ async def basic_auth(request, call_next):
     return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="ki.360"'})
 
 
-@app.on_event("startup")
-def startup():
-    db.init_db()
-    db.seed_db()
-    try:
-        parsed = parse_all_excel()
-        if parsed:
-            db.seed_excel_data(parsed)
-    except Exception as e:
-        print(f"Excel parse warning: {e}")
+def _background_sync():
+    """Run slow Google Sheets syncs in background so startup doesn't block."""
     for series in ("ZT", "LN", "KT", "DT1", "DT2"):
         try:
             db.sync_series_hotels(series)
@@ -69,6 +62,20 @@ def startup():
             db.sync_payment_statuses(statuses)
     except Exception as e:
         print(f"Payment status sync warning: {e}")
+    print("[startup] background sync complete")
+
+
+@app.on_event("startup")
+def startup():
+    db.init_db()
+    db.seed_db()
+    try:
+        parsed = parse_all_excel()
+        if parsed:
+            db.seed_excel_data(parsed)
+    except Exception as e:
+        print(f"Excel parse warning: {e}")
+    threading.Thread(target=_background_sync, daemon=True).start()
 
 
 class NoteUpdate(BaseModel):
