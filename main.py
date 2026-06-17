@@ -1,10 +1,9 @@
 import os
-import base64
 import secrets
 import threading
 from datetime import date, timedelta
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, Response
+from fastapi import FastAPI, HTTPException, Request, Form
+from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from pydantic import BaseModel
 import database as db
 from excel_parser import parse_all_excel
@@ -14,26 +13,87 @@ from payments_sync import fetch_payment_statuses
 
 app = FastAPI(title="ki.360")
 
-# ── Basic auth gate ────────────────────────────────────────────
 APP_USER = os.environ.get("APP_USER", "360")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "vai2211")
+SESSION_TOKEN = secrets.token_hex(32)
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ki.360 — შესვლა</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+* { box-sizing: border-box; font-family: 'Noto Sans Georgian', sans-serif; }
+body { background: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+.card { background: #1e293b; border-radius: 16px; padding: 40px 36px; width: 340px; box-shadow: 0 20px 60px #0005; }
+h1 { color: #f1f5f9; font-size: 28px; margin: 0 0 6px; }
+p { color: #94a3b8; font-size: 13px; margin: 0 0 28px; }
+label { display: block; color: #cbd5e1; font-size: 12px; margin-bottom: 6px; }
+input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #334155;
+        background: #0f172a; color: #f1f5f9; font-size: 15px; outline: none; margin-bottom: 16px; }
+input:focus { border-color: #fbbf24; }
+button { width: 100%; padding: 12px; background: #fbbf24; color: #0f172a; border: none;
+         border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }
+button:hover { background: #f59e0b; }
+.err { color: #f87171; font-size: 13px; margin-bottom: 14px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>ki.360</h1>
+  <p>ტურ-მენეჯმენტი</p>
+  {error}
+  <form method="post" action="/login">
+    <label>მომხმარებელი</label>
+    <input type="text" name="username" autocomplete="username" autofocus/>
+    <label>პაროლი</label>
+    <input type="password" name="password" autocomplete="current-password"/>
+    <button type="submit">შესვლა →</button>
+  </form>
+</div>
+</body>
+</html>"""
+
+
+def _is_authed(request: Request) -> bool:
+    return request.cookies.get("ki360_session") == SESSION_TOKEN
 
 
 @app.middleware("http")
-async def basic_auth(request, call_next):
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Basic "):
-        try:
-            user, _, pwd = base64.b64decode(auth[6:]).decode("utf-8").partition(":")
-            if secrets.compare_digest(user, APP_USER) and secrets.compare_digest(pwd, APP_PASSWORD):
-                return await call_next(request)
-        except Exception:
-            pass
-    return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="ki.360"'})
+async def auth_gate(request: Request, call_next):
+    path = request.url.path
+    if path in ("/login", "/logout"):
+        return await call_next(request)
+    if not _is_authed(request):
+        return RedirectResponse("/login", status_code=302)
+    return await call_next(request)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    return LOGIN_HTML.replace("{error}", "")
+
+
+@app.post("/login")
+async def login_submit(username: str = Form(...), password: str = Form(...)):
+    if secrets.compare_digest(username, APP_USER) and secrets.compare_digest(password, APP_PASSWORD):
+        resp = RedirectResponse("/", status_code=302)
+        resp.set_cookie("ki360_session", SESSION_TOKEN, httponly=True, samesite="lax", max_age=86400 * 30)
+        return resp
+    html = LOGIN_HTML.replace("{error}", '<div class="err">მომხმარებელი ან პაროლი არასწორია</div>')
+    return HTMLResponse(html, status_code=401)
+
+
+@app.get("/logout")
+def logout():
+    resp = RedirectResponse("/login", status_code=302)
+    resp.delete_cookie("ki360_session")
+    return resp
 
 
 def _background_sync():
-    """Run slow Google Sheets syncs in background so startup doesn't block."""
     for series in ("ZT", "LN", "KT", "DT1", "DT2"):
         try:
             db.sync_series_hotels(series)
@@ -251,7 +311,6 @@ def get_vendors():
 
 @app.post("/api/sync-hotels")
 def sync_hotels():
-    """Re-read Google Sheets and update hotel assignments. Read-only on the sheet."""
     try:
         assignments = fetch_hotel_assignments()
         updated = db.update_hotels_from_sheets(assignments)
