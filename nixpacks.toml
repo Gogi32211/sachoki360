@@ -1,12 +1,2 @@
 [phases.setup]
-nixPkgs = ["python313", "gcc", "curl"]
-
-[phases.build]
-cmds = [
-  "mkdir -p frontend/static",
-  "curl -sLf 'https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js' -o frontend/static/react.js",
-  "curl -sLf 'https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js' -o frontend/static/react-dom.js",
-  "curl -sLf 'https://cdn.jsdelivr.net/npm/@babel/standalone@7.27.3/babel.min.js' -o frontend/static/babel.js",
-  "curl -sLf 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js' -o frontend/static/chart.js",
-  "pip install -r requirements.txt"
-]
+nixPkgs = ["python313", "gcc"]

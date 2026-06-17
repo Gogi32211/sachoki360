@@ -98,6 +98,11 @@ def logout():
     return resp
 
 
+@app.get("/ping")
+def ping():
+    return {"ok": True, "tours": len(db.get_all_tours())}
+
+
 def _background_sync():
     for series in ("ZT", "LN", "KT", "DT1", "DT2"):
         try:
