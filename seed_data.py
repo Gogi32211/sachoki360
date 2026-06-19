@@ -158,7 +158,6 @@ TOURS_2026 = [
     {"code": "DT1-0531", "series": "DT1", "bus_start": "2026-06-02"},
     {"code": "DT1-0614", "series": "DT1", "bus_start": "2026-06-16"},
     {"code": "DT1-0628", "series": "DT1", "bus_start": "2026-06-30"},
-    {"code": "DT1-0705", "series": "DT1", "bus_start": "2026-07-07"},
     {"code": "DT1-0712", "series": "DT1", "bus_start": "2026-07-14"},
     {"code": "DT1-0719", "series": "DT1", "bus_start": "2026-07-21"},
     {"code": "DT1-0726", "series": "DT1", "bus_start": "2026-07-28"},
