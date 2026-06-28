@@ -53,6 +53,12 @@ def _usd_from_row(cells) -> float:
     return max(cand) if cand else 0.0
 
 
+_HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', 'მარკო', 'გორი ინ',
+               'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან',
+               'ლილატ', 'გუდაურ', 'best western', 'ბესთ', 'ქრაუნ',
+               'crown', 'ბორჯომ', 'ინნ')
+
+
 def _categorize(name: str):
     """Map a line-item description to a cost component (or None to skip)."""
     n = name.lower().strip()
@@ -67,17 +73,18 @@ def _categorize(name: str):
         return 'bus'
     if 'მძღოლ' in n:
         return 'driver'
-    if any(k in n for k in ('ლანჩი', 'ვახშამ', 'ვაშამ', 'დეგუსტაცი')):
+    is_meal = any(k in n for k in ('ლანჩი', 'ვახშამ', 'ვაშამ', 'დეგუსტაცი'))
+    # Dinner/lunch at a hotel is already included in the hotel cost — skip.
+    if is_meal and any(k in n for k in _HOTEL_KEYS):
+        return None
+    if is_meal:
         return 'restaurant'
     if 'გიდი' in n or 'გიდის' in n:
         return 'guide'
     if any(k in n for k in ('ვარძი', 'სტალინ', 'უფლისციხ', 'უფლიციხ', 'საბაგირ',
                             'გემზე', 'მოზეომ', 'დელიკ', 'ბილეთ', 'მუზეუმ', 'ცაგვ')):
         return 'attraction'
-    if any(k in n for k in ('ჰუალინგ', 'radisson', 'რადისონ', 'მარკო', 'გორი ინ',
-                            'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან',
-                            'ლილატ', 'გუდაურ', 'best western', 'ბესთ', 'ქრაუნ',
-                            'crown', 'ბორჯომ', 'ინნ')):
+    if any(k in n for k in _HOTEL_KEYS):
         return 'hotel'
     return 'other'
 
