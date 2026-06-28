@@ -108,15 +108,19 @@ def _categorize(name: str):
     if 'აზერბაიჯ' in n:                    # Azerbaijan — excluded from stats
         return None
     if any(k in n for k in ('სომხეთი', 'yerevan', 'ერევან', 'aghababayan',
-                            'აღაბაბაია', 'სევან')):
+                            'agababayan', 'აღაბაბაია', 'სევან')):
         return 'armenia'
     if 'ავტობუს' in n or 'სპრინტერ' in n:
         return 'bus'
     is_guide_ref  = 'გიდ' in n
     is_driver_ref = 'მძღოლ' in n
+    is_dito_ref   = 'დიტო' in n
     # Staff (personnel) expenses: guide/driver accommodation, transport, food
     if (is_guide_ref or is_driver_ref) and \
        any(k in n for k in ('კვება', 'დარჩენა', 'ტრანსპორტ', 'ტაქს')):
+        return 'staff'
+    # "დიტო" entries in hotel rows = staff accommodation/meals at a hotel
+    if is_dito_ref and any(k in n for k in ('დარჩენა', 'კვება', 'ღამ')):
         return 'staff'
     # Driver name / tips entry → merged into bus
     if is_driver_ref:
