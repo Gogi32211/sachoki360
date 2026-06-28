@@ -97,7 +97,7 @@ def _fix_name(name: str) -> str:
 _HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', 'მარკო', 'გორი ინ',
                'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან', 'pullman',
                'ლილატ', 'გუდაურ', 'best western', 'ბესთ', 'ქრაუნ',
-               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ')
+               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ', 'პინო', 'pino')
 
 
 def _categorize(name: str):
