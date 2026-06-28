@@ -121,6 +121,15 @@ def init_db():
                 conn.execute(f"ALTER TABLE payment_terms ADD COLUMN {col} {defn}")
             except Exception:
                 pass
+        # From 2026-06-24 the first-day lunch changed from ხარება to ბალკონი სიღნაღი.
+        # Update any already-inserted daily_log rows for tours on/after that date.
+        conn.execute("""
+            UPDATE daily_log SET lunch = 'ლანჩი: ბალკონი სიღნაღი'
+            WHERE lunch = 'ლანჩი: ხარება'
+              AND tour_code IN (
+                  SELECT code FROM tours WHERE bus_start >= '2026-06-24'
+              )
+        """)
 
 # (vendor_name, vendor_type, timing, days_offset, notes, unit_price, currency, series_prices)
 _DEFAULT_PAYMENT_TERMS = [

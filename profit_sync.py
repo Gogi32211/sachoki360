@@ -15,14 +15,8 @@ READ-ONLY on the sheets.
 """
 import io
 import re
-from datetime import date
 import requests
 from openpyxl import load_workbook
-
-# Khareba winery items (დეგუსტაცია ხარება, ლანჩი - ხარება) were replaced by
-# ლანჩი - ბალკონი სიღნაღი from this date onwards.  Tours before the cutoff
-# had real Khareba costs and those must be kept; tours on/after should ignore them.
-_KHAREBA_CUTOFF = date(2026, 6, 24)
 
 # Same three financial workbooks used for meals/payments.
 SHEET_IDS = {
@@ -111,17 +105,6 @@ def _num(v):
         return None
 
 
-def _tour_date_from_code(code: str):
-    """Extract the first-day date from a tour code (MMDD suffix → 2026-MM-DD)."""
-    m = re.search(r'-(\d{2})(\d{2})$', code)
-    if not m:
-        return None
-    try:
-        return date(2026, int(m.group(1)), int(m.group(2)))
-    except ValueError:
-        return None
-
-
 def _parse_worksheet(ws) -> tuple:
     """Return (tour_code, profit_dict) or (None, None) if no code found."""
     code = None
@@ -162,11 +145,6 @@ def _parse_worksheet(ws) -> tuple:
         if name and not any(name.startswith(k) for k in _SUMMARY_KEYS) \
                 and not TOUR_CODE_RE.search(name):
             cat = _categorize(name)
-            # Khareba winery items: real cost for tours before cutoff, skip after.
-            if cat and 'ხარება' in name.lower():
-                tour_dt = _tour_date_from_code(code) if code else None
-                if tour_dt is None or tour_dt >= _KHAREBA_CUTOFF:
-                    cat = None
             if cat:
                 usd = _usd_from_row(cells)
                 if usd:
