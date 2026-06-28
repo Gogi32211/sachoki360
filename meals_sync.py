@@ -16,11 +16,11 @@ SHEET_IDS = {
     "ZT":    "1aWUi7GuMFZLuSq1dp2MgP_KV4rmwXGAE",
 }
 
-TOUR_SECTION_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2)-?\d{4})\s*/')
+TOUR_SECTION_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2|LT)-?\d{4})\s*/')
 DATE_MEAL_RE    = re.compile(r'(\d{1,2}/\d{1,2}/\d{4}),((?:ლანჩი|ვახშამი|ვაშამი|დეგუსტაცია)[^,]*),([^,]*),([^,]*),([^,]*)')
 
 def _norm_code(code: str) -> str:
-    return re.sub(r'(ZT|LN|KT|DT1|DT2)(\d{4})', r'\1-\2', code)
+    return re.sub(r'(ZT|LN|KT|DT1|DT2|LT)(\d{4})', r'\1-\2', code)
 
 def _parse_sheet_text(text: str) -> dict:
     results: dict = {}

@@ -14,10 +14,10 @@ SHEET_IDS = {
     "ZT":    "1aWUi7GuMFZLuSq1dp2MgP_KV4rmwXGAE",
 }
 
-TOUR_CODE_RE = re.compile(r'\b((?:ZT|LN|KT|DT1|DT2)-?\d{4})\b')
+TOUR_CODE_RE = re.compile(r'\b((?:ZT|LN|KT|DT1|DT2|LT)-?\d{4})\b')
 
 def _norm_code(code: str) -> str:
-    return re.sub(r'(ZT|LN|KT|DT1|DT2)(\d{4})', r'\1-\2', code)
+    return re.sub(r'(ZT|LN|KT|DT1|DT2|LT)(\d{4})', r'\1-\2', code)
 
 # Meal type prefixes to strip from column B
 _MEAL_PREFIXES = ('ვახშამი - ', 'ლანჩი - ', 'ვაშამი - ', 'დეგუსტაცია - ',

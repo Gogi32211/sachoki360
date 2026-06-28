@@ -25,7 +25,7 @@ SHEET_IDS = {
     "ZT":    "1aWUi7GuMFZLuSq1dp2MgP_KV4rmwXGAE",
 }
 
-TOUR_CODE_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2)-?\d{4})')
+TOUR_CODE_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2|LT)-?\d{4})')
 # Group size, e.g. "19+1" = 19 tourists + 1 leader.
 PAX_RE = re.compile(r'(\d{1,2})\s*\+\s*(\d{1,2})')
 
@@ -83,7 +83,7 @@ def _categorize(name: str):
 
 
 def _norm_code(code: str) -> str:
-    return re.sub(r'(ZT|LN|KT|DT1|DT2)(\d{4})', r'\1-\2', code)
+    return re.sub(r'(ZT|LN|KT|DT1|DT2|LT)(\d{4})', r'\1-\2', code)
 
 
 def _num(v):
