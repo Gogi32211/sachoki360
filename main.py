@@ -11,6 +11,7 @@ from excel_parser import parse_all_excel
 from sheets_sync import fetch_hotel_assignments
 from meals_sync import fetch_all_meals
 from payments_sync import fetch_payment_statuses
+from profit_sync import fetch_tour_profit
 
 app = FastAPI(title="ki.360")
 
@@ -132,6 +133,12 @@ def _background_sync():
             db.sync_payment_statuses(statuses)
     except Exception as e:
         print(f"Payment status sync warning: {e}")
+    try:
+        profit = fetch_tour_profit()
+        if profit:
+            db.sync_tour_profit(profit)
+    except Exception as e:
+        print(f"Profit sync warning: {e}")
     print("[startup] background sync complete")
 
 
@@ -326,6 +333,20 @@ def debug_payments_sync():
             entry["xlsx"] = {"error": str(e)}
         result["tests"][key] = entry
     return result
+
+@app.get("/api/tour-profit")
+def tour_profit():
+    return db.get_tour_profit()
+
+@app.post("/api/sync-profit")
+def sync_profit():
+    try:
+        data = fetch_tour_profit()
+        updated = db.sync_tour_profit(data)
+        return {"ok": True, "updated": updated}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 
 @app.get("/api/vendors")
 def get_vendors():

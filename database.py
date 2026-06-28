@@ -88,6 +88,16 @@ def init_db():
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL DEFAULT ''
             );
+            CREATE TABLE IF NOT EXISTS tour_profit (
+                tour_code        TEXT PRIMARY KEY,
+                spent_gel        REAL,
+                spent_usd        REAL,
+                revenue_gel      REAL,
+                revenue_usd      REAL,
+                profit_gel       REAL,
+                profit_usd       REAL,
+                profit_after_vat REAL
+            );
         """)
         # Migrate: add new columns to payment_terms if missing
         for col, defn in [
@@ -838,6 +848,46 @@ def get_tour_payment_summary(from_date: str = None, to_date: str = None):
     ]
     result.sort(key=lambda t: t['bus_start'])
     return result
+
+
+def sync_tour_profit(data: dict) -> int:
+    """Upsert per-tour profit data from {tour_code: {spent/revenue/profit...}}."""
+    count = 0
+    with get_db() as conn:
+        for code, d in data.items():
+            conn.execute("""
+                INSERT INTO tour_profit
+                    (tour_code, spent_gel, spent_usd, revenue_gel, revenue_usd,
+                     profit_gel, profit_usd, profit_after_vat)
+                VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT(tour_code) DO UPDATE SET
+                    spent_gel=excluded.spent_gel, spent_usd=excluded.spent_usd,
+                    revenue_gel=excluded.revenue_gel, revenue_usd=excluded.revenue_usd,
+                    profit_gel=excluded.profit_gel, profit_usd=excluded.profit_usd,
+                    profit_after_vat=excluded.profit_after_vat
+            """, (code, d.get('spent_gel'), d.get('spent_usd'),
+                  d.get('revenue_gel'), d.get('revenue_usd'),
+                  d.get('profit_gel'), d.get('profit_usd'), d.get('profit_after_vat')))
+            count += 1
+    return count
+
+
+def get_tour_profit() -> list:
+    """Return per-tour profit joined with tour series/dates, newest first."""
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT p.*, t.series, t.bus_start, t.bus_end
+            FROM tour_profit p
+            JOIN tours t ON t.code = p.tour_code
+            ORDER BY t.bus_start
+        """).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d['status'] = get_tour_status(r['bus_start'], r['bus_end'])
+            d['color'] = SERIES.get(r['series'], {}).get('color', '#888')
+            result.append(d)
+        return result
 
 
 def get_setting(key: str, default: str = '') -> str:
