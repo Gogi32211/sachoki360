@@ -1658,8 +1658,12 @@ function StatsView() {
   const fmtDec = n => (n || n === 0) ? n.toFixed(1) : '—';
   const toggleRow = code => setExpanded(e => ({...e, [code]: !e[code]}));
 
-  // Only sold tours that carry a component breakdown.
-  const sold = rows.filter(r => (r.revenue_usd || 0) > 0 && r.components && Object.keys(r.components).length);
+  // Only completed tours with full balance data (active/upcoming have partial expenses).
+  const sold = rows.filter(r =>
+    (r.revenue_usd || 0) > 0 &&
+    r.components && Object.keys(r.components).length &&
+    ['finished', 'paid', 'done'].includes(r.status)
+  );
   const scope = sold.filter(r => sFilter === 'all' || r.series === sFilter)
                     .slice().sort((a, b) => (a.bus_start || '').localeCompare(b.bus_start || ''));
 
@@ -1872,7 +1876,7 @@ function StatsView() {
           <div className="px-3 py-2 bg-amber-50 border-t text-xs text-amber-700">
             {perPax
               ? <span>ყველა მნიშვნელობა გაყოფილია ტურისტების რაოდენობაზე (გიდი გამოკლებულია). ? = pax უცნობია.</span>
-              : <span>დააჭირეთ ტურის სტრიქონს დეტალური ჩამონათვლის სანახავად.</span>}
+              : <span>მხოლოდ <strong>დასრულებული</strong> ტურები — მიმდინარე/მომავალი გამოტოვებულია (ბალანსი არ არის დახურული). დააჭირეთ სტრიქონს დეტალებისთვის.</span>}
             <span className="ml-2 text-red-600 font-medium">წითელი = საშუალოზე მეტი</span>,
             <span className="text-green-700 font-medium"> მწვანე = ნაკლები</span>. ცარიელი (·) = ამ ტურს ეს ხარჯი არ ჰქონია.
           </div>
