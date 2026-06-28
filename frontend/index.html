@@ -1303,37 +1303,42 @@ function ProfitView() {
   rows.forEach(r => { if (isPaid(r)) paidByCode[r.tour_code] = r; });
 
   const SERIES_LIST = Object.keys(SERIES_COLORS);
-  const overallAvg = (() => {
-    const p = rows.filter(isPaid);
-    return p.length ? p.reduce((s,r)=>s+r.profit_usd,0)/p.length : 0;
-  })();
+  const mean = (arr) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+  const overallAvg = mean(rows.filter(isPaid).map(r => r.profit_usd));
+  const overallAvgVat = mean(rows.filter(isPaid).map(r => finalVat(r) || 0));
 
   const forecast = SERIES_LIST.map(s => {
     // Realistic average: PAID tours only (their profit is final).
     const paid = rows.filter(r => r.series === s && isPaid(r));
-    const avg = paid.length ? paid.reduce((a,r)=>a+r.profit_usd,0)/paid.length : overallAvg;
+    const avg    = paid.length ? mean(paid.map(r => r.profit_usd))      : overallAvg;
+    const avgVat = paid.length ? mean(paid.map(r => finalVat(r) || 0))  : overallAvgVat;
     // Ideal benchmark: full groups (>=19 tourists) among ALL sold tours,
     // since few/no paid tours so far were full 19+1.
     const full = rows.filter(r => r.series === s && isSold(r) && paxNum(r) >= 19);
-    const avgFullRaw = full.length ? full.reduce((a,r)=>a+r.profit_usd,0)/full.length : avg;
-    const avgFull = Math.max(avgFullRaw, avg); // ideal can never be below realistic
+    const avgFull    = Math.max(full.length ? mean(full.map(r => r.profit_usd))     : avg,    avg);
+    const avgVatFull = Math.max(full.length ? mean(full.map(r => finalVat(r) || 0)) : avgVat, avgVat);
     const planned = allTours.filter(t => t.series === s);
-    const remaining = planned.filter(t => !(t.code in paidByCode));
-    const actualTotal = paid.reduce((a,r)=>a+r.profit_usd,0);
+    const remaining = planned.filter(t => !(t.code in paidByCode)).length;
+    const actualTotal = mean(paid.map(r => r.profit_usd)) * paid.length;
+    const actualVat   = paid.reduce((a,r)=>a+(finalVat(r)||0), 0);
     return {
       series: s, doneCount: paid.length, plannedCount: planned.length,
-      remaining: remaining.length, avg, avgFull, actualTotal,
-      realistic: actualTotal + remaining.length * avg,
-      ideal:     actualTotal + remaining.length * avgFull,
+      remaining, avg, avgFull, actualTotal,
+      realistic:    actualTotal + remaining * avg,
+      ideal:        actualTotal + remaining * avgFull,
+      vatRealistic: actualVat   + remaining * avgVat,
+      vatIdeal:     actualVat   + remaining * avgVatFull,
     };
   }).filter(f => f.plannedCount > 0 || f.doneCount > 0);
 
-  const fcActual    = forecast.reduce((s,f) => s + f.actualTotal, 0);
-  const fcRealistic = forecast.reduce((s,f) => s + f.realistic, 0);
-  const fcIdeal     = forecast.reduce((s,f) => s + f.ideal, 0);
+  const fcActual     = forecast.reduce((s,f) => s + f.actualTotal, 0);
+  const fcRealistic  = forecast.reduce((s,f) => s + f.realistic, 0);
+  const fcIdeal      = forecast.reduce((s,f) => s + f.ideal, 0);
+  const fcVatReal    = forecast.reduce((s,f) => s + f.vatRealistic, 0);
+  const fcVatIdeal   = forecast.reduce((s,f) => s + f.vatIdeal, 0);
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
+    <div className={`p-4 mx-auto ${viewMode === 'forecast' ? 'max-w-6xl' : 'max-w-4xl'}`}>
       <div className="flex gap-2 mb-4">
         <button onClick={() => setViewMode('table')}
           className={`px-4 py-1.5 rounded text-sm font-medium ${viewMode==='table' ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>📋 ცხრილი</button>
@@ -1365,8 +1370,8 @@ function ProfitView() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
+            <table className="w-full text-sm whitespace-nowrap">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">სერია</th>
@@ -1375,7 +1380,9 @@ function ProfitView() {
                   <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">საშ. მოგება/ტ. $</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">ფაქტი $</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">პროგნ. რეალ. $</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-violet-600">დღგ რეალ. $</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">პროგნ. იდეალ. $</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-violet-600">დღგ იდეალ. $</th>
                 </tr>
               </thead>
               <tbody>
@@ -1387,7 +1394,9 @@ function ProfitView() {
                     <td className="px-3 py-2 text-right text-gray-700">${fmt(f.avg)}</td>
                     <td className="px-3 py-2 text-right text-gray-700">${fmt(f.actualTotal)}</td>
                     <td className="px-3 py-2 text-right font-bold text-green-700">${fmt(f.realistic)}</td>
+                    <td className="px-3 py-2 text-right text-violet-700">${fmt(f.vatRealistic)}</td>
                     <td className="px-3 py-2 text-right font-bold text-amber-700">${fmt(f.ideal)}</td>
+                    <td className="px-3 py-2 text-right text-violet-700">${fmt(f.vatIdeal)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1399,7 +1408,9 @@ function ProfitView() {
                   <td className="px-3 py-2.5"></td>
                   <td className="px-3 py-2.5 text-right text-gray-700">${fmt(fcActual)}</td>
                   <td className="px-3 py-2.5 text-right text-green-700">${fmt(fcRealistic)}</td>
+                  <td className="px-3 py-2.5 text-right text-violet-700">${fmt(fcVatReal)}</td>
                   <td className="px-3 py-2.5 text-right text-amber-700">${fmt(fcIdeal)}</td>
+                  <td className="px-3 py-2.5 text-right text-violet-700">${fmt(fcVatIdeal)}</td>
                 </tr>
               </tfoot>
             </table>
