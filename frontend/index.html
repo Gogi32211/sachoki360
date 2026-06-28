@@ -1564,47 +1564,79 @@ const STAT_COMPONENTS = [
   ['other',      'სხვა',         '#94a3b8'],
 ];
 
-const CAT_COLORS = Object.fromEntries(STAT_COMPONENTS.map(([k,,c]) => [k, c]));
-const CAT_LABELS = Object.fromEntries(STAT_COMPONENTS.map(([k,l]) => [k, l]));
+// Parse "19+1" → 19 (tourist count, excluding guide)
+const parsePax = paxStr => {
+  if (!paxStr) return null;
+  const m = String(paxStr).match(/^(\d+)/);
+  return m ? parseInt(m[1]) : null;
+};
 
-function TourDetailPanel({ r }) {
+function TourDetailPanel({ r, perPax }) {
   const items = r.components_detail || [];
   if (!items.length) return <div className="text-xs text-gray-400 px-4 py-2">დეტალური ჩანაწერები არ არის</div>;
 
-  // Group by category
+  const paxCount = parsePax(r.pax);
+  const divisor = (perPax && paxCount) ? paxCount : 1;
+
   const bycat = {};
   items.forEach(it => {
     if (!bycat[it.cat]) bycat[it.cat] = [];
     bycat[it.cat].push(it);
   });
 
-  const fmt = n => n ? Math.round(n).toLocaleString() : '—';
+  const fmtV = usd => {
+    if (!usd && usd !== 0) return '—';
+    const v = usd / divisor;
+    return divisor > 1 ? `$${v.toFixed(1)}` : `$${Math.round(v).toLocaleString()}`;
+  };
 
   return (
-    <div className="px-4 py-3 bg-slate-50 border-t grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      {STAT_COMPONENTS.map(([k, label, color]) => {
-        const catItems = bycat[k];
-        if (!catItems || !catItems.length) return null;
-        return (
-          <div key={k} className="bg-white rounded-lg border shadow-sm overflow-hidden">
-            <div className="px-3 py-1.5 text-xs font-bold text-white" style={{background: color}}>{label}</div>
-            <div className="divide-y">
-              {catItems.map((it, i) => (
-                <div key={i} className="flex items-center justify-between px-3 py-1.5 gap-2">
-                  <span className="text-xs text-gray-700 leading-tight flex-1 min-w-0 truncate" title={it.name}>{it.name}</span>
-                  <span className="text-xs font-semibold text-gray-800 flex-shrink-0">${fmt(it.usd)}</span>
-                </div>
-              ))}
-              {catItems.length > 1 && (
-                <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50">
-                  <span className="text-xs text-gray-400">ჯამი</span>
-                  <span className="text-xs font-bold text-gray-700">${fmt(catItems.reduce((a,it)=>a+it.usd,0))}</span>
-                </div>
-              )}
+    <div className="px-4 py-3 bg-slate-50 border-t">
+      {perPax && paxCount && (
+        <div className="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
+          <span className="bg-slate-200 text-slate-600 rounded px-1.5 py-0.5 font-mono font-bold">÷{paxCount}</span>
+          <span>ნაჩვენებია 1 სტუმარზე (ჯგ. {r.pax})</span>
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {STAT_COMPONENTS.map(([k, label, color]) => {
+          const catItems = bycat[k];
+          if (!catItems || !catItems.length) return null;
+          const catTotal = catItems.reduce((a, it) => a + it.usd, 0);
+          return (
+            <div key={k} className="bg-white rounded-lg border shadow-sm overflow-hidden">
+              <div className="px-3 py-1.5 flex items-center justify-between" style={{background: color}}>
+                <span className="text-xs font-bold text-white">{label}</span>
+                <span className="text-xs font-bold text-white/90">{fmtV(catTotal)}</span>
+              </div>
+              <div className="divide-y">
+                {catItems.map((it, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-1.5 gap-2">
+                    <span className="text-xs text-gray-700 leading-tight flex-1 min-w-0 truncate" title={it.name}>{it.name}</span>
+                    <div className="flex-shrink-0 text-right">
+                      <span className="text-xs font-semibold text-gray-800">{fmtV(it.usd)}</span>
+                      {perPax && paxCount && (
+                        <span className="text-xs text-gray-400 ml-1">(${Math.round(it.usd)})</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {catItems.length > 1 && (
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50">
+                    <span className="text-xs text-gray-400">ჯამი</span>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-gray-700">{fmtV(catTotal)}</span>
+                      {perPax && paxCount && (
+                        <span className="text-xs text-gray-400 ml-1">(${Math.round(catTotal)})</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1614,6 +1646,7 @@ function StatsView() {
   const [loading, setLoading] = useState(true);
   const [sFilter, setSFilter] = useState('all');
   const [expanded, setExpanded] = useState({});
+  const [perPax, setPerPax] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/tour-profit`).then(r => r.json())
@@ -1621,34 +1654,51 @@ function StatsView() {
       .catch(() => setLoading(false));
   }, []);
 
-  const fmt = (n) => (n || n === 0) ? Math.round(n).toLocaleString() : '—';
-
+  const fmt = n => (n || n === 0) ? Math.round(n).toLocaleString() : '—';
+  const fmtDec = n => (n || n === 0) ? n.toFixed(1) : '—';
   const toggleRow = code => setExpanded(e => ({...e, [code]: !e[code]}));
 
   // Only sold tours that carry a component breakdown.
   const sold = rows.filter(r => (r.revenue_usd || 0) > 0 && r.components && Object.keys(r.components).length);
   const scope = sold.filter(r => sFilter === 'all' || r.series === sFilter)
-                    .slice().sort((a,b) => (a.bus_start||'').localeCompare(b.bus_start||''));
+                    .slice().sort((a, b) => (a.bus_start || '').localeCompare(b.bus_start || ''));
 
-  // Per-component average & standard deviation across the scope.
+  // Normalize a value by pax if mode is on; returns null if pax unknown.
+  const norm = (val, r) => {
+    if (!perPax) return val || 0;
+    const p = parsePax(r.pax);
+    return p ? (val || 0) / p : null;
+  };
+
+  // Per-component average & standard deviation — uses normalized values when perPax.
+  // Only tours with known pax are included in per-pax stats.
   const stats = {};
   STAT_COMPONENTS.forEach(([k]) => {
-    const vals = scope.map(r => r.components[k] || 0);
-    const m = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
-    const sd = vals.length ? Math.sqrt(vals.reduce((a,v)=>a+(v-m)**2,0)/vals.length) : 0;
+    const vals = scope
+      .map(r => norm(r.components[k] || 0, r))
+      .filter(v => v !== null);
+    const m = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    const sd = vals.length ? Math.sqrt(vals.reduce((a, v) => a + (v - m) ** 2, 0) / vals.length) : 0;
     stats[k] = { mean: m, sd };
   });
-  const avgProfit = scope.length ? scope.reduce((a,r)=>a+(r.profit_usd||0),0)/scope.length : 0;
-  const avgSpent  = scope.length ? scope.reduce((a,r)=>a+(r.spent_usd||0),0)/scope.length : 0;
 
-  // Which component swings the most (drives profit dissonance).
-  const ranked = STAT_COMPONENTS.map(([k,label,color]) => ({k,label,color,...stats[k]}))
-    .sort((a,b) => b.sd - a.sd);
+  const profitVals = scope.map(r => norm(r.profit_usd || 0, r)).filter(v => v !== null);
+  const spentVals  = scope.map(r => norm(r.spent_usd  || 0, r)).filter(v => v !== null);
+  const avgProfit = profitVals.length ? profitVals.reduce((a, b) => a + b, 0) / profitVals.length : 0;
+  const avgSpent  = spentVals.length  ? spentVals.reduce((a, b) => a + b, 0)  / spentVals.length  : 0;
+
+  // Average pax across the scope (for info card).
+  const paxCounts = scope.map(r => parsePax(r.pax)).filter(Boolean);
+  const avgPax = paxCounts.length ? Math.round(paxCounts.reduce((a, b) => a + b, 0) / paxCounts.length) : null;
+
+  // Which component swings the most.
+  const ranked = STAT_COMPONENTS.map(([k, label, color]) => ({k, label, color, ...stats[k]}))
+    .sort((a, b) => b.sd - a.sd);
   const maxMean = Math.max(1, ...STAT_COMPONENTS.map(([k]) => stats[k].mean));
 
-  // Cell tint by deviation from the component average (red = costs more).
+  // Cell tint by deviation from the component average.
   const devCls = (val, m) => {
-    if (!m) return 'text-gray-500';
+    if (val === null || !m) return 'text-gray-400';
     const d = (val - m) / m;
     if (d >  0.15) return 'bg-red-100 text-red-700 font-semibold';
     if (d >  0.05) return 'bg-red-50 text-red-600';
@@ -1656,10 +1706,14 @@ function StatsView() {
     if (d < -0.05) return 'bg-green-50 text-green-600';
     return 'text-gray-500';
   };
-  const profitCls = (p) => p > avgProfit*1.1 ? 'bg-green-100 text-green-700' : p < avgProfit*0.9 ? 'bg-red-100 text-red-700' : 'text-gray-700';
+  const profitCls = p => p === null ? 'text-gray-400' : p > avgProfit * 1.1 ? 'bg-green-100 text-green-700' : p < avgProfit * 0.9 ? 'bg-red-100 text-red-700' : 'text-gray-700';
+
+  const unit = perPax ? '/კაცი' : '/ტური';
+  const fmtCell = v => v === null ? '?' : perPax ? fmtDec(v) : fmt(v);
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
+      {/* Filters + per-pax toggle */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <span className="text-xs text-gray-400 mr-1">სერია:</span>
         <button onClick={() => setSFilter('all')}
@@ -1669,40 +1723,71 @@ function StatsView() {
             className={`px-3 py-1 rounded text-xs font-bold ${sFilter===s ? 'text-white' : 'bg-white border hover:bg-gray-50'}`}
             style={sFilter===s ? {background: SERIES_COLORS[s]} : {color: SERIES_COLORS[s]}}>{s}</button>
         ))}
-        <span className="ml-auto text-xs text-gray-400">აზერბაიჯანის ხარჯი გამოკლებულია</span>
+        <div className="ml-auto flex items-center gap-1 bg-white border rounded-lg overflow-hidden shadow-sm">
+          <button onClick={() => setPerPax(false)}
+            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${!perPax ? 'bg-slate-700 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            ჯამური
+          </button>
+          <button onClick={() => setPerPax(true)}
+            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${perPax ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            👤 კაცზე
+          </button>
+        </div>
       </div>
 
       {loading ? <Spinner/> : scope.length === 0 ? (
         <div className="text-center py-16 text-gray-400 text-sm">მონაცემები არ არის</div>
       ) : (
       <>
+        {/* Summary cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-            <div className="text-xs text-green-600 mb-0.5">საშ. მოგება/ტური ($)</div>
-            <div className="text-2xl font-bold text-green-700">${fmt(avgProfit)}</div>
+            <div className="text-xs text-green-600 mb-0.5">საშ. მოგება{unit} ($)</div>
+            <div className="text-2xl font-bold text-green-700">${perPax ? fmtDec(avgProfit) : fmt(avgProfit)}</div>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-            <div className="text-xs text-gray-500 mb-0.5">საშ. ხარჯი/ტური ($)</div>
-            <div className="text-2xl font-bold text-gray-700">${fmt(avgSpent)}</div>
+            <div className="text-xs text-gray-500 mb-0.5">საშ. ხარჯი{unit} ($)</div>
+            <div className="text-2xl font-bold text-gray-700">${perPax ? fmtDec(avgSpent) : fmt(avgSpent)}</div>
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 col-span-2">
-            <div className="text-xs text-amber-600 mb-0.5">ყველაზე ცვალებადი კომპონენტი (დისონანსის წყარო)</div>
-            <div className="text-lg font-bold text-amber-700">{ranked[0] && ranked[0].label} <span className="text-sm font-normal text-amber-600">±${fmt(ranked[0] && ranked[0].sd)} გადახრა</span></div>
+          {perPax ? (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
+              <div className="text-xs text-indigo-600 mb-0.5">საშ. ჯგ. ზომა (ტურისტი)</div>
+              <div className="text-2xl font-bold text-indigo-700">{avgPax ? `${avgPax}` : '—'}</div>
+              <div className="text-xs text-indigoply-400 mt-0.5 text-indigo-400">{paxCounts.length} ტური pax-ით</div>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+              <div className="text-xs text-blue-600 mb-0.5">ყველ. ძვ. კომპ. (საშ.)</div>
+              <div className="text-lg font-bold text-blue-700">{ranked[0] && ranked[0].label}</div>
+              <div className="text-xs text-blue-500">${fmt(ranked[0] && ranked[0].mean)} საშ.</div>
+            </div>
+          )}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-amber-600 mb-0.5">ყვ. ცვალებადი{perPax ? '/კაცი' : ''}</div>
+            <div className="text-lg font-bold text-amber-700">{ranked[0] && ranked[0].label}</div>
+            <div className="text-xs text-amber-500">±${perPax ? fmtDec(ranked[0] && ranked[0].sd) : fmt(ranked[0] && ranked[0].sd)} გადახრა</div>
           </div>
         </div>
 
-        {/* Average cost per component — bars */}
+        {/* Average cost per component — horizontal bars */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-          <div className="text-sm font-semibold text-gray-700 mb-3">საშუალო ხარჯი კომპონენტებზე (1 ტურზე)</div>
+          <div className="text-sm font-semibold text-gray-700 mb-3">
+            საშუალო ხარჯი კომპონენტებზე ({perPax ? '1 სტუმარზე' : '1 ტურზე'})
+            {perPax && avgPax && <span className="ml-2 text-xs text-indigo-500 font-normal">საშ. ჯგ. {avgPax} კაცი</span>}
+          </div>
           <div className="space-y-1.5">
-            {STAT_COMPONENTS.map(([k,label,color]) => (
+            {STAT_COMPONENTS.map(([k, label, color]) => (
               <div key={k} className="flex items-center gap-2">
                 <div className="w-24 text-xs text-gray-600 text-right flex-shrink-0">{label}</div>
                 <div className="flex-1 bg-gray-100 rounded h-5 relative">
-                  <div className="h-5 rounded" style={{width: `${Math.max(2,(stats[k].mean/maxMean)*100)}%`, background: color}}/>
+                  <div className="h-5 rounded" style={{width: `${Math.max(2, (stats[k].mean / maxMean) * 100)}%`, background: color}}/>
                 </div>
-                <div className="w-20 text-xs font-semibold text-gray-700 text-right flex-shrink-0">${fmt(stats[k].mean)}</div>
-                <div className="w-16 text-xs text-gray-400 text-right flex-shrink-0">±{fmt(stats[k].sd)}</div>
+                <div className="w-20 text-xs font-semibold text-gray-700 text-right flex-shrink-0">
+                  ${perPax ? fmtDec(stats[k].mean) : fmt(stats[k].mean)}
+                </div>
+                <div className="w-16 text-xs text-gray-400 text-right flex-shrink-0">
+                  ±{perPax ? fmtDec(stats[k].sd) : fmt(stats[k].sd)}
+                </div>
               </div>
             ))}
           </div>
@@ -1716,17 +1801,21 @@ function StatsView() {
                 <th className="text-left px-2 py-2 font-semibold text-gray-500 w-4"></th>
                 <th className="text-left px-2 py-2 font-semibold text-gray-500">ტური</th>
                 <th className="text-left px-2 py-2 font-semibold text-gray-500">ჯგ.</th>
-                {STAT_COMPONENTS.map(([k,label,color]) => (
-                  <th key={k} className="text-right px-2 py-2 font-semibold" style={{color}}>{label}</th>
+                {STAT_COMPONENTS.map(([k, label, color]) => (
+                  <th key={k} className="text-right px-2 py-2 font-semibold" style={{color}}>
+                    {label}{perPax ? <span className="text-gray-400 font-normal">/კ</span> : ''}
+                  </th>
                 ))}
-                <th className="text-right px-2 py-2 font-semibold text-gray-500">ხარჯი</th>
-                <th className="text-right px-2 py-2 font-semibold text-gray-500">მოგება</th>
+                <th className="text-right px-2 py-2 font-semibold text-gray-500">ხარჯი{perPax ? '/კ' : ''}</th>
+                <th className="text-right px-2 py-2 font-semibold text-gray-500">მოგება{perPax ? '/კ' : ''}</th>
               </tr>
             </thead>
             <tbody>
               {scope.map(r => {
                 const isOpen = !!expanded[r.tour_code];
                 const hasDetail = (r.components_detail || []).length > 0;
+                const normSpent  = norm(r.spent_usd,  r);
+                const normProfit = norm(r.profit_usd, r);
                 return (
                   <React.Fragment key={r.tour_code}>
                     <tr className={`border-b ${isOpen ? 'bg-slate-50' : 'hover:bg-gray-50'} cursor-pointer`}
@@ -1736,22 +1825,28 @@ function StatsView() {
                       </td>
                       <td className="px-2 py-1.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background:r.color}}/>
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: r.color}}/>
                           <span className="font-bold text-gray-800">{r.tour_code}</span>
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-gray-500">{r.pax || '—'}</td>
                       {STAT_COMPONENTS.map(([k]) => {
-                        const v = r.components[k] || 0;
-                        return <td key={k} className={`px-2 py-1.5 text-right ${devCls(v, stats[k].mean)}`}>{v ? fmt(v) : '·'}</td>;
+                        const v = norm(r.components[k] || 0, r);
+                        return (
+                          <td key={k} className={`px-2 py-1.5 text-right ${devCls(v, stats[k].mean)}`}>
+                            {(r.components[k] || 0) ? fmtCell(v) : '·'}
+                          </td>
+                        );
                       })}
-                      <td className="px-2 py-1.5 text-right text-gray-700 font-medium">{fmt(r.spent_usd)}</td>
-                      <td className={`px-2 py-1.5 text-right font-bold rounded ${profitCls(r.profit_usd)}`}>${fmt(r.profit_usd)}</td>
+                      <td className="px-2 py-1.5 text-right text-gray-700 font-medium">{fmtCell(normSpent)}</td>
+                      <td className={`px-2 py-1.5 text-right font-bold rounded ${profitCls(normProfit)}`}>
+                        ${fmtCell(normProfit)}
+                      </td>
                     </tr>
                     {isOpen && (
                       <tr>
                         <td colSpan={3 + STAT_COMPONENTS.length + 2} className="p-0">
-                          <TourDetailPanel r={r}/>
+                          <TourDetailPanel r={r} perPax={perPax}/>
                         </td>
                       </tr>
                     )}
@@ -1761,22 +1856,24 @@ function StatsView() {
             </tbody>
             <tfoot>
               <tr className="bg-slate-50 border-t-2 border-slate-200 font-bold">
-                <td className="px-2 py-2" colSpan="3"></td>
+                <td className="px-2 py-2 text-xs text-gray-500" colSpan="3">
+                  საშუალო ({scope.length} ტური{perPax && avgPax ? `, ${avgPax} კაცი` : ''})
+                </td>
                 {STAT_COMPONENTS.map(([k]) => (
-                  <td key={k} className="px-2 py-2 text-right text-gray-700">{fmt(stats[k].mean)}</td>
+                  <td key={k} className="px-2 py-2 text-right text-gray-700">
+                    {perPax ? fmtDec(stats[k].mean) : fmt(stats[k].mean)}
+                  </td>
                 ))}
-                <td className="px-2 py-2 text-right text-gray-700">{fmt(avgSpent)}</td>
-                <td className="px-2 py-2 text-right text-green-700">${fmt(avgProfit)}</td>
-              </tr>
-              <tr className="bg-slate-50">
-                <td colSpan="3" className="px-2 py-1 text-xs text-gray-400">საშუალო ({scope.length} ტური)</td>
-                <td colSpan={STAT_COMPONENTS.length + 2}></td>
+                <td className="px-2 py-2 text-right text-gray-700">{perPax ? fmtDec(avgSpent) : fmt(avgSpent)}</td>
+                <td className="px-2 py-2 text-right text-green-700">${perPax ? fmtDec(avgProfit) : fmt(avgProfit)}</td>
               </tr>
             </tfoot>
           </table>
           <div className="px-3 py-2 bg-amber-50 border-t text-xs text-amber-700">
-            დააჭირეთ ტურის სტრიქონს დეტალური ჩამონათვლის სანახავად (სასტუმრო, რესტორანი, ატრაქცია და სხვ.).
-            <span className="ml-2 text-red-600 font-medium">წითელი = საშუალოზე მეტი ხარჯი</span>,
+            {perPax
+              ? <span>ყველა მნიშვნელობა გაყოფილია ტურისტების რაოდენობაზე (გიდი გამოკლებულია). ? = pax უცნობია.</span>
+              : <span>დააჭირეთ ტურის სტრიქონს დეტალური ჩამონათვლის სანახავად.</span>}
+            <span className="ml-2 text-red-600 font-medium">წითელი = საშუალოზე მეტი</span>,
             <span className="text-green-700 font-medium"> მწვანე = ნაკლები</span>. ცარიელი (·) = ამ ტურს ეს ხარჯი არ ჰქონია.
           </div>
         </div>
