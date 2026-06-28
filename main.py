@@ -21,7 +21,11 @@ if os.path.isdir(_static_dir):
 
 APP_USER = os.environ.get("APP_USER", "360")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "vai2211")
-SESSION_TOKEN = secrets.token_hex(32)
+# Stable token derived from the credentials so the login cookie survives
+# server restarts / redeploys (otherwise users get logged out every deploy).
+import hashlib
+SESSION_TOKEN = hashlib.sha256(f"ki360:{APP_USER}:{APP_PASSWORD}".encode()).hexdigest()
+COOKIE_MAX_AGE = 86400 * 365  # 1 year
 
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="ka">
@@ -86,7 +90,7 @@ def login_page():
 async def login_submit(username: str = Form(...), password: str = Form(...)):
     if secrets.compare_digest(username, APP_USER) and secrets.compare_digest(password, APP_PASSWORD):
         resp = RedirectResponse("/", status_code=302)
-        resp.set_cookie("ki360_session", SESSION_TOKEN, httponly=True, samesite="lax", max_age=86400 * 30)
+        resp.set_cookie("ki360_session", SESSION_TOKEN, httponly=True, samesite="lax", max_age=COOKIE_MAX_AGE)
         return resp
     html = LOGIN_HTML.replace("{error}", '<div class="err">მომხმარებელი ან პაროლი არასწორია</div>')
     return HTMLResponse(html, status_code=401)
