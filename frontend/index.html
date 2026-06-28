@@ -1916,6 +1916,7 @@ function StatsView() {
 function VendorChart({ scope, perPax }) {
   const [cat, setCat] = useState('hotel');
   const [expandedV, setExpandedV] = useState(null);
+  const [searchQ, setSearchQ] = useState('');
 
   const CAT_OPTS = [
     ['hotel',      'სასტუმრო',    '#3b82f6'],
@@ -1971,6 +1972,23 @@ function VendorChart({ scope, perPax }) {
   const fmt  = n => Math.round(n).toLocaleString();
   const fmtD = n => n.toFixed(1);
 
+  // Full-text search across ALL categories
+  const searchResults = (() => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return null;
+    const hits = [];
+    scope.forEach(r => {
+      const pax = parsePax(r.pax);
+      (r.components_detail || []).forEach(i => {
+        if (i.name.toLowerCase().includes(q)) {
+          hits.push({itemName: i.name, cat: i.cat, tour_code: r.tour_code,
+                     color: r.color, usd: i.usd, pax});
+        }
+      });
+    });
+    return hits.sort((a, b) => b.usd - a.usd);
+  })();
+
   const vendors = Object.entries(vendorMap).map(([name, entries]) => {
     const vals = perPax
       ? entries.filter(e => e.pax).map(e => e.usd / e.pax)
@@ -1989,19 +2007,58 @@ function VendorChart({ scope, perPax }) {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b flex-wrap">
         <span className="font-semibold text-gray-700 text-sm">ვენდორების ანალიზი</span>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {CAT_OPTS.map(([k, label, col]) => (
-            <button key={k} onClick={() => {setCat(k); setExpandedV(null);}}
-              className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${cat===k ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-              style={cat===k ? {background: col} : {}}>
+            <button key={k} onClick={() => {setCat(k); setExpandedV(null); setSearchQ('');}}
+              className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${cat===k && !searchQ ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              style={cat===k && !searchQ ? {background: col} : {}}>
               {label}
             </button>
           ))}
         </div>
-        <span className="ml-auto text-xs text-gray-400">{perPax ? '1 სტუმარზე' : '1 ტურზე'} · დასაწყობად ▸ ვენდორზე</span>
+        <div className="ml-auto flex items-center gap-2">
+          <input
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+            placeholder="🔍 ძებნა..."
+            className="px-3 py-1 text-xs border rounded-lg outline-none focus:border-indigo-400 w-40"
+          />
+          {searchQ && <button onClick={() => setSearchQ('')} className="text-xs text-gray-400 hover:text-gray-600">✕</button>}
+        </div>
       </div>
 
-      {vendors.length === 0 ? (
+      {/* Search results mode */}
+      {searchResults ? (
+        searchResults.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs text-gray-400">"{searchQ}" — არ მოიძებნა</div>
+        ) : (
+          <div className="p-3">
+            <div className="text-xs text-gray-400 mb-2 px-1">{searchResults.length} ჩანაწერი · "{searchQ}"</div>
+            <div className="space-y-1">
+              {searchResults.map((e, i) => {
+                const catInfo = CAT_OPTS.find(([k]) => k === e.cat);
+                const [, catLabel, catCol] = catInfo || ['','სხვა','#94a3b8'];
+                const val = perPax && e.pax ? e.usd / e.pax : e.usd;
+                return (
+                  <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-gray-50 text-xs">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: e.color}}/>
+                    <span className="w-20 font-mono text-gray-700 flex-shrink-0">{e.tour_code}</span>
+                    <span className="flex-1 text-gray-800 truncate" title={e.itemName}>{e.itemName}</span>
+                    <span className="px-1.5 py-0.5 rounded text-white text-xs flex-shrink-0"
+                          style={{background: catCol, fontSize: '10px'}}>{catLabel}</span>
+                    <span className="w-16 text-right font-semibold text-gray-800 flex-shrink-0">
+                      ${perPax && e.pax ? fmtD(val) : fmt(e.usd)}
+                    </span>
+                    {!perPax && e.pax && (
+                      <span className="w-14 text-right text-gray-400 flex-shrink-0">${fmtD(e.usd/e.pax)}/კ.</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )
+      ) : vendors.length === 0 ? (
         <div className="px-4 py-8 text-center text-xs text-gray-400">მონაცემები არ არის</div>
       ) : (
         <div className="p-3 space-y-0.5">
