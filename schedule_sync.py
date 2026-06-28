@@ -51,13 +51,22 @@ def fetch_active_tours() -> list:
     resp.raise_for_status()
     wb = load_workbook(io.BytesIO(resp.content), data_only=True, read_only=True)
 
-    # Flatten all cells to text, row by row, so we can locate the marker.
-    parts = []
+    # Only read the main schedule tab — reading all tabs would pull tour codes
+    # from the 'cancelled' tab and incorrectly treat them as active.
+    main_ws = None
     for ws in wb.worksheets:
-        for row in ws.iter_rows(values_only=True):
-            for c in row:
-                if c is not None:
-                    parts.append(str(c))
+        title = (ws.title or '').lower()
+        if '2026' in title or 'tour' in title or 'map' in title:
+            main_ws = ws
+            break
+    if main_ws is None:
+        main_ws = wb.worksheets[0]
+
+    parts = []
+    for row in main_ws.iter_rows(values_only=True):
+        for c in row:
+            if c is not None:
+                parts.append(str(c))
     wb.close()
     text = " ".join(parts)
 
