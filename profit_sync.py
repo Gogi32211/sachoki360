@@ -117,7 +117,7 @@ def _categorize(name: str):
     is_dito_ref   = 'დიტო' in n
     # Staff (personnel) expenses: guide/driver accommodation, transport, food
     if (is_guide_ref or is_driver_ref) and \
-       any(k in n for k in ('კვება', 'დარჩენა', 'ტრანსპორტ', 'ტაქს')):
+       any(k in n for k in ('კვება', 'დარჩენა', 'ტრანსპორტ', 'ტაქს', 'ხარჯ')):
         return 'staff'
     # "დიტო" entries in hotel rows = staff accommodation/meals at a hotel
     if is_dito_ref and any(k in n for k in ('დარჩენა', 'კვება', 'ღამ')):
