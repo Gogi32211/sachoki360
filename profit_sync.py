@@ -71,15 +71,22 @@ def _categorize(name: str):
         return 'armenia'
     if 'ავტობუს' in n or 'სპრინტერ' in n:
         return 'bus'
-    if 'მძღოლ' in n:
-        return 'driver'
+    is_guide_ref  = 'გიდ' in n
+    is_driver_ref = 'მძღოლ' in n
+    # Staff (personnel) expenses: guide/driver accommodation, transport, food
+    if (is_guide_ref or is_driver_ref) and \
+       any(k in n for k in ('კვება', 'დარჩენა', 'ტრანსპორტ', 'ტაქს')):
+        return 'staff'
+    # Driver name / tips entry → merged into bus
+    if is_driver_ref:
+        return 'bus'
     is_meal = any(k in n for k in ('ლანჩი', 'ვახშამ', 'ვაშამ', 'დეგუსტაცი'))
     # Dinner/lunch at a hotel is already included in the hotel cost — skip.
     if is_meal and any(k in n for k in _HOTEL_KEYS):
         return None
     if is_meal:
         return 'restaurant'
-    if 'გიდი' in n or 'გიდის' in n:
+    if is_guide_ref:
         return 'guide'
     if any(k in n for k in ('ვარძი', 'სტალინ', 'უფლისციხ', 'უფლიციხ', 'საბაგირ',
                             'გემზე', 'მოზეომ', 'დელიკ', 'ბილეთ', 'მუზეუმ', 'ცაგვ')):
