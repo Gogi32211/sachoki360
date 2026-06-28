@@ -1295,9 +1295,9 @@ function ProfitView() {
           <div className="text-xs text-indigo-600 mb-0.5">სავარაუდო დღგ დასაბრუნებელი ($)</div>
           <div className="text-2xl font-bold text-indigo-700">${fmt(totVat)}</div>
         </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-          <div className="text-xs text-gray-500 mb-0.5">სულ (მოგება + დღგ) ($)</div>
-          <div className="text-2xl font-bold text-gray-700">${fmt(totProfit + totVat)}</div>
+        <div className="bg-violet-50 border border-violet-200 rounded-lg px-4 py-3">
+          <div className="text-xs text-violet-600 mb-0.5">სულ დღგ საბოლოო ($)</div>
+          <div className="text-2xl font-bold text-violet-700">${fmt(totVatFin)}</div>
         </div>
       </div>
 
@@ -1341,6 +1341,7 @@ function ProfitView() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">ტური</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">ჯგუფი</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">დაწყება</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სავარაუდო მოგება $</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სავარაუდო დღგ $</th>
@@ -1358,6 +1359,11 @@ function ProfitView() {
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: r.color}}/>
                       <span className="font-bold text-gray-800 whitespace-nowrap">{r.tour_code}</span>
                     </div>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {r.pax
+                      ? <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded px-1.5 py-0.5">{r.pax}</span>
+                      : <span className="text-gray-300 text-xs">—</span>}
                   </td>
                   <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{r.bus_start}</td>
                   <td className={`px-3 py-2 text-right font-bold whitespace-nowrap ${prClr(r.profit_usd)}`}>
@@ -1381,7 +1387,7 @@ function ProfitView() {
             </tbody>
             <tfoot>
               <tr className="bg-slate-50 border-t-2 border-slate-200 font-bold">
-                <td className="px-3 py-2.5 text-gray-700" colSpan="2">
+                <td className="px-3 py-2.5 text-gray-700" colSpan="3">
                   ჯამი ({filtered.length})
                 </td>
                 <td className={`px-3 py-2.5 text-right ${prClr(totProfit)}`}>${fmt(totProfit)}</td>

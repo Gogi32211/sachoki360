@@ -26,6 +26,13 @@ SHEET_IDS = {
 }
 
 TOUR_CODE_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2)-?\d{4})')
+# Group size, e.g. "19+1" = 19 tourists + 1 leader.
+PAX_RE = re.compile(r'(\d{1,2})\s*\+\s*(\d{1,2})')
+
+
+def _extract_pax(text: str):
+    m = PAX_RE.search(text or '')
+    return f"{m.group(1)}+{m.group(2)}" if m else None
 
 
 def _norm_code(code: str) -> str:
@@ -50,8 +57,10 @@ def _parse_worksheet(ws) -> tuple:
     m = TOUR_CODE_RE.search(ws.title or '')
     if m:
         code = _norm_code(m.group(1))
+    pax = _extract_pax(ws.title)
 
     out = {
+        'pax': pax,               # group size, e.g. "19+1"
         'profit_usd': None,       # მოგება (1st value = USD)
         'vat_usd': None,          # დღგ სავარაუდო (USD VAT to refund)
         'profit_after_vat': None, # მოგება 3rd value = profit + vat
@@ -66,6 +75,12 @@ def _parse_worksheet(ws) -> tuple:
                 mm = TOUR_CODE_RE.search(cell)
                 if mm:
                     code = _norm_code(mm.group(1))
+                    break
+        if not out['pax']:
+            for cell in cells[:4]:
+                p = _extract_pax(cell)
+                if p:
+                    out['pax'] = p
                     break
         for i, c in enumerate(cells):
             is_vat = c.startswith('დღგ სავარაუდო')

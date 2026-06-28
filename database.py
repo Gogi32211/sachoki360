@@ -90,6 +90,7 @@ def init_db():
             );
             CREATE TABLE IF NOT EXISTS tour_profit (
                 tour_code        TEXT PRIMARY KEY,
+                pax              TEXT,
                 profit_usd       REAL,
                 vat_usd          REAL,
                 profit_after_vat REAL,
@@ -99,6 +100,7 @@ def init_db():
         """)
         # Migrate older tour_profit schema → add any missing columns.
         for col, defn in [
+            ("pax", "TEXT"),
             ("profit_usd", "REAL"), ("vat_usd", "REAL"),
             ("profit_after_vat", "REAL"), ("spent_usd", "REAL"),
             ("revenue_usd", "REAL"),
@@ -865,13 +867,14 @@ def sync_tour_profit(data: dict) -> int:
         for code, d in data.items():
             conn.execute("""
                 INSERT INTO tour_profit
-                    (tour_code, profit_usd, vat_usd, profit_after_vat, spent_usd, revenue_usd)
-                VALUES (?,?,?,?,?,?)
+                    (tour_code, pax, profit_usd, vat_usd, profit_after_vat, spent_usd, revenue_usd)
+                VALUES (?,?,?,?,?,?,?)
                 ON CONFLICT(tour_code) DO UPDATE SET
+                    pax=excluded.pax,
                     profit_usd=excluded.profit_usd, vat_usd=excluded.vat_usd,
                     profit_after_vat=excluded.profit_after_vat,
                     spent_usd=excluded.spent_usd, revenue_usd=excluded.revenue_usd
-            """, (code, d.get('profit_usd'), d.get('vat_usd'),
+            """, (code, d.get('pax'), d.get('profit_usd'), d.get('vat_usd'),
                   d.get('profit_after_vat'), d.get('spent_usd'), d.get('revenue_usd')))
             count += 1
     return count
