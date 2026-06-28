@@ -262,6 +262,35 @@ def sync_series_hotels(series_key: str):
     return updated
 
 
+def remove_cancelled_tours(codes: set) -> int:
+    """Delete all DB records for the given cancelled tour codes. Returns count removed."""
+    if not codes:
+        return 0
+    with get_db() as conn:
+        placeholders = ','.join('?' * len(codes))
+        code_list = list(codes)
+        existing = [r[0] for r in conn.execute(
+            f"SELECT code FROM tours WHERE code IN ({placeholders})", code_list
+        ).fetchall()]
+        if not existing:
+            return 0
+        ex_ph = ','.join('?' * len(existing))
+        for table, col in [
+            ('daily_log',       'tour_code'),
+            ('tour_meals',      'tour_code'),
+            ('tour_financials', 'tour_code'),
+            ('tour_profit',     'tour_code'),
+            ('payment_status',  'tour_code'),
+        ]:
+            try:
+                conn.execute(f"DELETE FROM {table} WHERE {col} IN ({ex_ph})", existing)
+            except Exception:
+                pass
+        conn.execute(f"DELETE FROM tours WHERE code IN ({ex_ph})", existing)
+        print(f"[cancel_sync] Removed {len(existing)} cancelled tours: {sorted(existing)}")
+        return len(existing)
+
+
 def get_tour_status(bus_start_str: str, bus_end_str: str) -> str:
     today = today_tbilisi()
     bs = date.fromisoformat(bus_start_str)
