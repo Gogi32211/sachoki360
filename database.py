@@ -95,7 +95,8 @@ def init_db():
                 vat_usd          REAL,
                 profit_after_vat REAL,
                 spent_usd        REAL,
-                revenue_usd      REAL
+                revenue_usd      REAL,
+                components       TEXT
             );
         """)
         # Migrate older tour_profit schema → add any missing columns.
@@ -103,7 +104,7 @@ def init_db():
             ("pax", "TEXT"),
             ("profit_usd", "REAL"), ("vat_usd", "REAL"),
             ("profit_after_vat", "REAL"), ("spent_usd", "REAL"),
-            ("revenue_usd", "REAL"),
+            ("revenue_usd", "REAL"), ("components", "TEXT"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE tour_profit ADD COLUMN {col} {defn}")
@@ -867,15 +868,17 @@ def sync_tour_profit(data: dict) -> int:
         for code, d in data.items():
             conn.execute("""
                 INSERT INTO tour_profit
-                    (tour_code, pax, profit_usd, vat_usd, profit_after_vat, spent_usd, revenue_usd)
-                VALUES (?,?,?,?,?,?,?)
+                    (tour_code, pax, profit_usd, vat_usd, profit_after_vat, spent_usd, revenue_usd, components)
+                VALUES (?,?,?,?,?,?,?,?)
                 ON CONFLICT(tour_code) DO UPDATE SET
                     pax=excluded.pax,
                     profit_usd=excluded.profit_usd, vat_usd=excluded.vat_usd,
                     profit_after_vat=excluded.profit_after_vat,
-                    spent_usd=excluded.spent_usd, revenue_usd=excluded.revenue_usd
+                    spent_usd=excluded.spent_usd, revenue_usd=excluded.revenue_usd,
+                    components=excluded.components
             """, (code, d.get('pax'), d.get('profit_usd'), d.get('vat_usd'),
-                  d.get('profit_after_vat'), d.get('spent_usd'), d.get('revenue_usd')))
+                  d.get('profit_after_vat'), d.get('spent_usd'), d.get('revenue_usd'),
+                  _json.dumps(d.get('components') or {})))
             count += 1
     return count
 
@@ -918,6 +921,10 @@ def get_tour_profit() -> list:
             d.pop('t_start', None); d.pop('t_end', None)
             d['status'] = get_tour_status(bs, be) if (bs and be) else 'done'
             d['color'] = SERIES.get(series, {}).get('color', '#888')
+            try:
+                d['components'] = _json.loads(d.get('components') or '{}')
+            except Exception:
+                d['components'] = {}
             result.append(d)
         result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
         return result
