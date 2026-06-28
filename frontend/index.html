@@ -1281,27 +1281,32 @@ function ProfitView() {
   // Final VAT = estimated VAT * 80%.
   const finalVat = (r) => r.vat_usd != null ? r.vat_usd * 0.80 : null;
 
-  // Totals reflect the currently selected filter.
-  const totProfit  = filtered.reduce((s,r) => s + (r.profit_usd || 0), 0);
+  // A tour is genuinely "sold/costed" only once it has a sale price.
+  // Tours with revenue 0 are future/unpriced — their მოგება is just
+  // negative costs and must not count as real profit.
+  const isSold = (r) => (r.revenue_usd || 0) > 0;
+
+  // Totals reflect the currently selected filter (profit only for sold tours).
+  const totProfit  = filtered.reduce((s,r) => s + (isSold(r) ? r.profit_usd : 0), 0);
   const totVat     = filtered.reduce((s,r) => s + (r.vat_usd || 0), 0);
   const totVatFin  = filtered.reduce((s,r) => s + (finalVat(r) || 0), 0);
-  const soldCount  = filtered.filter(r => r.profit_usd != null).length;
+  const soldCount  = filtered.filter(isSold).length;
 
   // ── FORECAST ──────────────────────────────────────────────────
   // Per series: actual profit (costed tours) + estimate for the
   // remaining planned tours, using the series' average profit/tour
   // (realistic) and average profit of full 19+1 groups (ideal).
   const profByCode = {};
-  rows.forEach(r => { if (r.profit_usd != null) profByCode[r.tour_code] = r; });
+  rows.forEach(r => { if (isSold(r)) profByCode[r.tour_code] = r; });
 
   const SERIES_LIST = Object.keys(SERIES_COLORS);
   const overallAvg = (() => {
-    const done = rows.filter(r => r.profit_usd != null);
+    const done = rows.filter(isSold);
     return done.length ? done.reduce((s,r)=>s+r.profit_usd,0)/done.length : 0;
   })();
 
   const forecast = SERIES_LIST.map(s => {
-    const done = rows.filter(r => r.series === s && r.profit_usd != null);
+    const done = rows.filter(r => r.series === s && isSold(r));
     const full = done.filter(r => r.pax === '19+1');
     const avg     = done.length ? done.reduce((a,r)=>a+r.profit_usd,0)/done.length : overallAvg;
     const avgFull = full.length ? full.reduce((a,r)=>a+r.profit_usd,0)/full.length
@@ -1479,8 +1484,8 @@ function ProfitView() {
                       : <span className="text-gray-300 text-xs">—</span>}
                   </td>
                   <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{r.bus_start}</td>
-                  <td className={`px-3 py-2 text-right font-bold whitespace-nowrap ${prClr(r.profit_usd)}`}>
-                    {r.profit_usd != null ? '$'+fmt(r.profit_usd) : '—'}
+                  <td className={`px-3 py-2 text-right font-bold whitespace-nowrap ${isSold(r) ? prClr(r.profit_usd) : 'text-gray-400'}`}>
+                    {isSold(r) ? '$'+fmt(r.profit_usd) : '—'}
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     {r.vat_usd != null
