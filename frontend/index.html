@@ -1925,16 +1925,32 @@ function VendorChart({ scope, perPax }) {
   const [, , catColor] = CAT_OPTS.find(([k]) => k === cat) || CAT_OPTS[0];
 
   // Build vendor → [{tour_code, series, color, usd, pax}]
-  const vendorMap = {};
+  const rawMap = {};
   scope.forEach(r => {
     const pax = parsePax(r.pax);
     (r.components_detail || [])
       .filter(i => i.cat === cat)
       .forEach(i => {
         const v = i.name.trim();
-        if (!vendorMap[v]) vendorMap[v] = [];
-        vendorMap[v].push({tour_code: r.tour_code, series: r.series, color: r.color, usd: i.usd, pax});
+        if (!rawMap[v]) rawMap[v] = [];
+        rawMap[v].push({tour_code: r.tour_code, series: r.series, color: r.color, usd: i.usd, pax});
       });
+  });
+
+  // Merge vendor names where one is a substring of another (e.g. "მარკო პოლო" ⊂ "გუდაური მარკო პოლო").
+  // Shorter (more generic) name becomes the canonical key.
+  const vendorMap = {};
+  Object.keys(rawMap).sort((a, b) => a.length - b.length).forEach(name => {
+    const nl = name.toLowerCase();
+    const canon = Object.keys(vendorMap).find(c => {
+      const cl = c.toLowerCase();
+      return nl.includes(cl) || cl.includes(nl);
+    });
+    if (canon) {
+      vendorMap[canon] = vendorMap[canon].concat(rawMap[name]);
+    } else {
+      vendorMap[name] = rawMap[name].slice();
+    }
   });
 
   const fmt  = n => Math.round(n).toLocaleString();
