@@ -188,23 +188,25 @@ def seed_db():
         for t in TOURS_2026:
             if t["code"] in existing:
                 continue
-            series = t["series"]
-            bus_start = date.fromisoformat(t["bus_start"])
-            duration = SERIES[series]["duration"]
-            # Tour ends on the Tbilisi→Urumqi flight day = last itinerary day
-            bus_end = bus_start + timedelta(days=duration - 1)
-            conn.execute(
-                "INSERT INTO tours (code, series, bus_start, bus_end) VALUES (?,?,?,?)",
-                (t["code"], series, bus_start.isoformat(), bus_end.isoformat())
-            )
-            nights = SERIES[series]["nights"]
-            for offset, info in nights.items():
-                day_date = bus_start + timedelta(days=offset)
-                conn.execute(
-                    "INSERT INTO daily_log (tour_code, date, city, hotel, lunch, dinner, border_crossing) VALUES (?,?,?,?,?,?,?)",
-                    (t["code"], day_date.isoformat(), info.get("city",""), info.get("hotel",""),
-                     info.get("lunch",""), info.get("dinner",""), info.get("border") or "")
-                )
+            _insert_tour(conn, t["code"], t["series"], date.fromisoformat(t["bus_start"]))
+
+
+def _insert_tour(conn, code: str, series: str, bus_start: date):
+    """Insert a tour + its daily_log rows from the SERIES template."""
+    duration = SERIES[series]["duration"]
+    # Tour ends on the Tbilisi→Urumqi flight day = last itinerary day
+    bus_end = bus_start + timedelta(days=duration - 1)
+    conn.execute(
+        "INSERT INTO tours (code, series, bus_start, bus_end) VALUES (?,?,?,?)",
+        (code, series, bus_start.isoformat(), bus_end.isoformat())
+    )
+    for offset, info in SERIES[series]["nights"].items():
+        day_date = bus_start + timedelta(days=offset)
+        conn.execute(
+            "INSERT INTO daily_log (tour_code, date, city, hotel, lunch, dinner, border_crossing) VALUES (?,?,?,?,?,?,?)",
+            (code, day_date.isoformat(), info.get("city",""), info.get("hotel",""),
+             info.get("lunch",""), info.get("dinner",""), info.get("border") or "")
+        )
 
 def sync_series_meals(series_key: str):
     """Update lunch/dinner in daily_log for all tours of a given series from SERIES definition."""
@@ -943,3 +945,54 @@ def set_setting(key: str, value: str):
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (key, str(value))
         )
+
+
+def apply_schedule_sync(active: list) -> dict:
+    """Reconcile the tours table with the master schedule's active list.
+
+    `active` is a list of {code, series, bus_start(ISO)} for tours that are
+    currently ongoing or planned (NOT completed/cancelled).
+
+    - ADD: active tours not yet in the DB (series must be known).
+    - REMOVE: future DB tours (bus_start > today) absent from the active list
+      — i.e. cancelled/removed planned tours. Past/ongoing tours are kept
+      (completed tours simply drop out of the master list).
+    """
+    active_codes = {a["code"] for a in active}
+    # Safety guard: never wipe future tours on a bad/empty fetch.
+    if len(active_codes) < 20:
+        return {"ok": False, "reason": f"too few active codes ({len(active_codes)}) — skipped",
+                "added": [], "removed": []}
+
+    today = today_tbilisi()
+    added, removed = [], []
+    with get_db() as conn:
+        existing = {r["code"]: r["bus_start"]
+                    for r in conn.execute("SELECT code, bus_start FROM tours").fetchall()}
+
+        # Additions
+        for a in active:
+            code, series = a["code"], a["series"]
+            if code in existing or series not in SERIES:
+                continue
+            try:
+                bs = date.fromisoformat(a["bus_start"])
+            except Exception:
+                continue
+            _insert_tour(conn, code, series, bs)
+            added.append(code)
+
+        # Removals (future planned tours that vanished from the active list)
+        for code, bs in existing.items():
+            try:
+                started = date.fromisoformat(bs) <= today
+            except Exception:
+                started = True
+            if not started and code not in active_codes:
+                conn.execute("DELETE FROM daily_log WHERE tour_code=?", (code,))
+                conn.execute("DELETE FROM tour_meals WHERE tour_code=?", (code,))
+                conn.execute("DELETE FROM tours WHERE code=?", (code,))
+                removed.append(code)
+
+    print(f"[schedule_sync] added={added} removed={removed}")
+    return {"ok": True, "added": added, "removed": removed}

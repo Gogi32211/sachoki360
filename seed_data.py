@@ -73,6 +73,18 @@ SERIES = {
     },
 }
 
+# LT — ახალი სერია, ZT ტურის იდენტური პროგრამით (მცირე განსხვავებებით).
+SERIES["LT"] = {
+    "name": "LT — ZT-ის მსგავსი (11 ღამე)",
+    "duration": 9,
+    "color": "#26A69A",
+    "nights": SERIES["ZT"]["nights"],
+}
+
+# Day offset from the schedule-map's first (Baku/Almaty) date to the
+# app's bus_start (the Georgia / Khareba day). Used by schedule_sync.
+SERIES_START_OFFSET = {"ZT": 3, "LN": 3, "KT": 3, "DT1": 2, "DT2": 2, "LT": 2}
+
 TOURS_2026 = [
     {"code": "ZT-0427", "series": "ZT", "bus_start": "2026-04-30"},
     {"code": "ZT-0504", "series": "ZT", "bus_start": "2026-05-07"},
@@ -111,6 +123,7 @@ TOURS_2026 = [
     {"code": "LN-0617", "series": "LN", "bus_start": "2026-06-20"},
     {"code": "LN-0619", "series": "LN", "bus_start": "2026-06-22"},
     {"code": "LN-0622", "series": "LN", "bus_start": "2026-06-25"},
+    {"code": "LN-0629", "series": "LN", "bus_start": "2026-07-02"},
     {"code": "LN-0701", "series": "LN", "bus_start": "2026-07-04"},
     {"code": "LN-0703", "series": "LN", "bus_start": "2026-07-06"},
     {"code": "LN-0715", "series": "LN", "bus_start": "2026-07-18"},
@@ -134,7 +147,6 @@ TOURS_2026 = [
     {"code": "LN-1019", "series": "LN", "bus_start": "2026-10-22"},
     {"code": "KT-0428", "series": "KT", "bus_start": "2026-05-01"},
     {"code": "KT-0505", "series": "KT", "bus_start": "2026-05-08"},
-    {"code": "KT-0519", "series": "KT", "bus_start": "2026-05-22"},
     {"code": "KT-0602", "series": "KT", "bus_start": "2026-06-05"},
     {"code": "KT-0609", "series": "KT", "bus_start": "2026-06-12"},
     {"code": "KT-0616", "series": "KT", "bus_start": "2026-06-19"},
@@ -173,10 +185,8 @@ TOURS_2026 = [
     {"code": "DT1-1004", "series": "DT1", "bus_start": "2026-10-06"},
     {"code": "DT1-1011", "series": "DT1", "bus_start": "2026-10-13"},
     {"code": "DT2-0511", "series": "DT2", "bus_start": "2026-05-13"},
-    {"code": "DT2-0517", "series": "DT2", "bus_start": "2026-05-19"},
     {"code": "DT2-0524", "series": "DT2", "bus_start": "2026-05-26"},
     {"code": "DT2-0531", "series": "DT2", "bus_start": "2026-06-02"},
-    {"code": "DT2-0607", "series": "DT2", "bus_start": "2026-06-09"},
     {"code": "DT2-0614", "series": "DT2", "bus_start": "2026-06-16"},
     {"code": "DT2-0621", "series": "DT2", "bus_start": "2026-06-23"},
     {"code": "DT2-0628", "series": "DT2", "bus_start": "2026-06-30"},
@@ -195,4 +205,10 @@ TOURS_2026 = [
     {"code": "DT2-0927", "series": "DT2", "bus_start": "2026-09-29"},
     {"code": "DT2-1004", "series": "DT2", "bus_start": "2026-10-06"},
     {"code": "DT2-1011", "series": "DT2", "bus_start": "2026-10-13"},
+    # LT series — new (ZT-like)
+    {"code": "LT-0624", "series": "LT", "bus_start": "2026-06-26"},
+    {"code": "LT-0626", "series": "LT", "bus_start": "2026-06-28"},
+    {"code": "LT-0706", "series": "LT", "bus_start": "2026-07-08"},
+    {"code": "LT-0708", "series": "LT", "bus_start": "2026-07-10"},
+    {"code": "LT-0713", "series": "LT", "bus_start": "2026-07-15"},
 ]

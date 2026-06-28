@@ -12,6 +12,7 @@ from sheets_sync import fetch_hotel_assignments
 from meals_sync import fetch_all_meals
 from payments_sync import fetch_payment_statuses
 from profit_sync import fetch_tour_profit
+from schedule_sync import fetch_active_tours
 
 app = FastAPI(title="ki.360")
 
@@ -110,12 +111,20 @@ def ping():
 
 
 def _background_sync():
-    for series in ("ZT", "LN", "KT", "DT1", "DT2"):
+    # Reconcile schedule (add new / remove cancelled planned tours) FIRST,
+    # so the rest of the syncs operate on the up-to-date tour set.
+    try:
+        active = fetch_active_tours()
+        if active:
+            db.apply_schedule_sync(active)
+    except Exception as e:
+        print(f"Schedule sync warning: {e}")
+    for series in ("ZT", "LN", "KT", "DT1", "DT2", "LT"):
         try:
             db.sync_series_hotels(series)
         except Exception as e:
             print(f"Hotel sync warning ({series}): {e}")
-    for series in ("ZT", "LN", "KT", "DT1", "DT2"):
+    for series in ("ZT", "LN", "KT", "DT1", "DT2", "LT"):
         try:
             db.sync_series_meals(series)
         except Exception as e:
@@ -342,6 +351,15 @@ def debug_payments_sync():
 @app.get("/api/tour-profit")
 def tour_profit():
     return db.get_tour_profit()
+
+@app.post("/api/sync-schedule")
+def sync_schedule():
+    try:
+        active = fetch_active_tours()
+        result = db.apply_schedule_sync(active)
+        return result
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 @app.post("/api/sync-profit")
 def sync_profit():

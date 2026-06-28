@@ -30,11 +30,11 @@ const { useState, useEffect, useCallback, useRef } = React;
 const API = window.location.origin + "/api";
 
 const SERIES_COLORS = {
-  ZT: "#42A5F5", LN: "#66BB6A", KT: "#FF7043", DT1: "#AB47BC", DT2: "#EC407A"
+  ZT: "#42A5F5", LN: "#66BB6A", KT: "#FF7043", DT1: "#AB47BC", DT2: "#EC407A", LT: "#26A69A"
 };
 
 // Approx tour price (USD) for a 19+1 group — revenue from clients.
-const TOUR_PRICE = { ZT: 20300, LN: 17350, KT: 13600, DT1: 13300, DT2: 13300 };
+const TOUR_PRICE = { ZT: 20300, LN: 17350, KT: 13600, DT1: 13300, DT2: 13300, LT: 20300 };
 
 const pad2 = n => String(n).padStart(2, "0");
 const addDays = (iso, n) => {
