@@ -1315,8 +1315,8 @@ function ProfitView() {
     // Ideal benchmark: full groups (>=19 tourists) among ALL sold tours,
     // since few/no paid tours so far were full 19+1.
     const full = rows.filter(r => r.series === s && isSold(r) && paxNum(r) >= 19);
-    const avgFull    = Math.max(full.length ? mean(full.map(r => r.profit_usd))     : avg,    avg);
-    const avgVatFull = Math.max(full.length ? mean(full.map(r => finalVat(r) || 0)) : avgVat, avgVat);
+    const avgFull    = full.length ? mean(full.map(r => r.profit_usd))     : avg;
+    const avgVatFull = full.length ? mean(full.map(r => finalVat(r) || 0)) : avgVat;
     const planned = allTours.filter(t => t.series === s);
     const remaining = planned.filter(t => !(t.code in paidByCode)).length;
     const actualTotal = mean(paid.map(r => r.profit_usd)) * paid.length;
@@ -1417,7 +1417,7 @@ function ProfitView() {
             <div className="px-3 py-2 bg-amber-50 border-t text-xs text-amber-700">
               საშუალო მოგება/ტური ითვლება მხოლოდ <strong>გადახდილი</strong> ტურებიდან (მათი მოგება საბოლოოა).
               <strong> რეალისტური</strong> = გადახდილი ტურების ფაქტი + დარჩენილი ტურები × სერიის საშუალო.
-              <strong> იდეალური</strong> = დარჩენილი ტურები × max(19+1 საშ., სერიის საშ.) — ანუ სრული ჯგუფებით, არასდროს რეალისტურზე ნაკლები.
+              <strong> იდეალური</strong> = დარჩენილი ტურები × 19+1 (სრული) ჯგუფების საშუალო (თუ 19+1 მონაცემი არ არის — სერიის საშუალო). ზოგჯერ რეალისტურზე ნაკლებიც შეიძლება იყოს — მაგ. სასტუმროს ფასდაკლება სპეცტურებზე.
             </div>
           </div>
         </div>
