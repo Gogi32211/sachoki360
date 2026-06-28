@@ -1243,41 +1243,40 @@ function ProfitView() {
       .finally(() => setSyncing(false));
   };
 
-  // A tour counts as "sold" once it has a revenue figure.
-  const sold = rows.filter(r => (r.revenue_usd || 0) > 0 || (r.revenue_gel || 0) > 0);
+  // A tour counts as "sold" once it has a profit figure.
+  const sold = rows.filter(r => r.profit_usd != null);
 
   const filtered = (filter === 'sold' ? sold
       : filter === 'active' ? rows.filter(r => r.status !== 'done')
       : rows)
     .slice()
     .sort((a, b) => {
-      if (sortBy === 'profit') return (b.profit_after_vat||b.profit_gel||0) - (a.profit_after_vat||a.profit_gel||0);
+      if (sortBy === 'profit') return (b.profit_usd||0) - (a.profit_usd||0);
       return (a.bus_start||'').localeCompare(b.bus_start||'');
     });
 
   // Totals (only sold tours have a meaningful profit)
-  const totProfitGel = sold.reduce((s,r) => s + (r.profit_after_vat || r.profit_gel || 0), 0);
-  const totRevUsd    = sold.reduce((s,r) => s + (r.revenue_usd || 0), 0);
-  const totSpentUsd  = sold.reduce((s,r) => s + (r.spent_usd || 0), 0);
+  const totProfit = sold.reduce((s,r) => s + (r.profit_usd || 0), 0);
+  const totVat    = sold.reduce((s,r) => s + (r.vat_usd || 0), 0);
 
   const fmt  = (n) => (n || n === 0) ? Math.round(n).toLocaleString() : '—';
   const prClr = (n) => n > 0 ? 'text-green-700' : n < 0 ? 'text-red-600' : 'text-gray-400';
 
   return (
-    <div className="p-4 max-w-6xl mx-auto">
+    <div className="p-4 max-w-3xl mx-auto">
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-          <div className="text-xs text-green-600 mb-0.5">სავარაუდო მოგება (₾, დღგ-ს შემდეგ)</div>
-          <div className="text-2xl font-bold text-green-700">₾{fmt(totProfitGel)}</div>
+          <div className="text-xs text-green-600 mb-0.5">სავარაუდო მოგება ($)</div>
+          <div className="text-2xl font-bold text-green-700">${fmt(totProfit)}</div>
           <div className="text-xs text-green-500 mt-1">{sold.length} გაყიდული ტური</div>
         </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
-          <div className="text-xs text-blue-600 mb-0.5">სულ შემოსავალი ($)</div>
-          <div className="text-2xl font-bold text-blue-700">${fmt(totRevUsd)}</div>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
+          <div className="text-xs text-indigo-600 mb-0.5">სავარაუდო დღგ დასაბრუნებელი ($)</div>
+          <div className="text-2xl font-bold text-indigo-700">${fmt(totVat)}</div>
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-          <div className="text-xs text-gray-500 mb-0.5">სულ დახარჯული ($)</div>
-          <div className="text-2xl font-bold text-gray-700">${fmt(totSpentUsd)}</div>
+          <div className="text-xs text-gray-500 mb-0.5">სულ (მოგება + დღგ) ($)</div>
+          <div className="text-2xl font-bold text-gray-700">${fmt(totProfit + totVat)}</div>
         </div>
       </div>
 
@@ -1304,49 +1303,39 @@ function ProfitView() {
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  {['ტური','დაწყება','შემოს. $','დახარჯ. $','მოგება $','მოგება ₾','სავარ. მოგება ₾ (დღგ)','სტ.'].map(h => (
-                    <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
-                  ))}
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">ტური</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">დაწყება</th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სავარაუდო მოგება $</th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სავარაუდო დღგ $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(r => (
+                <tr key={r.tour_code} className="border-b hover:bg-gray-50">
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: r.color}}/>
+                      <span className="font-bold text-gray-800 whitespace-nowrap">{r.tour_code}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{r.bus_start}</td>
+                  <td className={`px-3 py-2 text-right font-bold whitespace-nowrap ${prClr(r.profit_usd)}`}>
+                    {r.profit_usd != null ? '$'+fmt(r.profit_usd) : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    {r.vat_usd != null
+                      ? <span className="text-indigo-700 font-medium">${fmt(r.vat_usd)}</span>
+                      : <span className="text-gray-400">—</span>}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filtered.map(r => (
-                  <tr key={r.tour_code} className="border-b hover:bg-gray-50">
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: r.color}}/>
-                        <span className="font-bold text-gray-800 whitespace-nowrap">{r.tour_code}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{r.bus_start}</td>
-                    <td className="px-3 py-2 text-blue-700 whitespace-nowrap">{r.revenue_usd ? '$'+fmt(r.revenue_usd) : '—'}</td>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{r.spent_usd ? '$'+fmt(r.spent_usd) : '—'}</td>
-                    <td className={`px-3 py-2 font-medium whitespace-nowrap ${prClr(r.profit_usd)}`}>{r.profit_usd != null ? '$'+fmt(r.profit_usd) : '—'}</td>
-                    <td className={`px-3 py-2 whitespace-nowrap ${prClr(r.profit_gel)}`}>{r.profit_gel != null ? '₾'+fmt(r.profit_gel) : '—'}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {r.profit_after_vat != null
-                        ? <span className={`px-2 py-0.5 rounded font-bold ${r.profit_after_vat > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>₾{fmt(r.profit_after_vat)}</span>
-                        : <span className="text-gray-400">—</span>}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        r.status==='active' ? 'bg-green-100 text-green-700' :
-                        r.status==='upcoming' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-500'}`}>
-                        {r.status==='active'?'აქტ.':r.status==='upcoming'?'მომ.':'დასრ.'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
           <div className="px-3 py-2 bg-amber-50 border-t text-xs text-amber-700">
-            „სავარ. მოგება ₾ (დღგ)" = სავარაუდო მოგება დღგ-ს დაბრუნების შემდეგ — პირდაპირ BALANCE ფაილებიდან. ცარიელი (—) = ტურს ჯერ არ აქვს გასაყიდი ფასი შევსებული.
+            ორივე თანხა დოლარში — პირდაპირ BALANCE ფაილებიდან. „დღგ" = დღგ-ს დაბრუნებით მოსალოდნელი თანხა. ცარიელი (—) = ტურს ჯერ არ აქვს მოგება დათვლილი.
           </div>
         </div>
       )}

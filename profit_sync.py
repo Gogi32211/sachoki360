@@ -1,11 +1,15 @@
 """
-Sync estimated tour profit from the Google Sheets BALANCE files.
+Sync estimated tour profit (USD) from the Google Sheets BALANCE files.
 
 Each financial workbook has one tab per tour. Every tab ends with a summary
-block:
-    დაიხარჯა      <gel>  <usd>      (total spent)
-    ტურის ღირებ.  <gel>  <usd>      (tour revenue / sale price)
-    მოგება        <gel>  <usd>  <after_vat>   (profit; 3rd = profit after VAT refund)
+block. The relevant cells (all amounts in USD):
+
+    დღგ სავარაუდო   <vat_usd>            (estimated VAT to be refunded)
+    დაიხარჯა        <spent_usd>  ...
+    ტურის ღირებ.    <revenue_usd> ...
+    მოგება          <profit_usd>  <ignore>  <profit_after_vat>
+
+profit_after_vat == profit_usd + vat_usd.
 
 READ-ONLY on the sheets.
 """
@@ -48,10 +52,11 @@ def _parse_worksheet(ws) -> tuple:
         code = _norm_code(m.group(1))
 
     out = {
-        'spent_gel': None, 'spent_usd': None,
-        'revenue_gel': None, 'revenue_usd': None,
-        'profit_gel': None, 'profit_usd': None,
-        'profit_after_vat': None,
+        'profit_usd': None,       # მოგება (1st value = USD)
+        'vat_usd': None,          # დღგ სავარაუდო (USD VAT to refund)
+        'profit_after_vat': None, # მოგება 3rd value = profit + vat
+        'spent_usd': None,        # დაიხარჯა (1st value = USD)
+        'revenue_usd': None,      # ტურის ღირებ. (1st value = USD)
     }
 
     for row in ws.iter_rows(values_only=True):
@@ -63,23 +68,30 @@ def _parse_worksheet(ws) -> tuple:
                     code = _norm_code(mm.group(1))
                     break
         for i, c in enumerate(cells):
-            if c not in ('დაიხარჯა', 'მოგება') and not c.startswith('ტურის ღირებ'):
+            is_vat = c.startswith('დღგ სავარაუდო')
+            is_spent = c == 'დაიხარჯა'
+            is_rev = c.startswith('ტურის ღირებ')
+            is_profit = c == 'მოგება'
+            if not (is_vat or is_spent or is_rev or is_profit):
                 continue
             nxt = [n for n in (_num(x) for x in cells[i + 1:] if str(x).strip() != '')
                    if n is not None]
-            if c == 'დაიხარჯა' and len(nxt) >= 2:
-                out['spent_gel'], out['spent_usd'] = nxt[0], nxt[1]
-            elif c.startswith('ტურის ღირებ') and len(nxt) >= 1:
-                out['revenue_gel'] = nxt[0]
-                if len(nxt) >= 2:
-                    out['revenue_usd'] = nxt[1]
-            elif c == 'მოგება' and len(nxt) >= 2:
-                out['profit_gel'], out['profit_usd'] = nxt[0], nxt[1]
+            if is_vat and len(nxt) >= 1:
+                out['vat_usd'] = nxt[0]
+            elif is_spent and len(nxt) >= 1:
+                out['spent_usd'] = nxt[0]
+            elif is_rev and len(nxt) >= 1:
+                out['revenue_usd'] = nxt[0]
+            elif is_profit and len(nxt) >= 1:
+                out['profit_usd'] = nxt[0]
                 if len(nxt) >= 3:
                     out['profit_after_vat'] = nxt[2]
 
     if not code:
         return None, None
+    # Derive profit_after_vat if the sheet didn't carry it explicitly.
+    if out['profit_after_vat'] is None and out['profit_usd'] is not None and out['vat_usd'] is not None:
+        out['profit_after_vat'] = round(out['profit_usd'] + out['vat_usd'], 2)
     return code, out
 
 
@@ -102,7 +114,7 @@ def _fetch_workbook_profit(sheet_id: str) -> dict:
 
 
 def fetch_tour_profit() -> dict:
-    """Return {tour_code: {spent/revenue/profit...}} across all balance files."""
+    """Return {tour_code: {profit_usd, vat_usd, ...}} across all balance files."""
     results: dict = {}
     for key, sheet_id in SHEET_IDS.items():
         results.update(_fetch_workbook_profit(sheet_id))

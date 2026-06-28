@@ -90,15 +90,23 @@ def init_db():
             );
             CREATE TABLE IF NOT EXISTS tour_profit (
                 tour_code        TEXT PRIMARY KEY,
-                spent_gel        REAL,
-                spent_usd        REAL,
-                revenue_gel      REAL,
-                revenue_usd      REAL,
-                profit_gel       REAL,
                 profit_usd       REAL,
-                profit_after_vat REAL
+                vat_usd          REAL,
+                profit_after_vat REAL,
+                spent_usd        REAL,
+                revenue_usd      REAL
             );
         """)
+        # Migrate older tour_profit schema → add any missing columns.
+        for col, defn in [
+            ("profit_usd", "REAL"), ("vat_usd", "REAL"),
+            ("profit_after_vat", "REAL"), ("spent_usd", "REAL"),
+            ("revenue_usd", "REAL"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE tour_profit ADD COLUMN {col} {defn}")
+            except Exception:
+                pass
         # Migrate: add new columns to payment_terms if missing
         for col, defn in [
             ("unit_price",    "REAL DEFAULT 0"),
@@ -851,23 +859,20 @@ def get_tour_payment_summary(from_date: str = None, to_date: str = None):
 
 
 def sync_tour_profit(data: dict) -> int:
-    """Upsert per-tour profit data from {tour_code: {spent/revenue/profit...}}."""
+    """Upsert per-tour profit data from {tour_code: {profit_usd, vat_usd, ...}}."""
     count = 0
     with get_db() as conn:
         for code, d in data.items():
             conn.execute("""
                 INSERT INTO tour_profit
-                    (tour_code, spent_gel, spent_usd, revenue_gel, revenue_usd,
-                     profit_gel, profit_usd, profit_after_vat)
-                VALUES (?,?,?,?,?,?,?,?)
+                    (tour_code, profit_usd, vat_usd, profit_after_vat, spent_usd, revenue_usd)
+                VALUES (?,?,?,?,?,?)
                 ON CONFLICT(tour_code) DO UPDATE SET
-                    spent_gel=excluded.spent_gel, spent_usd=excluded.spent_usd,
-                    revenue_gel=excluded.revenue_gel, revenue_usd=excluded.revenue_usd,
-                    profit_gel=excluded.profit_gel, profit_usd=excluded.profit_usd,
-                    profit_after_vat=excluded.profit_after_vat
-            """, (code, d.get('spent_gel'), d.get('spent_usd'),
-                  d.get('revenue_gel'), d.get('revenue_usd'),
-                  d.get('profit_gel'), d.get('profit_usd'), d.get('profit_after_vat')))
+                    profit_usd=excluded.profit_usd, vat_usd=excluded.vat_usd,
+                    profit_after_vat=excluded.profit_after_vat,
+                    spent_usd=excluded.spent_usd, revenue_usd=excluded.revenue_usd
+            """, (code, d.get('profit_usd'), d.get('vat_usd'),
+                  d.get('profit_after_vat'), d.get('spent_usd'), d.get('revenue_usd')))
             count += 1
     return count
 
