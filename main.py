@@ -13,6 +13,7 @@ from meals_sync import fetch_all_meals
 from payments_sync import fetch_payment_statuses
 from profit_sync import fetch_tour_profit
 from schedule_sync import fetch_active_tours
+from cancel_sync import fetch_cancelled_tour_codes
 
 app = FastAPI(title="ki.360")
 
@@ -111,6 +112,13 @@ def ping():
 
 
 def _background_sync():
+    # Remove cancelled tours FIRST so downstream syncs skip them entirely.
+    try:
+        cancelled = fetch_cancelled_tour_codes()
+        if cancelled:
+            db.remove_cancelled_tours(cancelled)
+    except Exception as e:
+        print(f"Cancel sync warning: {e}")
     # Reconcile schedule (add new / remove cancelled planned tours) FIRST,
     # so the rest of the syncs operate on the up-to-date tour set.
     try:
@@ -367,6 +375,15 @@ def sync_profit():
         data = fetch_tour_profit()
         updated = db.sync_tour_profit(data)
         return {"ok": True, "updated": updated}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.post("/api/sync-cancelled")
+def sync_cancelled():
+    try:
+        cancelled = fetch_cancelled_tour_codes()
+        removed = db.remove_cancelled_tours(cancelled)
+        return {"ok": True, "cancelled_codes": sorted(cancelled), "removed": removed}
     except Exception as e:
         raise HTTPException(500, str(e))
 
