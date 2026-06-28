@@ -1297,6 +1297,7 @@ function ProfitView() {
   // (finished-but-unpaid tours may still be adjusted downward). Every
   // not-yet-paid planned tour is projected with that average.
   const isPaid = (r) => isSold(r) && payStatus(r) === 'paid';
+  const paxNum = (r) => { const m = (r.pax||'').match(/^(\d+)/); return m ? parseInt(m[1]) : 0; };
   const paidByCode = {};
   rows.forEach(r => { if (isPaid(r)) paidByCode[r.tour_code] = r; });
 
@@ -1307,9 +1308,12 @@ function ProfitView() {
   })();
 
   const forecast = SERIES_LIST.map(s => {
+    // Realistic average: PAID tours only (their profit is final).
     const paid = rows.filter(r => r.series === s && isPaid(r));
-    const full = paid.filter(r => r.pax === '19+1');
-    const avg     = paid.length ? paid.reduce((a,r)=>a+r.profit_usd,0)/paid.length : overallAvg;
+    const avg = paid.length ? paid.reduce((a,r)=>a+r.profit_usd,0)/paid.length : overallAvg;
+    // Ideal benchmark: full groups (>=19 tourists) among ALL sold tours,
+    // since few/no paid tours so far were full 19+1.
+    const full = rows.filter(r => r.series === s && isSold(r) && paxNum(r) >= 19);
     const avgFullRaw = full.length ? full.reduce((a,r)=>a+r.profit_usd,0)/full.length : avg;
     const avgFull = Math.max(avgFullRaw, avg); // ideal can never be below realistic
     const planned = allTours.filter(t => t.series === s);
