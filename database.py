@@ -913,24 +913,14 @@ def _approx_dates_from_code(code: str):
 
 
 def get_tour_profit() -> list:
-    """Return ALL scheduled tours + balance-only tours.
-    Scheduled tours without balance data appear with NULL financials so
-    the profit tab count matches the daily-view count."""
+    """Return per-tour profit for ALL tours that have balance data,
+    whether or not they're still in the schedule table.
+    Tours without balance data are considered cancelled and excluded."""
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT t.code AS tour_code,
-                   p.pax, p.profit_usd, p.vat_usd, p.profit_after_vat,
-                   p.spent_usd, p.revenue_usd, p.components, p.components_detail,
-                   t.series AS t_series, t.bus_start AS t_start, t.bus_end AS t_end
-            FROM tours t
-            LEFT JOIN tour_profit p ON p.tour_code = t.code
-            UNION ALL
-            SELECT p.tour_code,
-                   p.pax, p.profit_usd, p.vat_usd, p.profit_after_vat,
-                   p.spent_usd, p.revenue_usd, p.components, p.components_detail,
-                   NULL AS t_series, NULL AS t_start, NULL AS t_end
+            SELECT p.*, t.series AS t_series, t.bus_start AS t_start, t.bus_end AS t_end
             FROM tour_profit p
-            WHERE p.tour_code NOT IN (SELECT code FROM tours)
+            LEFT JOIN tours t ON t.code = p.tour_code
         """).fetchall()
         result = []
         for r in rows:
