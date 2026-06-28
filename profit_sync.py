@@ -54,9 +54,9 @@ def _usd_from_row(cells) -> float:
 
 
 _HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', 'მარკო', 'გორი ინ',
-               'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან',
+               'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან', 'pullman',
                'ლილატ', 'გუდაურ', 'best western', 'ბესთ', 'ქრაუნ',
-               'crown', 'ბორჯომ', 'ინნ')
+               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ')
 
 
 def _categorize(name: str):
@@ -67,7 +67,7 @@ def _categorize(name: str):
     if 'აზერბაიჯ' in n:                    # Azerbaijan — excluded from stats
         return None
     if any(k in n for k in ('სომხეთი', 'yerevan', 'ერევან', 'aghababayan',
-                            'აღაბაბაია', 'სევან', 'პაინ')):
+                            'აღაბაბაია', 'სევან')):
         return 'armenia'
     if 'ავტობუს' in n or 'სპრინტერ' in n:
         return 'bus'
