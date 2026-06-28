@@ -82,6 +82,18 @@ def _usd_from_row(cells) -> float:
     return max(cand) if cand else 0.0
 
 
+# Known spelling corrections in balance sheets: wrong → correct.
+_SPELLING_FIXES = {
+    'ორქოს': 'ოქროს',
+}
+
+
+def _fix_name(name: str) -> str:
+    for wrong, right in _SPELLING_FIXES.items():
+        name = name.replace(wrong, right)
+    return name
+
+
 _HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', 'მარკო', 'გორი ინ',
                'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან', 'pullman',
                'ლილატ', 'გუდაურ', 'best western', 'ბესთ', 'ქრაუნ',
@@ -194,7 +206,7 @@ def _parse_worksheet(ws) -> tuple:
                         break
 
         # ── Cost-component breakdown from line items ──
-        name = cells[1].strip() if len(cells) > 1 else ''
+        name = _fix_name(cells[1].strip() if len(cells) > 1 else '')
         if name and not any(name.startswith(k) for k in _SUMMARY_KEYS) \
                 and not TOUR_CODE_RE.search(name):
             cat = _categorize(name)
