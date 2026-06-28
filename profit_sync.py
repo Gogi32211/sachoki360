@@ -116,6 +116,7 @@ def _parse_worksheet(ws) -> tuple:
         'components': {},         # {category: usd} cost breakdown (no Azerbaijan)
     }
     comp = {}
+    items = []  # [{name, cat, usd}] — individual line items
 
     for row in ws.iter_rows(values_only=True):
         cells = [str(c).strip() if c is not None else '' for c in row]
@@ -141,6 +142,7 @@ def _parse_worksheet(ws) -> tuple:
                 usd = _usd_from_row(cells)
                 if usd:
                     comp[cat] = round(comp.get(cat, 0.0) + usd, 2)
+                    items.append({'name': name, 'cat': cat, 'usd': round(usd, 2)})
 
         for i, c in enumerate(cells):
             is_vat = c.startswith('დღგ სავარაუდო')
@@ -165,6 +167,7 @@ def _parse_worksheet(ws) -> tuple:
     if not code:
         return None, None
     out['components'] = comp
+    out['items'] = items
     # Derive profit_after_vat if the sheet didn't carry it explicitly.
     if out['profit_after_vat'] is None and out['profit_usd'] is not None and out['vat_usd'] is not None:
         out['profit_after_vat'] = round(out['profit_usd'] + out['vat_usd'], 2)

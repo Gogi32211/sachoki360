@@ -105,6 +105,7 @@ def init_db():
             ("profit_usd", "REAL"), ("vat_usd", "REAL"),
             ("profit_after_vat", "REAL"), ("spent_usd", "REAL"),
             ("revenue_usd", "REAL"), ("components", "TEXT"),
+            ("components_detail", "TEXT"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE tour_profit ADD COLUMN {col} {defn}")
@@ -870,17 +871,19 @@ def sync_tour_profit(data: dict) -> int:
         for code, d in data.items():
             conn.execute("""
                 INSERT INTO tour_profit
-                    (tour_code, pax, profit_usd, vat_usd, profit_after_vat, spent_usd, revenue_usd, components)
-                VALUES (?,?,?,?,?,?,?,?)
+                    (tour_code, pax, profit_usd, vat_usd, profit_after_vat, spent_usd, revenue_usd, components, components_detail)
+                VALUES (?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(tour_code) DO UPDATE SET
                     pax=excluded.pax,
                     profit_usd=excluded.profit_usd, vat_usd=excluded.vat_usd,
                     profit_after_vat=excluded.profit_after_vat,
                     spent_usd=excluded.spent_usd, revenue_usd=excluded.revenue_usd,
-                    components=excluded.components
+                    components=excluded.components,
+                    components_detail=excluded.components_detail
             """, (code, d.get('pax'), d.get('profit_usd'), d.get('vat_usd'),
                   d.get('profit_after_vat'), d.get('spent_usd'), d.get('revenue_usd'),
-                  _json.dumps(d.get('components') or {})))
+                  _json.dumps(d.get('components') or {}),
+                  _json.dumps(d.get('items') or [])))
             count += 1
     return count
 
@@ -927,6 +930,10 @@ def get_tour_profit() -> list:
                 d['components'] = _json.loads(d.get('components') or '{}')
             except Exception:
                 d['components'] = {}
+            try:
+                d['components_detail'] = _json.loads(d.get('components_detail') or '[]')
+            except Exception:
+                d['components_detail'] = []
             result.append(d)
         result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
         return result
