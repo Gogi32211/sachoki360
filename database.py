@@ -996,16 +996,16 @@ def set_setting(key: str, value: str):
 def apply_schedule_sync(active: list) -> dict:
     """Reconcile the tours table with the master schedule's active list.
 
-    `active` is a list of {code, series, bus_start(ISO)} for tours that are
-    currently ongoing or planned (NOT completed/cancelled).
+    `active` is [{code, series, bus_start(ISO)}] — every ongoing/planned tour
+    visible in the master sheet's main tab (before the 'done 2026' marker).
 
-    - ADD: active tours not yet in the DB (series must be known).
-    - REMOVE: future DB tours (bus_start > today) absent from the active list
-      — i.e. cancelled/removed planned tours. Past/ongoing tours are kept
-      (completed tours simply drop out of the master list).
+    - ADD  : tours in the active list not yet in the DB.
+    - REMOVE: DB tours NOT in the active list that haven't finished yet
+              (bus_end >= today).  Completed tours (bus_end < today) are kept
+              because they naturally fall off the master tab once done.
     """
     active_codes = {a["code"] for a in active}
-    # Safety guard: never wipe future tours on a bad/empty fetch.
+    # Safety guard: never wipe tours on a bad/empty fetch.
     if len(active_codes) < 20:
         return {"ok": False, "reason": f"too few active codes ({len(active_codes)}) — skipped",
                 "added": [], "removed": []}
@@ -1013,8 +1013,8 @@ def apply_schedule_sync(active: list) -> dict:
     today = today_tbilisi()
     added, removed = [], []
     with get_db() as conn:
-        existing = {r["code"]: r["bus_start"]
-                    for r in conn.execute("SELECT code, bus_start FROM tours").fetchall()}
+        existing = {r["code"]: r["bus_end"]
+                    for r in conn.execute("SELECT code, bus_end FROM tours").fetchall()}
 
         # Additions
         for a in active:
@@ -1028,15 +1028,26 @@ def apply_schedule_sync(active: list) -> dict:
             _insert_tour(conn, code, series, bs)
             added.append(code)
 
-        # Removals (future planned tours that vanished from the active list)
-        for code, bs in existing.items():
+        # Removals: not in active list AND not yet completed
+        for code, be_str in existing.items():
+            if code in active_codes:
+                continue
             try:
-                started = date.fromisoformat(bs) <= today
+                bus_end = date.fromisoformat(be_str)
             except Exception:
-                started = True
-            if not started and code not in active_codes:
-                conn.execute("DELETE FROM daily_log WHERE tour_code=?", (code,))
-                conn.execute("DELETE FROM tour_meals WHERE tour_code=?", (code,))
+                continue
+            if bus_end >= today:  # still ongoing or future → cancelled
+                for tbl, col in [
+                    ('daily_log',       'tour_code'),
+                    ('tour_meals',      'tour_code'),
+                    ('tour_financials', 'tour_code'),
+                    ('tour_profit',     'tour_code'),
+                    ('payment_status',  'tour_code'),
+                ]:
+                    try:
+                        conn.execute(f"DELETE FROM {tbl} WHERE {col}=?", (code,))
+                    except Exception:
+                        pass
                 conn.execute("DELETE FROM tours WHERE code=?", (code,))
                 removed.append(code)
 
