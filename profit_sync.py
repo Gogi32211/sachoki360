@@ -107,8 +107,13 @@ def _categorize(name: str):
         return None
     if 'აზერბაიჯ' in n:                    # Azerbaijan — excluded from stats
         return None
+    is_meal = any(k in n for k in ('ლანჩი', 'ვახშამ', 'ვაშამ', 'დეგუსტაცი'))
     if any(k in n for k in ('სომხეთი', 'yerevan', 'ერევან', 'aghababayan',
                             'agababayan', 'აღაბაბაია', 'სევან')):
+        # Meal rows in Armenia are informational diary entries; the cost is
+        # already captured in "სომხეთი გიდი" / "Radisson Yerevan" line items.
+        if is_meal:
+            return None
         return 'armenia'
     if 'ავტობუს' in n or 'სპრინტერ' in n:
         return 'bus'
@@ -125,7 +130,6 @@ def _categorize(name: str):
     # Driver name / tips entry → merged into bus
     if is_driver_ref:
         return 'bus'
-    is_meal = any(k in n for k in ('ლანჩი', 'ვახშამ', 'ვაშამ', 'დეგუსტაცი'))
     # Dinner/lunch at a hotel is already included in the hotel cost — skip.
     if is_meal and any(k in n for k in _HOTEL_KEYS):
         return None
