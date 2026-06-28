@@ -66,6 +66,8 @@ def _categorize(name: str):
         return None
     if 'აზერბაიჯ' in n:                    # Azerbaijan — excluded from stats
         return None
+    if 'ხარება' in n:                       # Khareba winery items excluded permanently
+        return None
     if any(k in n for k in ('სომხეთი', 'yerevan', 'ერევან', 'aghababayan',
                             'აღაბაბაია', 'სევან', 'პაინ')):
         return 'armenia'
