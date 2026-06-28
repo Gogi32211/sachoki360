@@ -1938,22 +1938,36 @@ function VendorChart({ scope, perPax }) {
   });
 
   // Normalize name for comparison: strip parenthetical suffixes and extra spaces.
-  // "ახალი აზია (ისანი)" → "ახალი აზია ისანი" so it merges with "ახალი აზია ისანი".
   const normKey = s => s.toLowerCase()
-    .replace(/\s*\([^)]*\)/g, ' ')  // "(ისანი)" → " "
+    .replace(/\s*\([^)]*\)/g, ' ')
     .replace(/[()]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Merge vendor names where one normalized form is a substring of another.
-  // Shorter (more generic) name becomes the canonical display key.
+  // Core words: strip meal/transport prefix ("ვახშამი -", "ლანჩი -" etc.) then split.
+  const coreWords = s => normKey(s)
+    .replace(/^(ვახშამი|ვაშამი|ლანჩი|სადილი|breakfast)\s*[-–]\s*/i, '')
+    .split(/\s+/)
+    .filter(w => w.length >= 3);
+
+  // Two vendor names are considered the same if:
+  // (a) one normalized name is a substring of the other, OR
+  // (b) after stripping meal prefixes, ≥1 significant word is shared AND
+  //     the overlap covers ≥40% of the longer name's words.
+  const isSameVendor = (a, b) => {
+    const na = normKey(a), nb = normKey(b);
+    if (na.includes(nb) || nb.includes(na)) return true;
+    const wa = new Set(coreWords(a));
+    const wb = coreWords(b);
+    if (!wa.size || !wb.length) return false;
+    const common = wb.filter(w => wa.has(w)).length;
+    return common >= 1 && common / Math.max(wa.size, wb.length) >= 0.4;
+  };
+
+  // Merge: shorter (more generic) name becomes the canonical display key.
   const vendorMap = {};
   Object.keys(rawMap).sort((a, b) => a.length - b.length).forEach(name => {
-    const nl = normKey(name);
-    const canon = Object.keys(vendorMap).find(c => {
-      const cl = normKey(c);
-      return nl.includes(cl) || cl.includes(nl);
-    });
+    const canon = Object.keys(vendorMap).find(c => isSameVendor(c, name));
     if (canon) {
       vendorMap[canon] = vendorMap[canon].concat(rawMap[name]);
     } else {
