@@ -89,7 +89,8 @@ def _categorize(name: str):
     if is_guide_ref:
         return 'guide'
     if any(k in n for k in ('ვარძი', 'სტალინ', 'უფლისციხ', 'უფლიციხ', 'საბაგირ',
-                            'გემზე', 'მოზეომ', 'დელიკ', 'ბილეთ', 'მუზეუმ', 'ცაგვ')):
+                            'გემზე', 'მოზეომ', 'დელიკ', 'ბილეთ', 'მუზეუმ', 'ცაგვ',
+                            'მარტვილ')):
         return 'attraction'
     if any(k in n for k in _HOTEL_KEYS):
         return 'hotel'
