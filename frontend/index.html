@@ -1653,12 +1653,23 @@ function StatsView() {
   const [sFilter, setSFilter] = useState('all');
   const [expanded, setExpanded] = useState({});
   const [perPax, setPerPax] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => {
+  const loadData = () => {
     fetch(`${API}/tour-profit`).then(r => r.json())
       .then(d => { setRows(d); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  const handleSync = () => {
+    setSyncing(true);
+    fetch(`${API}/sync-profit`, {method: 'POST'})
+      .then(() => loadData())
+      .catch(() => {})
+      .finally(() => setSyncing(false));
+  };
 
   const fmt = n => (n || n === 0) ? Math.round(n).toLocaleString() : '—';
   const fmtDec = n => (n || n === 0) ? n.toFixed(1) : '—';
@@ -1733,7 +1744,12 @@ function StatsView() {
             className={`px-3 py-1 rounded text-xs font-bold ${sFilter===s ? 'text-white' : 'bg-white border hover:bg-gray-50'}`}
             style={sFilter===s ? {background: SERIES_COLORS[s]} : {color: SERIES_COLORS[s]}}>{s}</button>
         ))}
-        <div className="ml-auto flex items-center gap-1 bg-white border rounded-lg overflow-hidden shadow-sm">
+        <button onClick={handleSync} disabled={syncing}
+          className="px-3 py-1.5 text-xs font-semibold bg-white border rounded-lg shadow-sm hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
+          <span className={syncing ? 'animate-spin inline-block' : ''}>⟳</span>
+          {syncing ? 'სინქრო...' : 'განახლება'}
+        </button>
+        <div className="ml-2 flex items-center gap-1 bg-white border rounded-lg overflow-hidden shadow-sm">
           <button onClick={() => setPerPax(false)}
             className={`px-3 py-1.5 text-xs font-semibold transition-colors ${!perPax ? 'bg-slate-700 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             ჯამური
