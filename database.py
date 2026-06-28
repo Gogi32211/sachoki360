@@ -877,21 +877,46 @@ def sync_tour_profit(data: dict) -> int:
     return count
 
 
+def _approx_dates_from_code(code: str):
+    """Tour codes embed MM DD (e.g. DT2-0601 → June 1). Use as a fallback
+    date for balance-only tours that aren't in the schedule table."""
+    import re
+    m = re.search(r'-(\d{2})(\d{2})$', code)
+    if not m:
+        return None, None
+    mm, dd = m.group(1), m.group(2)
+    try:
+        d = date(2026, int(mm), int(dd))
+    except ValueError:
+        return None, None
+    return d.isoformat(), d.isoformat()
+
+
 def get_tour_profit() -> list:
-    """Return per-tour profit joined with tour series/dates, newest first."""
+    """Return per-tour profit for ALL tours that have balance data,
+    whether or not they're still in the schedule table."""
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT p.*, t.series, t.bus_start, t.bus_end
+            SELECT p.*, t.series AS t_series, t.bus_start AS t_start, t.bus_end AS t_end
             FROM tour_profit p
-            JOIN tours t ON t.code = p.tour_code
-            ORDER BY t.bus_start
+            LEFT JOIN tours t ON t.code = p.tour_code
         """).fetchall()
         result = []
         for r in rows:
             d = dict(r)
-            d['status'] = get_tour_status(r['bus_start'], r['bus_end'])
-            d['color'] = SERIES.get(r['series'], {}).get('color', '#888')
+            code = r['tour_code']
+            series = r['t_series'] or code.split('-')[0]
+            d['series'] = series
+            d.pop('t_series', None)
+            bs, be = r['t_start'], r['t_end']
+            if not (bs and be):
+                bs, be = _approx_dates_from_code(code)
+            d['bus_start'], d['bus_end'] = bs, be
+            d.pop('t_start', None); d.pop('t_end', None)
+            d['status'] = get_tour_status(bs, be) if (bs and be) else 'done'
+            d['color'] = SERIES.get(series, {}).get('color', '#888')
             result.append(d)
+        result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
         return result
 
 
