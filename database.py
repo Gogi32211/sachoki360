@@ -111,6 +111,11 @@ def init_db():
                 conn.execute(f"ALTER TABLE tour_profit ADD COLUMN {col} {defn}")
             except Exception:
                 pass
+        # Migrate: add rooms column to tours if missing
+        try:
+            conn.execute("ALTER TABLE tours ADD COLUMN rooms TEXT DEFAULT ''")
+        except Exception:
+            pass
         # Migrate: add new columns to payment_terms if missing
         for col, defn in [
             ("unit_price",    "REAL DEFAULT 0"),
@@ -201,14 +206,14 @@ def seed_db():
             _insert_tour(conn, t["code"], t["series"], date.fromisoformat(t["bus_start"]))
 
 
-def _insert_tour(conn, code: str, series: str, bus_start: date):
+def _insert_tour(conn, code: str, series: str, bus_start: date, rooms: str = ''):
     """Insert a tour + its daily_log rows from the SERIES template."""
     duration = SERIES[series]["duration"]
     # Tour ends on the Tbilisi→Urumqi flight day = last itinerary day
     bus_end = bus_start + timedelta(days=duration - 1)
     conn.execute(
-        "INSERT INTO tours (code, series, bus_start, bus_end) VALUES (?,?,?,?)",
-        (code, series, bus_start.isoformat(), bus_end.isoformat())
+        "INSERT INTO tours (code, series, bus_start, bus_end, rooms) VALUES (?,?,?,?,?)",
+        (code, series, bus_start.isoformat(), bus_end.isoformat(), rooms)
     )
     for offset, info in SERIES[series]["nights"].items():
         day_date = bus_start + timedelta(days=offset)
@@ -312,6 +317,7 @@ def get_all_tours():
                 "bus_start": r["bus_start"], "bus_end": r["bus_end"],
                 "status": get_tour_status(r["bus_start"], r["bus_end"]),
                 "notes": r["notes"],
+                "rooms": r["rooms"] or "",
                 "color": SERIES[r["series"]]["color"],
                 "series_name": SERIES[r["series"]]["name"],
             })
@@ -320,7 +326,8 @@ def get_all_tours():
 def get_tours_on_date(check_date: str):
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT t.*, dl.city, dl.hotel, dl.lunch, dl.dinner, dl.border_crossing, dl.notes as day_notes "
+            "SELECT t.code, t.series, t.bus_start, t.bus_end, t.notes, t.rooms, "
+            "dl.city, dl.hotel, dl.lunch, dl.dinner, dl.border_crossing, dl.notes as day_notes "
             "FROM tours t JOIN daily_log dl ON t.code=dl.tour_code "
             "WHERE dl.date=? ORDER BY dl.city, t.series",
             (check_date,)
@@ -339,6 +346,7 @@ def get_tours_on_date(check_date: str):
                 "border_crossing": r["border_crossing"],
                 "day_notes": r["day_notes"],
                 "day_num": day_num, "total_days": duration,
+                "rooms": r["rooms"] or "",
                 "color": SERIES[r["series"]]["color"],
             })
         return result
@@ -369,6 +377,7 @@ def get_tour_detail(code: str):
             "bus_start": tour["bus_start"], "bus_end": tour["bus_end"],
             "status": get_tour_status(tour["bus_start"], tour["bus_end"]),
             "notes": tour["notes"],
+            "rooms": tour["rooms"] or "",
             "color": SERIES[tour["series"]]["color"],
             "series_name": SERIES[tour["series"]]["name"],
             "days": days,
@@ -947,7 +956,8 @@ def get_tour_profit() -> list:
     Tours without balance data are considered cancelled and excluded."""
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT p.*, t.series AS t_series, t.bus_start AS t_start, t.bus_end AS t_end
+            SELECT p.*, t.series AS t_series, t.bus_start AS t_start,
+                   t.bus_end AS t_end, t.rooms AS t_rooms
             FROM tour_profit p
             LEFT JOIN tours t ON t.code = p.tour_code
         """).fetchall()
@@ -964,6 +974,8 @@ def get_tour_profit() -> list:
             d['bus_start'], d['bus_end'] = bs, be
             d.pop('t_start', None); d.pop('t_end', None)
             d['status'] = get_tour_status(bs, be) if (bs and be) else 'done'
+            d['rooms'] = r['t_rooms'] or ''
+            d.pop('t_rooms', None)
             d['color'] = SERIES.get(series, {}).get('color', '#888')
             try:
                 d['components'] = _json.loads(d.get('components') or '{}')
@@ -1016,16 +1028,25 @@ def apply_schedule_sync(active: list) -> dict:
         existing = {r["code"]: r["bus_end"]
                     for r in conn.execute("SELECT code, bus_end FROM tours").fetchall()}
 
-        # Additions
+        # Additions + rooms update for existing tours
         for a in active:
             code, series = a["code"], a["series"]
-            if code in existing or series not in SERIES:
+            rooms = a.get("rooms", "")
+            if series not in SERIES:
+                continue
+            if code in existing:
+                # Update rooms if the sheet now has info and DB is empty
+                if rooms:
+                    conn.execute(
+                        "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms='')",
+                        (rooms, code)
+                    )
                 continue
             try:
                 bs = date.fromisoformat(a["bus_start"])
             except Exception:
                 continue
-            _insert_tour(conn, code, series, bs)
+            _insert_tour(conn, code, series, bs, rooms)
             added.append(code)
 
         # Removals: not in active list AND not yet completed
