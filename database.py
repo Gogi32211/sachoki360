@@ -1005,6 +1005,23 @@ def set_setting(key: str, value: str):
         )
 
 
+def bulk_update_rooms(rooms: dict) -> int:
+    """Update rooms for any tour in the DB that currently has an empty rooms field."""
+    if not rooms:
+        return 0
+    updated = 0
+    with get_db() as conn:
+        for code, room_str in rooms.items():
+            if not room_str:
+                continue
+            cur = conn.execute(
+                "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms='')",
+                (room_str, code)
+            )
+            updated += cur.rowcount
+    return updated
+
+
 def apply_schedule_sync(active: list) -> dict:
     """Reconcile the tours table with the master schedule's active list.
 

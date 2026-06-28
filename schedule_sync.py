@@ -143,3 +143,55 @@ def fetch_active_tours() -> list:
 
     print(f"[schedule_sync] active tours parsed: {len(active)}")
     return active
+
+
+def fetch_all_tour_rooms() -> dict:
+    """Return {tour_code: rooms_str} for ALL tour codes found in the main tab,
+    including completed ones past the 'done 2026' marker."""
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    wb = load_workbook(io.BytesIO(resp.content), data_only=True, read_only=True)
+
+    main_ws = None
+    for ws in wb.worksheets:
+        title = (ws.title or '').lower()
+        if '2026' in title or 'tour' in title or 'map' in title:
+            main_ws = ws
+            break
+    if main_ws is None:
+        main_ws = wb.worksheets[0]
+
+    grid = []
+    for row in main_ws.iter_rows(values_only=True):
+        grid.append([str(c).strip() if c is not None else '' for c in row])
+    wb.close()
+
+    seen: set = set()
+    rooms_map: dict = {}
+
+    for row_i in range(len(grid)):
+        for col_i, cell in enumerate(grid[row_i]):
+            m = TOUR_CODE_RE.search(cell)
+            if not m:
+                continue
+            code = _norm_code(m.group(1))
+            if code in seen:
+                continue
+            seen.add(code)
+
+            rooms = ''
+            for look_back in range(1, 5):
+                ri = row_i - look_back
+                if ri < 0:
+                    break
+                candidate = grid[ri][col_i] if col_i < len(grid[ri]) else ''
+                if _ROOM_KEYWORD_RE.search(candidate):
+                    rooms = _abbrev_rooms(candidate)
+                    break
+
+            if rooms:
+                rooms_map[code] = rooms
+
+    print(f"[schedule_sync] rooms found for {len(rooms_map)} tours (full sheet)")
+    return rooms_map

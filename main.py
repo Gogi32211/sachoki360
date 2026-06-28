@@ -12,7 +12,7 @@ from sheets_sync import fetch_hotel_assignments
 from meals_sync import fetch_all_meals
 from payments_sync import fetch_payment_statuses
 from profit_sync import fetch_tour_profit
-from schedule_sync import fetch_active_tours
+from schedule_sync import fetch_active_tours, fetch_all_tour_rooms
 from cancel_sync import fetch_cancelled_tour_codes
 
 app = FastAPI(title="ki.360")
@@ -127,6 +127,13 @@ def _background_sync():
             db.apply_schedule_sync(active)
     except Exception as e:
         print(f"Schedule sync warning: {e}")
+    try:
+        all_rooms = fetch_all_tour_rooms()
+        if all_rooms:
+            updated = db.bulk_update_rooms(all_rooms)
+            print(f"[startup] rooms updated for {updated} tours")
+    except Exception as e:
+        print(f"Rooms sync warning: {e}")
     for series in ("ZT", "LN", "KT", "DT1", "DT2", "LT"):
         try:
             db.sync_series_hotels(series)
@@ -365,6 +372,9 @@ def sync_schedule():
     try:
         active = fetch_active_tours()
         result = db.apply_schedule_sync(active)
+        all_rooms = fetch_all_tour_rooms()
+        rooms_updated = db.bulk_update_rooms(all_rooms)
+        result['rooms_updated'] = rooms_updated
         return result
     except Exception as e:
         raise HTTPException(500, str(e))
