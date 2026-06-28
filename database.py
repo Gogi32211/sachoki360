@@ -931,6 +931,13 @@ def sync_tour_profit(data: dict) -> int:
                   d.get('profit_after_vat'), d.get('spent_usd'), d.get('revenue_usd'),
                   _json.dumps(d.get('components') or {}),
                   _json.dumps(d.get('items') or [])))
+            # Also fill rooms on the tours table if the balance sheet has it
+            rooms = d.get('rooms', '')
+            if rooms:
+                conn.execute(
+                    "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms='')",
+                    (rooms, code)
+                )
             count += 1
     return count
 
