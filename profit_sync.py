@@ -97,7 +97,8 @@ def _fix_name(name: str) -> str:
 _HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', 'მარკო', 'გორი ინ',
                'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან', 'pullman',
                'ლილატ', 'გუდაურ', 'best western', 'ბესთ', 'ქრაუნ',
-               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ', 'პინო', 'pino', 'ჯინო')
+               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ', 'პინო', 'pino', 'ჯინო',
+               'yerevan', 'ერევან', 'aghababayan', 'agababayan', 'სევან')
 
 
 def _categorize(name: str):
@@ -108,10 +109,9 @@ def _categorize(name: str):
     if 'აზერბაიჯ' in n:                    # Azerbaijan — excluded from stats
         return None
     is_meal = any(k in n for k in ('ლანჩი', 'ვახშამ', 'ვაშამ', 'დეგუსტაცი'))
-    if any(k in n for k in ('სომხეთი', 'yerevan', 'ერევან', 'aghababayan',
-                            'agababayan', 'აღაბაბაია', 'სევან')):
+    if any(k in n for k in ('სომხეთი', 'აღაბაბაია')):
         # Meal rows in Armenia are informational diary entries; the cost is
-        # already captured in "სომხეთი გიდი" / "Radisson Yerevan" line items.
+        # already captured in the guide and hotel line items.
         if is_meal:
             return None
         return 'armenia'
