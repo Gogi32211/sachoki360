@@ -1905,7 +1905,140 @@ function StatsView() {
             <span className="text-green-700 font-medium"> მწვანე = ნაკლები</span>. ცარიელი (·) = ამ ტურს ეს ხარჯი არ ჰქონია.
           </div>
         </div>
+        <VendorChart scope={scope} perPax={perPax} />
       </>
+      )}
+    </div>
+  );
+}
+
+// ── VENDOR ANALYSIS CHART ─────────────────────────────────────────
+function VendorChart({ scope, perPax }) {
+  const [cat, setCat] = useState('hotel');
+  const [expandedV, setExpandedV] = useState(null);
+
+  const CAT_OPTS = [
+    ['hotel',      'სასტუმრო',  '#3b82f6'],
+    ['restaurant', 'რესტორანი', '#f59e0b'],
+    ['bus',        'ავტობუსი',  '#10b981'],
+  ];
+  const [, , catColor] = CAT_OPTS.find(([k]) => k === cat) || CAT_OPTS[0];
+
+  // Build vendor → [{tour_code, series, color, usd, pax}]
+  const vendorMap = {};
+  scope.forEach(r => {
+    const pax = parsePax(r.pax);
+    (r.components_detail || [])
+      .filter(i => i.cat === cat)
+      .forEach(i => {
+        const v = i.name.trim();
+        if (!vendorMap[v]) vendorMap[v] = [];
+        vendorMap[v].push({tour_code: r.tour_code, series: r.series, color: r.color, usd: i.usd, pax});
+      });
+  });
+
+  const fmt  = n => Math.round(n).toLocaleString();
+  const fmtD = n => n.toFixed(1);
+
+  const vendors = Object.entries(vendorMap).map(([name, entries]) => {
+    const vals = perPax
+      ? entries.filter(e => e.pax).map(e => e.usd / e.pax)
+      : entries.map(e => e.usd);
+    const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    const sd  = vals.length > 1
+      ? Math.sqrt(vals.reduce((a, v) => a + (v - avg) ** 2, 0) / vals.length)
+      : 0;
+    return {name, entries, avg, sd, count: entries.length};
+  }).filter(v => v.avg > 0).sort((a, b) => b.avg - a.avg);
+
+  const maxAvg = Math.max(1, ...vendors.map(v => v.avg));
+
+  return (
+    <div className="mt-6 bg-white rounded-xl shadow-sm border">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b flex-wrap">
+        <span className="font-semibold text-gray-700 text-sm">ვენდორების ანალიზი</span>
+        <div className="flex gap-1">
+          {CAT_OPTS.map(([k, label, col]) => (
+            <button key={k} onClick={() => {setCat(k); setExpandedV(null);}}
+              className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${cat===k ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              style={cat===k ? {background: col} : {}}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="ml-auto text-xs text-gray-400">{perPax ? '1 სტუმარზე' : '1 ტურზე'} · დასაწყობად ▸ ვენდორზე</span>
+      </div>
+
+      {vendors.length === 0 ? (
+        <div className="px-4 py-8 text-center text-xs text-gray-400">მონაცემები არ არის</div>
+      ) : (
+        <div className="p-3 space-y-0.5">
+          {vendors.map(({name, entries, avg, sd, count}) => (
+            <div key={name}>
+              {/* Vendor summary row */}
+              <div
+                className="flex items-center gap-2 py-2 px-2 cursor-pointer hover:bg-gray-50 rounded-lg group"
+                onClick={() => setExpandedV(expandedV === name ? null : name)}>
+                <span className="w-4 text-xs text-gray-400 flex-shrink-0 group-hover:text-gray-600">
+                  {expandedV === name ? '▾' : '▸'}
+                </span>
+                <span className="w-44 text-xs text-gray-800 truncate flex-shrink-0 font-medium" title={name}>{name}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2.5 mx-2 min-w-0">
+                  <div className="h-2.5 rounded-full transition-all" style={{width:`${(avg/maxAvg)*100}%`, background: catColor}}/>
+                </div>
+                <span className="w-20 text-right text-sm font-bold text-gray-800">
+                  ${perPax ? fmtD(avg) : fmt(avg)}
+                </span>
+                <span className="w-16 text-right text-xs text-gray-400">±{perPax ? fmtD(sd) : fmt(sd)}</span>
+                <span className="w-12 text-right text-xs text-gray-400 flex-shrink-0">{count} ტ.</span>
+              </div>
+
+              {/* Per-tour breakdown */}
+              {expandedV === name && (
+                <div className="ml-6 mb-2 bg-slate-50 rounded-lg p-3 border border-slate-100">
+                  <div className="space-y-1.5">
+                    {entries.slice().sort((a, b) => a.tour_code.localeCompare(b.tour_code)).map((e, i) => {
+                      const val = perPax && e.pax ? e.usd / e.pax : e.usd;
+                      const pct = Math.min(100, (val / maxAvg) * 100);
+                      const vsAvg = avg > 0 ? (val - avg) / avg : 0;
+                      const diffCls = vsAvg > 0.12 ? 'text-red-600 font-semibold' : vsAvg < -0.12 ? 'text-green-600 font-semibold' : 'text-gray-600';
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: e.color}}/>
+                          <span className="w-20 font-mono text-gray-700 flex-shrink-0">{e.tour_code}</span>
+                          <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                            <div className="h-1.5 rounded-full" style={{width:`${pct}%`, background: e.color, opacity: 0.8}}/>
+                          </div>
+                          <span className={`w-16 text-right ${diffCls}`}>
+                            ${perPax && e.pax ? fmtD(val) : fmt(e.usd)}
+                          </span>
+                          {e.pax && perPax === false && (
+                            <span className="w-16 text-right text-gray-400">
+                              ${fmtD(e.usd / e.pax)}/კაც
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {/* Average line */}
+                    <div className="flex items-center gap-2 text-xs border-t pt-1.5 mt-1">
+                      <span className="w-2 h-2 flex-shrink-0"/>
+                      <span className="w-20 text-gray-400 flex-shrink-0">საშ.</span>
+                      <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                        <div className="h-1.5 rounded-full bg-gray-500" style={{width:`${(avg/maxAvg)*100}%`}}/>
+                      </div>
+                      <span className="w-16 text-right font-bold text-gray-700">
+                        ${perPax ? fmtD(avg) : fmt(avg)}
+                      </span>
+                      {!perPax && <span className="w-16"/>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
