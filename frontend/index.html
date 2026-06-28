@@ -1937,13 +1937,21 @@ function VendorChart({ scope, perPax }) {
       });
   });
 
-  // Merge vendor names where one is a substring of another (e.g. "მარკო პოლო" ⊂ "გუდაური მარკო პოლო").
-  // Shorter (more generic) name becomes the canonical key.
+  // Normalize name for comparison: strip parenthetical suffixes and extra spaces.
+  // "ახალი აზია (ისანი)" → "ახალი აზია ისანი" so it merges with "ახალი აზია ისანი".
+  const normKey = s => s.toLowerCase()
+    .replace(/\s*\([^)]*\)/g, ' ')  // "(ისანი)" → " "
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Merge vendor names where one normalized form is a substring of another.
+  // Shorter (more generic) name becomes the canonical display key.
   const vendorMap = {};
   Object.keys(rawMap).sort((a, b) => a.length - b.length).forEach(name => {
-    const nl = name.toLowerCase();
+    const nl = normKey(name);
     const canon = Object.keys(vendorMap).find(c => {
-      const cl = c.toLowerCase();
+      const cl = normKey(c);
       return nl.includes(cl) || cl.includes(nl);
     });
     if (canon) {
