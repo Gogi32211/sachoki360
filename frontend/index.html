@@ -1944,31 +1944,12 @@ function VendorChart({ scope, perPax }) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Location/city words that should NOT be used as vendor identifiers.
-  // "მესტია უშბა" and "მესტია გისტოლა" share "მესტია" but are different hotels.
-  const LOCATION_WORDS = new Set([
-    'მესტია','ბათუმი','ბათუმ','თბილისი','გუდაური','სიგნახი','გორი',
-    'ბორჯომი','ბორჯომ','ახალციხე','ახალციხ','სვანეთი','კახეთი','კუტაისი','ანანური',
-  ]);
-
-  // Core words: strip meal prefix then split, excluding location words.
-  const coreWords = s => normKey(s)
-    .replace(/^(ვახშამი|ვაშამი|ლანჩი|სადილი|breakfast)\s*[-–]\s*/i, '')
-    .split(/\s+/)
-    .filter(w => w.length >= 3 && !LOCATION_WORDS.has(w));
-
-  // Two vendor names are the same if:
-  // (a) one normalized name is a substring of the other, OR
-  // (b) after stripping meal prefixes and location words, ≥1 significant
-  //     word is shared AND covers ≥40% of the longer name's core words.
+  // Two vendor names are the same only if one normalized form is a substring
+  // of the other (e.g. "მარკო პოლო" ⊂ "გუდაური მარკო პოლო").
+  // No automatic word-overlap merging — only merge what the user explicitly confirms.
   const isSameVendor = (a, b) => {
     const na = normKey(a), nb = normKey(b);
-    if (na.includes(nb) || nb.includes(na)) return true;
-    const wa = new Set(coreWords(a));
-    const wb = coreWords(b);
-    if (!wa.size || !wb.length) return false;
-    const common = wb.filter(w => wa.has(w)).length;
-    return common >= 1 && common / Math.max(wa.size, wb.length) >= 0.4;
+    return na.includes(nb) || nb.includes(na);
   };
 
   // Merge: shorter (more generic) name becomes the canonical display key.
