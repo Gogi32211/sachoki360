@@ -1918,9 +1918,14 @@ function VendorChart({ scope, perPax }) {
   const [expandedV, setExpandedV] = useState(null);
 
   const CAT_OPTS = [
-    ['hotel',      'სასტუმრო',  '#3b82f6'],
-    ['restaurant', 'რესტორანი', '#f59e0b'],
-    ['bus',        'ავტობუსი',  '#10b981'],
+    ['hotel',      'სასტუმრო',    '#3b82f6'],
+    ['restaurant', 'რესტორანი',   '#f59e0b'],
+    ['bus',        'ავტობუსი',    '#10b981'],
+    ['armenia',    'სომხეთი',     '#ef4444'],
+    ['attraction', 'ატრაქციონები','#8b5cf6'],
+    ['guide',      'გიდი',        '#ec4899'],
+    ['staff',      'პერსონალი',   '#14b8a6'],
+    ['other',      'სხვა',        '#94a3b8'],
   ];
   const [, , catColor] = CAT_OPTS.find(([k]) => k === cat) || CAT_OPTS[0];
 
