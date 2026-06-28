@@ -1933,7 +1933,7 @@ function VendorChart({ scope, perPax }) {
       .forEach(i => {
         const v = i.name.trim();
         if (!rawMap[v]) rawMap[v] = [];
-        rawMap[v].push({tour_code: r.tour_code, series: r.series, color: r.color, usd: i.usd, pax});
+        rawMap[v].push({tour_code: r.tour_code, series: r.series, color: r.color, usd: i.usd, pax, itemName: i.name});
       });
   });
 
@@ -2033,6 +2033,7 @@ function VendorChart({ scope, perPax }) {
                         <div key={i} className="flex items-center gap-2 text-xs">
                           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: e.color}}/>
                           <span className="w-20 font-mono text-gray-700 flex-shrink-0">{e.tour_code}</span>
+                          <span className="w-48 text-gray-400 truncate flex-shrink-0 italic" title={e.itemName}>{e.itemName}</span>
                           <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                             <div className="h-1.5 rounded-full" style={{width:`${pct}%`, background: e.color, opacity: 0.8}}/>
                           </div>
