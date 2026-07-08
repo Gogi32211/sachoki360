@@ -33,7 +33,10 @@ _ROOM_ENTRY_RE = re.compile(r'(\d+)\s*(twin|single|double|king|suite)\s*(?:\(([^
 
 
 def _extract_pax(text: str):
-    m = PAX_RE.search(text or '')
+    # Tab titles concatenate code+pax (e.g. "LT-070811+1" = LT-0708, 11+1):
+    # strip the tour code first so its digits can't bleed into the pax match.
+    cleaned = TOUR_CODE_RE.sub(' ', text or '')
+    m = PAX_RE.search(cleaned)
     return f"{m.group(1)}+{m.group(2)}" if m else None
 
 
