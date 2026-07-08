@@ -112,12 +112,20 @@ SERIES["HM2"] = {
     "color": "#D97706",
     "nights": _HM_NIGHTS,
 }
-# HT — placeholder (program TBD)
+# HT — 10 დღე: აზერბაიჯანი (3 ღ.) → საქართველო → სომხეთი
+# Day 1: Baku  Day 2: Baku  Day 3: Sheki  Day 4: Tbilisi (bus_start)
 SERIES["HT"] = {
-    "name": "HT — (პროგრამა დასაზუსტებელია)",
-    "duration": 8,
+    "name": "HT — 10 დღე (აზ.+საქ.+სომ.)",
+    "duration": 6,
     "color": "#6366F1",
-    "nights": {},
+    "nights": {
+        0: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+        1: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+        2: {"city": "Gudauri",  "hotel": "Marco Polo Gudauri",             "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+        3: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+        4: {"city": "Yerevan",  "hotel": "Radisson Blu Yerevan",           "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": "GEO→ARM"},
+        5: {"city": "✈ Yerevan→Urumqi", "hotel": "—",                     "lunch": "TBD",         "dinner": "TBD",           "border": None},
+    },
 }
 
 # Day offset from the schedule-map's first (Baku/Almaty) date to the
@@ -126,8 +134,8 @@ SERIES_START_OFFSET = {
     "ZT": 3, "LN": 3, "KT": 3, "DT1": 2, "DT2": 2, "LT": 2,
     # HM: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 3 → offset +2
     "HM": 2, "HM1": 2, "HM2": 2,
-    # HT: offset TBD — using 2 as placeholder
-    "HT": 2,
+    # HT: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 4 → offset +3
+    "HT": 3,
 }
 
 TOURS_2026 = [
