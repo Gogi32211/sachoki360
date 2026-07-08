@@ -3,7 +3,8 @@ import sqlite3
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import date, timedelta, datetime, timezone
-from seed_data import SERIES, TOURS_2026
+import re as _re
+from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET
 
 DB_PATH = "gtc360.db"
 
@@ -912,9 +913,14 @@ def get_tour_payment_summary(from_date: str = None, to_date: str = None):
 
 
 def sync_tour_profit(data: dict) -> int:
-    """Upsert per-tour profit data from {tour_code: {profit_usd, vat_usd, ...}}."""
+    """Upsert per-tour profit data from {tour_code: {profit_usd, vat_usd, ...}}.
+
+    Also auto-inserts any tour into the `tours` table if it has balance data
+    but wasn't found in the master schedule sheet (e.g. LT series).
+    """
     count = 0
     with get_db() as conn:
+        existing_codes = {r[0] for r in conn.execute("SELECT code FROM tours").fetchall()}
         for code, d in data.items():
             conn.execute("""
                 INSERT INTO tour_profit
@@ -938,6 +944,19 @@ def sync_tour_profit(data: dict) -> int:
                     "UPDATE tours SET rooms=? WHERE code=?",
                     (rooms, code)
                 )
+            # Auto-add to tours table if missing (e.g. not yet in the master schedule sheet)
+            if code not in existing_codes:
+                series = code.split('-')[0]
+                off = SERIES_START_OFFSET.get(series)
+                m = _re.search(r'-(\d{2})(\d{2})$', code)
+                if series in SERIES and off is not None and m:
+                    try:
+                        bs = date(2026, int(m.group(1)), int(m.group(2))) + timedelta(days=off)
+                        _insert_tour(conn, code, series, bs, rooms)
+                        existing_codes.add(code)
+                        print(f"[profit_sync] auto-added missing tour {code} (bus_start={bs})")
+                    except Exception as e:
+                        print(f"[profit_sync] could not auto-add {code}: {e}")
             count += 1
     return count
 
@@ -1074,9 +1093,13 @@ def apply_schedule_sync(active: list) -> dict:
             added.append(code)
 
         # Removals: not in active list AND not yet completed
+        # Tours with balance data are kept even if absent from the schedule sheet.
+        codes_with_profit = {r[0] for r in conn.execute("SELECT tour_code FROM tour_profit").fetchall()}
         for code, be_str in existing.items():
             if code in active_codes:
                 continue
+            if code in codes_with_profit:
+                continue  # has balance data — not cancelled, just missing from sheet
             try:
                 bus_end = date.fromisoformat(be_str)
             except Exception:
