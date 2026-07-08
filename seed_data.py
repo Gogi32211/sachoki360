@@ -81,9 +81,54 @@ SERIES["LT"] = {
     "nights": SERIES["ZT"]["nights"],
 }
 
+# HM — 12 დღე: აზერბაიჯანი → საქართველო (მესტია/სვანეთი) → სომხეთი
+# Day 1: Urumqi→Baku  Day 2: Baku→Sheki  Day 3: Sheki→Tbilisi (bus_start)
+_HM_NIGHTS = {
+    0: {"city": "Tbilisi",   "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    1: {"city": "Kazbegi",   "hotel": "Rooms Hotel Kazbegi",            "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    2: {"city": "Kutaisi",   "hotel": "Kutaisi Inn",                    "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    3: {"city": "Mestia",    "hotel": "Gistola Resort",                 "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    4: {"city": "Mestia",    "hotel": "Gistola Resort",                 "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD (უშგული)", "border": None},
+    5: {"city": "Batumi",    "hotel": "Greenwood Batumi",               "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    6: {"city": "Borjomi",   "hotel": "Borjomi Likani Health & Spa",    "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    7: {"city": "Yerevan",   "hotel": "Radisson Blu Yerevan",           "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": "GEO→ARM"},
+    8: {"city": "✈ Yerevan→Urumqi", "hotel": "—",                      "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+}
+SERIES["HM"] = {
+    "name": "HM — 12 დღე (აზ.+საქ.+სომ.)",
+    "duration": 9,
+    "color": "#F59E0B",
+    "nights": _HM_NIGHTS,
+}
+SERIES["HM1"] = {
+    "name": "HM1 — 12 დღე (ჯგუფი 1)",
+    "duration": 9,
+    "color": "#F59E0B",
+    "nights": _HM_NIGHTS,
+}
+SERIES["HM2"] = {
+    "name": "HM2 — 12 დღე (ჯგუფი 2)",
+    "duration": 9,
+    "color": "#D97706",
+    "nights": _HM_NIGHTS,
+}
+# HT — placeholder (program TBD)
+SERIES["HT"] = {
+    "name": "HT — (პროგრამა დასაზუსტებელია)",
+    "duration": 8,
+    "color": "#6366F1",
+    "nights": {},
+}
+
 # Day offset from the schedule-map's first (Baku/Almaty) date to the
 # app's bus_start (the Georgia / Khareba day). Used by schedule_sync.
-SERIES_START_OFFSET = {"ZT": 3, "LN": 3, "KT": 3, "DT1": 2, "DT2": 2, "LT": 2}
+SERIES_START_OFFSET = {
+    "ZT": 3, "LN": 3, "KT": 3, "DT1": 2, "DT2": 2, "LT": 2,
+    # HM: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 3 → offset +2
+    "HM": 2, "HM1": 2, "HM2": 2,
+    # HT: offset TBD — using 2 as placeholder
+    "HT": 2,
+}
 
 TOURS_2026 = [
     {"code": "ZT-0427", "series": "ZT", "bus_start": "2026-04-30"},
