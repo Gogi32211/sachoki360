@@ -74,11 +74,16 @@ SERIES = {
 }
 
 # LT — ახალი სერია, ZT ტურის იდენტური პროგრამით (მცირე განსხვავებებით).
+# განსხვავება ZT-სგან: მესტიის ორივე ღამე Lilati Mestia-ში — master განრიგის
+# ფურცელში LT ჯგუფები Lilati-შია განთავსებული, არა Gistola-ში.
+_LT_NIGHTS = {offset: dict(info) for offset, info in SERIES["ZT"]["nights"].items()}
+_LT_NIGHTS[4]["hotel"] = "Lilati Mestia"
+_LT_NIGHTS[5]["hotel"] = "Lilati Mestia"
 SERIES["LT"] = {
     "name": "LT — ZT-ის მსგავსი (11 ღამე)",
     "duration": 9,
     "color": "#26A69A",
-    "nights": SERIES["ZT"]["nights"],
+    "nights": _LT_NIGHTS,
 }
 
 # HM — 12 დღე: აზერბაიჯანი → საქართველო (მესტია/სვანეთი) → სომხეთი
@@ -128,6 +133,129 @@ SERIES["HT"] = {
     },
 }
 
+# ── T* სერიები (TH / TK / TM / TV) ────────────────────────────────
+# TH — 9 დღე: აზერბაიჯანი (დღე 1-3) → საქართველო (დღე 4-დან) → სომხეთი
+# Day 1-3: Urumqi→Baku→Sheki   Day 4: Sheki→Tbilisi (bus_start)
+# ბოლო დღე აპში = დღე 8 (ერევანი→ურუმჩი); დღე 9 ტრანზიტია, ავტობუსი არ მოძრაობს.
+SERIES["TH"] = {
+    "name": "TH — 9 დღე (აზ.+საქ.+სომ.)",
+    "duration": 5,
+    "color": "#E11D48",
+    "nights": {
+        0: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: მარნის დეგუსტაცია + ცეკვის შოუ",
+            "border": "AZE→GEO: ლაგოდეხი"},
+        1: {"city": "Gudauri", "hotel": "Marco Polo Gudauri",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
+        2: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: ხინკალი", "dinner": "ვახშამი: ჩინური", "border": None},
+        3: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan",
+            "lunch": "ლანჩი: სევანის თევზი", "dinner": "ვახშამი: სპეც. რესტორანი + დუდუკის შოუ",
+            "border": "GEO→ARM: სადახლო"},
+        4: {"city": "✈ Yerevan→Urumqi", "hotel": "—",
+            "lunch": "ლანჩი: სომხური ლავაში + მწვადი", "dinner": "ვახშამი: საკუთარი ხარჯებით",
+            "border": None, "notes": "CZ5092 23:50"},
+    },
+}
+
+# TK — 14 დღე: აზერბაიჯანი (დღე 1-3) → საქართველო + სომხეთი + სვანეთი
+# Day 4: Sheki→Tbilisi (bus_start)   Day 13: Tbilisi→Urumqi (CZ6040)
+# დღე 14 ტრანზიტია, ავტობუსი არ მოძრაობს.
+SERIES["TK"] = {
+    "name": "TK — 14 დღე (აზ.+საქ.+სომ.+სვანეთი)",
+    "duration": 10,
+    "color": "#7C3AED",
+    "nights": {
+        0: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: მარნის ცეკვის შოუ",
+            "border": "AZE→GEO: ლაგოდეხი"},
+        1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan",
+            "lunch": "ლანჩი: სევანის თევზი", "dinner": "ვახშამი: სპეც. რესტორანი + დუდუკის შოუ",
+            "border": "GEO→ARM: სადახლო"},
+        2: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
+        3: {"city": "Borjomi", "hotel": "Borjomi Likani Health & Spa",
+            "lunch": "ლანჩი: სომხური ლავაში + მწვადი", "dinner": "ვახშამი: სასტუმროს ბუფეტი",
+            "border": "ARM→GEO: ბავრა"},
+        4: {"city": "Mestia", "hotel": "Ushba / Lilati Mestia (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
+        5: {"city": "Mestia", "hotel": "Ushba / Lilati Mestia (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი (უშგული)", "border": None},
+        6: {"city": "Batumi", "hotel": "Greenwood Batumi",
+            "lunch": "ლანჩი: ხაჭაპური + მწვადი", "dinner": "ვახშამი: საკუთარი ხარჯებით", "border": None},
+        7: {"city": "Gudauri", "hotel": "Marco Polo Gudauri",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: სასტუმროს ბუფეტი", "border": None},
+        8: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
+        9: {"city": "✈ Tbilisi→Urumqi", "hotel": "—",
+            "lunch": "ლანჩი: ჩინური", "dinner": "ვახშამი: არ შედის",
+            "border": None, "notes": "CZ6040 22:50"},
+    },
+}
+
+# TM — 10 დღე: იწყება ურუმჩი→ერევანის ფრენით (CZ5091), სრულდება თბილისი→ბაქოთი.
+# დღე 1 = ტურის პირველი დღე → offset 0.
+SERIES["TM"] = {
+    "name": "TM — 10 დღე (სომხეთი + საქართველო)",
+    "duration": 10,
+    "color": "#0891B2",
+    "nights": {
+        0: {"city": "✈ Urumqi→Yerevan", "hotel": "Radisson Blu Yerevan",
+            "lunch": "ლანჩი: არ შედის", "dinner": "ვახშამი: არ შედის",
+            "border": None, "notes": "CZ5091 20:40–22:25"},
+        1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan",
+            "lunch": "ლანჩი: სევანის თევზი", "dinner": "ვახშამი: სპეც. რესტორანი + დუდუკის შოუ",
+            "border": None},
+        2: {"city": "Borjomi", "hotel": "Borjomi Likani Health & Spa",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი",
+            "border": "ARM→GEO: ბავრა"},
+        3: {"city": "Mestia", "hotel": "Ushba / Lilati Mestia (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
+        4: {"city": "Mestia", "hotel": "Ushba / Lilati Mestia (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი (უშგული)", "border": None},
+        5: {"city": "Batumi", "hotel": "Greenwood Batumi",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: საკუთარი ხარჯებით", "border": None},
+        6: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
+        7: {"city": "Kazbegi", "hotel": "Mountain House / Melodia (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
+        8: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: არ შედის", "border": None},
+        9: {"city": "✈ Tbilisi→Baku", "hotel": "—",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ჩინური",
+            "border": None, "notes": "J28226 21:20 / J28234 16:40"},
+    },
+}
+
+# TV — 7 დღე: იწყება ურუმჩი→ერევანის ფრენით (CZ5091), სრულდება თბილისი→ბაქოთი.
+# დღე 1 = ტურის პირველი დღე → offset 0.
+SERIES["TV"] = {
+    "name": "TV — 7 დღე (სომხეთი + საქართველო)",
+    "duration": 7,
+    "color": "#65A30D",
+    "nights": {
+        0: {"city": "✈ Urumqi→Yerevan", "hotel": "Radisson Blu Yerevan",
+            "lunch": "ლანჩი: არ შედის", "dinner": "ვახშამი: არ შედის",
+            "border": None, "notes": "CZ5091 20:45–22:25"},
+        1: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: სპეც. რესტორანი + დუდუკის შოუ",
+            "border": None},
+        2: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: სევანის თევზი", "dinner": "ვახშამი: ჩინური",
+            "border": "ARM→GEO: სადახლო"},
+        3: {"city": "Gudauri", "hotel": "Marco Polo Gudauri",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
+        4: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: ხინკალი", "dinner": "ვახშამი: ჩინური", "border": None},
+        5: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: მარნის დეგუსტაცია + ცეკვის შოუ",
+            "border": None},
+        6: {"city": "✈ Tbilisi→Baku", "hotel": "—",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: საკუთარი ხარჯებით",
+            "border": None, "notes": "J28234 16:40 / J28226 21:20"},
+    },
+}
+
 # Day offset from the schedule-map's first (Baku/Almaty) date to the
 # app's bus_start (the Georgia / Khareba day). Used by schedule_sync.
 SERIES_START_OFFSET = {
@@ -136,6 +264,10 @@ SERIES_START_OFFSET = {
     "HM": 2, "HM1": 2, "HM2": 2,
     # HT: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 4 → offset +3
     "HT": 3,
+    # TH/TK: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 4 → offset +3
+    "TH": 3, "TK": 3,
+    # TM/TV: code MMDD = Day 1 (Urumqi→Yerevan) — the tour starts there → offset 0
+    "TM": 0, "TV": 0,
 }
 
 TOURS_2026 = [

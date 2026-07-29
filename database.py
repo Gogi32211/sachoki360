@@ -440,6 +440,7 @@ HOTEL_CITY = {
     # Mestia
     'Gistola Resort 5★':        'Mestia',
     'Gistola Resort Mestia':    'Mestia',
+    'Lilati Mestia':            'Mestia',
     # Gori
     'Gori Inn':                 'Gori',
     # Gudauri
@@ -937,11 +938,13 @@ def sync_tour_profit(data: dict) -> int:
                   d.get('profit_after_vat'), d.get('spent_usd'), d.get('revenue_usd'),
                   _json.dumps(d.get('components') or {}),
                   _json.dumps(d.get('items') or [])))
-            # Update rooms from the balance sheet (authoritative source for room config)
+            # Rooms from the balance sheet are only a fallback — the master
+            # schedule sheet is authoritative, so fill in blanks and never
+            # overwrite a value it already set.
             rooms = d.get('rooms', '')
             if rooms:
                 conn.execute(
-                    "UPDATE tours SET rooms=? WHERE code=?",
+                    "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms='')",
                     (rooms, code)
                 )
             # Auto-add to tours table if missing (e.g. not yet in the master schedule sheet)
@@ -1032,7 +1035,12 @@ def set_setting(key: str, value: str):
 
 
 def bulk_update_rooms(rooms: dict) -> int:
-    """Update rooms for any tour in the DB that currently has an empty rooms field."""
+    """Write rooms from the master schedule sheet — the authoritative source.
+
+    Overwrites whatever the DB holds whenever the sheet disagrees (e.g. a value
+    previously filled in from a balance sheet); rows that already match are left
+    alone so the return value counts real changes only.
+    """
     if not rooms:
         return 0
     updated = 0
@@ -1041,8 +1049,8 @@ def bulk_update_rooms(rooms: dict) -> int:
             if not room_str:
                 continue
             cur = conn.execute(
-                "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms='')",
-                (room_str, code)
+                "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms<>?)",
+                (room_str, code, room_str)
             )
             updated += cur.rowcount
     return updated

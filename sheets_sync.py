@@ -54,6 +54,9 @@ HOTEL_MAP = {
     'gistola': 'Gistola Resort 5★',
     'gistola resort': 'Gistola Resort 5★',
     'gistola resort mestia': 'Gistola Resort 5★',
+    'lilat': 'Lilati Mestia',
+    'lilati': 'Lilati Mestia',
+    'lilati mestia': 'Lilati Mestia',
     # Gori — "gori inn" confirmed, "gori" alone is uncertain
     'gori inn': 'Gori Inn',
     # Gudauri — "marco polo" / "gudauri inn" confirmed, "gudauri" alone is uncertain
