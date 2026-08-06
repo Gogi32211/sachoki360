@@ -1006,6 +1006,21 @@ def get_tour_profit() -> list:
             d['rooms'] = r['t_rooms'] or ''
             d.pop('t_rooms', None)
             d['color'] = SERIES.get(series, {}).get('color', '#888')
+            # Itinerary length, so the UI can put costs on a per-day / per-night
+            # footing: `days` counts every itinerary day, `nights` only the ones
+            # spent in a hotel (the closing flight day has none).
+            spec = SERIES.get(series)
+            if spec:
+                d['days'] = spec['duration']
+                d['nights'] = sum(1 for n in spec['nights'].values()
+                                  if (n.get('hotel') or '').strip() not in ('', '—'))
+            else:
+                # Balance-only tours fall back to a single approximated date, so
+                # a range is only real when the end is actually past the start.
+                span = ((date.fromisoformat(be) - date.fromisoformat(bs)).days
+                        if (bs and be) else 0)
+                d['days'] = span + 1 if span > 0 else None
+                d['nights'] = span if span > 0 else None
             try:
                 d['components'] = _json.loads(d.get('components') or '{}')
             except Exception:

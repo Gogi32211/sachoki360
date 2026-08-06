@@ -1584,16 +1584,25 @@ const STAT_COMPONENTS = [
   ['other',      'სხვა',         '#94a3b8'],
 ];
 
-// What each cost component actually scales with — decides a fair denominator.
-//   'pax'   → meals and tickets: one more guest costs one more portion
-//   'rooms' → hotels are billed per room, not per head
-//   'tour'  → bus / guide / staff are fixed: a bigger group costs the same
-// Dividing a fixed cost by pax would flatter big groups and punish small ones
-// for something they didn't overspend on, so those stay per tour.
+// What each cost is divided by before tours are compared: a head/room count,
+// a length, or both. Chosen from how much each option actually tightens the
+// spread between series (measured on 2026 data, CV = spread across series):
+//   hotel  ÷ room ÷ night   32% → 10%      guide ÷ day         22% →  9%
+//   meals  ÷ guest ÷ day    24% → 13%      tickets ÷ guest ÷ day 27% → 17%
+// Armenia is a fixed 1-2 night leg, so dividing it by the whole tour's length
+// penalises short tours and made it worse (19% → 26%) — it stays per guest.
+// Bus and staff don't unify (a sprinter and a coach are different vehicles;
+// staff cost follows the itinerary), so their baseline stays per series.
 const COST_BASIS = {
-  restaurant: 'pax', attraction: 'pax', armenia: 'pax',
-  hotel: 'rooms',
-  bus: 'tour', guide: 'tour', staff: 'tour', other: 'tour',
+  restaurant: { per: 'pax',   time: 'days'   },
+  attraction: { per: 'pax',   time: 'days'   },
+  armenia:    { per: 'pax',   time: null     },
+  hotel:      { per: 'rooms', time: 'nights' },
+  bus:        { per: null,    time: 'days'   },
+  guide:      { per: null,    time: 'days'   },
+  staff:      { per: null,    time: 'days'   },
+  other:      { per: null,    time: 'days'   },
+  profit:     { per: 'pax',   time: 'days'   },
 };
 
 // Parse "19+1" → 19 (tourist count, excluding guide)
@@ -1734,19 +1743,27 @@ function StatsView() {
   };
 
   // What the cell's COLOUR is judged on — always, whatever is being printed.
-  // Each component is divided by what it actually scales with (see COST_BASIS),
-  // so a big group isn't red just for being big. Null when the divisor is
-  // unknown, in which case the cell prints its number but stays uncoloured.
+  // Divided by its COST_BASIS so a long tour or a big group isn't red for being
+  // long or big. Null when a divisor is missing: the cell prints its number but
+  // stays uncoloured rather than being compared on a guess.
   const fairVal = (val, r, k) => {
-    const v = val || 0;
-    const basis = (k && COST_BASIS[k]) || 'pax';
-    if (basis === 'tour') return v;
-    if (basis === 'rooms') {
+    const b = COST_BASIS[k] || { per: 'pax', time: null };
+    let div = 1;
+    if (b.per === 'pax') {
+      const p = parsePax(r.pax);
+      if (!p) return null;
+      div *= p;
+    } else if (b.per === 'rooms') {
       const rm = parseRooms(r.rooms);
-      return rm ? v / rm : null;
+      if (!rm) return null;
+      div *= rm;
     }
-    const p = parsePax(r.pax);
-    return p ? v / p : null;
+    if (b.time) {
+      const t = r[b.time];
+      if (!t) return null;
+      div *= t;
+    }
+    return (val || 0) / div;
   };
 
   const meanSd = vals => {
@@ -1764,27 +1781,32 @@ function StatsView() {
   // A 9-day ZT and a 6-day KT are never compared, so red stops meaning
   // "this is the long tour" and starts meaning "this one really overspent".
   // Median rather than mean so a single outlier can't shift the scale.
-  // A series needs a few tours before its median means anything — below that,
-  // one atypical tour would paint its neighbour red for no reason.
+  // A series needs a few tours before its own median means anything — below
+  // that, one atypical tour would paint its neighbour red. Those fall back to
+  // the median of every tour on screen, which the per-unit division above makes
+  // a fair comparison even across series of different lengths.
   const MIN_SAMPLE = 4;
   const medBy = (getVal) => {
-    const bySeries = {};
+    const bySeries = {}, all = [];
     scope.forEach(r => {
       const v = getVal(r);
       if (v === null || v === undefined) return;
       (bySeries[r.series] = bySeries[r.series] || []).push(v);
+      all.push(v);
     });
-    const out = {};
+    const overall = all.length ? median(all) : null;
+    const out = { _all: overall };
     Object.keys(bySeries).forEach(s => {
-      out[s] = bySeries[s].length >= MIN_SAMPLE ? median(bySeries[s]) : null;
+      out[s] = bySeries[s].length >= MIN_SAMPLE ? median(bySeries[s]) : overall;
     });
     return out;
   };
+  const baseFor = (m, series) => !m ? null : (m[series] != null ? m[series] : m._all);
   const seriesMed = {};
   STAT_COMPONENTS.forEach(([k]) => {
     seriesMed[k] = medBy(r => fairVal(r.components[k] || 0, r, k));
   });
-  const profitMed = medBy(r => fairVal(r.profit_usd, r));
+  const profitMed = medBy(r => fairVal(r.profit_usd, r, 'profit'));
 
   const profitVals = scope.map(r => norm(r.profit_usd || 0, r)).filter(v => v !== null);
   const spentVals  = scope.map(r => norm(r.spent_usd  || 0, r)).filter(v => v !== null);
@@ -1811,7 +1833,7 @@ function StatsView() {
     return 'text-gray-500';
   };
   const profitCls = (p, s) => {
-    const base = profitMed[s];
+    const base = baseFor(profitMed, s);
     if (p === null || !base) return 'text-gray-400';
     return p > base * 1.1 ? 'bg-green-100 text-green-700'
          : p < base * 0.9 ? 'bg-red-100 text-red-700'
@@ -1951,13 +1973,13 @@ function StatsView() {
                         const raw = r.components[k] || 0;
                         // print the amount as-is, tint it by the per-unit comparison
                         return (
-                          <td key={k} className={`px-2 py-1.5 text-right ${devCls(fairVal(raw, r, k), (seriesMed[k] || {})[r.series])}`}>
+                          <td key={k} className={`px-2 py-1.5 text-right ${devCls(fairVal(raw, r, k), baseFor(seriesMed[k], r.series))}`}>
                             {raw ? fmtCell(norm(raw, r)) : '·'}
                           </td>
                         );
                       })}
                       <td className="px-2 py-1.5 text-right text-gray-700 font-medium">{fmtCell(normSpent)}</td>
-                      <td className={`px-2 py-1.5 text-right font-bold rounded ${profitCls(fairVal(r.profit_usd, r), r.series)}`}>
+                      <td className={`px-2 py-1.5 text-right font-bold rounded ${profitCls(fairVal(r.profit_usd, r, 'profit'), r.series)}`}>
                         ${fmtCell(normProfit)}
                       </td>
                     </tr>
@@ -1991,9 +2013,11 @@ function StatsView() {
             {perPax
               ? <span>ყველა მნიშვნელობა გაყოფილია ტურისტების რაოდენობაზე (გიდი გამოკლებულია). ? = pax უცნობია.</span>
               : <span>მხოლოდ <strong>დასრულებული</strong> ტურები — მიმდინარე/მომავალი გამოტოვებულია (ბალანსი არ არის დახურული). დააჭირეთ სტრიქონს დეტალებისთვის.</span>}
-            <span className="ml-2 text-gray-600">ციფრები ჯამურია; <strong>ფერი</strong> კი ითვლება 1 ტურისტზე
-              (რესტორანი / ატრაქციონები / სომხეთი), 1 ოთახზე (სასტუმრო) და 1 ტურზე (ავტობუსი / გიდი / პერსონალი —
-              ფიქსირებული ხარჯია), ამავე სერიის მედიანასთან შედარებით.</span>
+            <span className="ml-2 text-gray-600">ციფრები ჯამურია; <strong>ფერი</strong> კი ითვლება გაყოფილ
+              მაჩვენებელზე: რესტორანი / ატრაქციონები — <strong>1 სტუმარზე დღეში</strong> · სასტუმრო —
+              <strong>1 ოთახზე ღამეში</strong> · ავტობუსი / გიდი / პერსონალი — <strong>1 დღეზე</strong> ·
+              სომხეთი — 1 სტუმარზე (ფიქსირებული მონაკვეთია). შედარება ამავე სერიის მედიანასთან, ხოლო თუ სერიას
+              4 ტურზე ნაკლები აქვს — ყველა ტურის საერთო მედიანასთან.</span>
             <span className="ml-1 text-red-600 font-medium">წითელი = +10%-ით მეტი</span>,
             <span className="text-green-700 font-medium"> მწვანე = −10%-ით ნაკლები</span>. ცარიელი (·) = ხარჯი არ ჰქონია.
           </div>
