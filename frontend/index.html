@@ -1694,10 +1694,7 @@ function StatsView() {
   const [loading, setLoading] = useState(true);
   const [sFilter, setSFilter] = useState('all');
   const [expanded, setExpanded] = useState({});
-  // 'total' = raw sums · 'pax' = everything ÷ tourists · 'fair' = each column
-  // divided by what it actually scales with (see COST_BASIS).
-  const [mode, setMode] = useState('fair');
-  const perPax = mode !== 'total';
+  const [perPax, setPerPax] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const loadData = () => {
@@ -1729,13 +1726,20 @@ function StatsView() {
   const scope = sold.filter(r => sFilter === 'all' || r.series === sFilter)
                     .slice().sort((a, b) => (a.bus_start || '').localeCompare(b.bus_start || ''));
 
-  // Value shown in a cell. `k` picks the denominator in 'fair' mode; without it
-  // (spent / profit) the value is treated as per-tourist.
-  // Returns null when the divisor is unknown, so the cell shows "?" instead of a lie.
-  const norm = (val, r, k) => {
+  // What the cell PRINTS: raw totals, or ÷ pax when the toggle is on. Unchanged.
+  const norm = (val, r) => {
+    if (!perPax) return val || 0;
+    const p = parsePax(r.pax);
+    return p ? (val || 0) / p : null;
+  };
+
+  // What the cell's COLOUR is judged on — always, whatever is being printed.
+  // Each component is divided by what it actually scales with (see COST_BASIS),
+  // so a big group isn't red just for being big. Null when the divisor is
+  // unknown, in which case the cell prints its number but stays uncoloured.
+  const fairVal = (val, r, k) => {
     const v = val || 0;
-    if (mode === 'total') return v;
-    const basis = mode === 'pax' ? 'pax' : ((k && COST_BASIS[k]) || 'pax');
+    const basis = (k && COST_BASIS[k]) || 'pax';
     if (basis === 'tour') return v;
     if (basis === 'rooms') {
       const rm = parseRooms(r.rooms);
@@ -1751,15 +1755,9 @@ function StatsView() {
     return { mean: m, sd };
   };
 
-  // Column averages, in each column's own unit — shown in the table footer.
   const stats = {};
-  // Same averages in ONE shared unit. The bar chart and the "biggest swing"
-  // card rank components against each other, which only works if they share a
-  // scale — in 'fair' mode the columns deliberately don't.
-  const uniStats = {};
   STAT_COMPONENTS.forEach(([k]) => {
-    stats[k]    = meanSd(scope.map(r => norm(r.components[k] || 0, r, k)).filter(v => v !== null));
-    uniStats[k] = meanSd(scope.map(r => norm(r.components[k] || 0, r)).filter(v => v !== null));
+    stats[k] = meanSd(scope.map(r => norm(r.components[k] || 0, r)).filter(v => v !== null));
   });
 
   // Colour baseline: the median of the SAME series, not of the whole table.
@@ -1784,9 +1782,9 @@ function StatsView() {
   };
   const seriesMed = {};
   STAT_COMPONENTS.forEach(([k]) => {
-    seriesMed[k] = medBy(r => norm(r.components[k] || 0, r, k));
+    seriesMed[k] = medBy(r => fairVal(r.components[k] || 0, r, k));
   });
-  const profitMed = medBy(r => norm(r.profit_usd, r));
+  const profitMed = medBy(r => fairVal(r.profit_usd, r));
 
   const profitVals = scope.map(r => norm(r.profit_usd || 0, r)).filter(v => v !== null);
   const spentVals  = scope.map(r => norm(r.spent_usd  || 0, r)).filter(v => v !== null);
@@ -1798,9 +1796,9 @@ function StatsView() {
   const avgPax = paxCounts.length ? Math.round(paxCounts.reduce((a, b) => a + b, 0) / paxCounts.length) : null;
 
   // Which component swings the most.
-  const ranked = STAT_COMPONENTS.map(([k, label, color]) => ({k, label, color, ...uniStats[k]}))
+  const ranked = STAT_COMPONENTS.map(([k, label, color]) => ({k, label, color, ...stats[k]}))
     .sort((a, b) => b.sd - a.sd);
-  const maxMean = Math.max(1, ...STAT_COMPONENTS.map(([k]) => uniStats[k].mean));
+  const maxMean = Math.max(1, ...STAT_COMPONENTS.map(([k]) => stats[k].mean));
 
   // Cell tint by deviation from the series baseline: ±10% is normal, ±25% stands out.
   const devCls = (val, base) => {
@@ -1820,17 +1818,8 @@ function StatsView() {
          : 'text-gray-700';
   };
 
-  const unit = mode === 'total' ? '/ტური' : '/კაცი';
-  // Header hint showing which denominator a column uses in 'fair' mode.
-  const basisSuffix = k => mode === 'total' ? ''
-    : mode === 'pax' ? '/კ'
-    : ({pax: '/კ', rooms: '/ოთ', tour: ''})[COST_BASIS[k] || 'pax'];
-  const fmtCell = (v, k) => {
-    if (v === null) return '?';
-    if (mode === 'total') return fmt(v);
-    if (mode === 'pax') return fmtDec(v);
-    return ((k && COST_BASIS[k]) || 'pax') === 'tour' ? fmt(v) : fmtDec(v);
-  };
+  const unit = perPax ? '/კაცი' : '/ტური';
+  const fmtCell = v => v === null ? '?' : perPax ? fmtDec(v) : fmt(v);
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
@@ -1850,17 +1839,13 @@ function StatsView() {
           {syncing ? 'სინქრო...' : 'განახლება'}
         </button>
         <div className="ml-2 flex items-center gap-1 bg-white border rounded-lg overflow-hidden shadow-sm">
-          <button onClick={() => setMode('total')} title="ნედლი ჯამები"
-            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${mode==='total' ? 'bg-slate-700 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+          <button onClick={() => setPerPax(false)}
+            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${!perPax ? 'bg-slate-700 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             ჯამური
           </button>
-          <button onClick={() => setMode('pax')} title="ყველაფერი ტურისტების რაოდენობაზე"
-            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${mode==='pax' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+          <button onClick={() => setPerPax(true)}
+            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${perPax ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             👤 კაცზე
-          </button>
-          <button onClick={() => setMode('fair')} title="თითო სვეტი იყოფა იმაზე, რაზეც რეალურად არის დამოკიდებული"
-            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${mode==='fair' ? 'bg-emerald-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-            ⚖️ სამართლიანი
           </button>
         </div>
       </div>
@@ -1910,13 +1895,13 @@ function StatsView() {
               <div key={k} className="flex items-center gap-2">
                 <div className="w-24 text-xs text-gray-600 text-right flex-shrink-0">{label}</div>
                 <div className="flex-1 bg-gray-100 rounded h-5 relative">
-                  <div className="h-5 rounded" style={{width: `${Math.max(2, (uniStats[k].mean / maxMean) * 100)}%`, background: color}}/>
+                  <div className="h-5 rounded" style={{width: `${Math.max(2, (stats[k].mean / maxMean) * 100)}%`, background: color}}/>
                 </div>
                 <div className="w-20 text-xs font-semibold text-gray-700 text-right flex-shrink-0">
-                  ${perPax ? fmtDec(uniStats[k].mean) : fmt(uniStats[k].mean)}
+                  ${perPax ? fmtDec(stats[k].mean) : fmt(stats[k].mean)}
                 </div>
                 <div className="w-16 text-xs text-gray-400 text-right flex-shrink-0">
-                  ±{perPax ? fmtDec(uniStats[k].sd) : fmt(uniStats[k].sd)}
+                  ±{perPax ? fmtDec(stats[k].sd) : fmt(stats[k].sd)}
                 </div>
               </div>
             ))}
@@ -1934,7 +1919,7 @@ function StatsView() {
                 <th className="text-left px-2 py-2 font-semibold text-gray-400 font-mono">ოთახები</th>
                 {STAT_COMPONENTS.map(([k, label, color]) => (
                   <th key={k} className="text-right px-2 py-2 font-semibold" style={{color}}>
-                    {label}{basisSuffix(k) ? <span className="text-gray-400 font-normal">{basisSuffix(k)}</span> : ''}
+                    {label}{perPax ? <span className="text-gray-400 font-normal">/კ</span> : ''}
                   </th>
                 ))}
                 <th className="text-right px-2 py-2 font-semibold text-gray-500">ხარჯი{perPax ? '/კ' : ''}</th>
@@ -1963,15 +1948,16 @@ function StatsView() {
                       <td className="px-2 py-1.5 text-gray-500">{r.pax || '—'}</td>
                       <td className="px-2 py-1.5 text-gray-400 font-mono text-xs">{r.rooms || ''}</td>
                       {STAT_COMPONENTS.map(([k]) => {
-                        const v = norm(r.components[k] || 0, r, k);
+                        const raw = r.components[k] || 0;
+                        // print the amount as-is, tint it by the per-unit comparison
                         return (
-                          <td key={k} className={`px-2 py-1.5 text-right ${devCls(v, (seriesMed[k] || {})[r.series])}`}>
-                            {(r.components[k] || 0) ? fmtCell(v, k) : '·'}
+                          <td key={k} className={`px-2 py-1.5 text-right ${devCls(fairVal(raw, r, k), (seriesMed[k] || {})[r.series])}`}>
+                            {raw ? fmtCell(norm(raw, r)) : '·'}
                           </td>
                         );
                       })}
                       <td className="px-2 py-1.5 text-right text-gray-700 font-medium">{fmtCell(normSpent)}</td>
-                      <td className={`px-2 py-1.5 text-right font-bold rounded ${profitCls(normProfit, r.series)}`}>
+                      <td className={`px-2 py-1.5 text-right font-bold rounded ${profitCls(fairVal(r.profit_usd, r), r.series)}`}>
                         ${fmtCell(normProfit)}
                       </td>
                     </tr>
@@ -1993,7 +1979,7 @@ function StatsView() {
                 </td>
                 {STAT_COMPONENTS.map(([k]) => (
                   <td key={k} className="px-2 py-2 text-right text-gray-700">
-                    {fmtCell(stats[k].mean, k)}
+                    {perPax ? fmtDec(stats[k].mean) : fmt(stats[k].mean)}
                   </td>
                 ))}
                 <td className="px-2 py-2 text-right text-gray-700">{perPax ? fmtDec(avgSpent) : fmt(avgSpent)}</td>
@@ -2002,14 +1988,14 @@ function StatsView() {
             </tfoot>
           </table>
           <div className="px-3 py-2 bg-amber-50 border-t text-xs text-amber-700">
-            {mode === 'fair'
-              ? <span>რესტორანი / ატრაქციონები / სომხეთი — <strong>1 ტურისტზე</strong> · სასტუმრო — <strong>1 ოთახზე</strong> ·
-                      ავტობუსი / გიდი / პერსონალი — <strong>1 ტურზე</strong> (ფიქსირებული ხარჯია, ჯგუფის ზომაზე არ არის დამოკიდებული).</span>
-              : mode === 'pax'
-              ? <span>ყველა მნიშვნელობა გაყოფილია ტურისტების რაოდენობაზე (გიდი გამოკლებულია). ფიქსირებულ ხარჯებს (ავტობუსი, გიდი) ეს ამახინჯებს — შეადარეთ „⚖️ სამართლიან" რეჟიმს.</span>
+            {perPax
+              ? <span>ყველა მნიშვნელობა გაყოფილია ტურისტების რაოდენობაზე (გიდი გამოკლებულია). ? = pax უცნობია.</span>
               : <span>მხოლოდ <strong>დასრულებული</strong> ტურები — მიმდინარე/მომავალი გამოტოვებულია (ბალანსი არ არის დახურული). დააჭირეთ სტრიქონს დეტალებისთვის.</span>}
-            <span className="ml-2 text-red-600 font-medium">წითელი = ამავე სერიის მედიანაზე +10%-ით მეტი</span>,
-            <span className="text-green-700 font-medium"> მწვანე = −10%-ით ნაკლები</span>. ცარიელი (·) = ხარჯი არ ჰქონია · ? = გამყოფი უცნობია.
+            <span className="ml-2 text-gray-600">ციფრები ჯამურია; <strong>ფერი</strong> კი ითვლება 1 ტურისტზე
+              (რესტორანი / ატრაქციონები / სომხეთი), 1 ოთახზე (სასტუმრო) და 1 ტურზე (ავტობუსი / გიდი / პერსონალი —
+              ფიქსირებული ხარჯია), ამავე სერიის მედიანასთან შედარებით.</span>
+            <span className="ml-1 text-red-600 font-medium">წითელი = +10%-ით მეტი</span>,
+            <span className="text-green-700 font-medium"> მწვანე = −10%-ით ნაკლები</span>. ცარიელი (·) = ხარჯი არ ჰქონია.
           </div>
         </div>
         <VendorChart scope={scope} perPax={perPax} />
