@@ -1270,13 +1270,17 @@ function ProfitView() {
   const fmt  = (n) => (n || n === 0) ? Math.round(n).toLocaleString() : '—';
   const prClr = (n) => n > 0 ? 'text-green-700' : n < 0 ? 'text-red-600' : 'text-gray-400';
 
-  // Status: upcoming → active → finished → paid (on the VAT refund date)
+  // Status: upcoming → active → finished → paid.
+  // The balance is settled within 14 days of the tour ending; the VAT refund is
+  // a separate, later date and must not drive this.
+  const BALANCE_DAYS = 14;
+  const balanceDueDate = iso => iso ? addDays(iso, BALANCE_DAYS) : null;
   const today = toISO(new Date());
   const payStatus = (r) => {
     if (!r.bus_start || !r.bus_end) return null;
     if (today < r.bus_start) return 'upcoming';
     if (today <= r.bus_end) return 'active';
-    if (today < vatRefundDate(r.bus_end)) return 'finished';
+    if (today < balanceDueDate(r.bus_end)) return 'finished';
     return 'paid';
   };
   const STAT = {
@@ -1509,7 +1513,12 @@ function ProfitView() {
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სავარაუდო დღგ $</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">დღგ საბოლოო $ (80%)</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">სტატუსი</th>
-                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">გადახდის თარიღი</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 leading-tight">
+                  <div>გადახდის თარიღი</div><div className="font-normal text-gray-400">ბალანსი, +14 დღე</div>
+                </th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-violet-600 leading-tight">
+                  <div>დღგ-ს დაბრუნება</div><div className="font-normal text-gray-400">მომდ. თვის 15</div>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1551,6 +1560,13 @@ function ProfitView() {
                   <td className="px-3 py-2 whitespace-nowrap text-xs">
                     {r.bus_end
                       ? <span className={st === 'paid' ? 'text-emerald-700 font-medium' : st === 'finished' ? 'text-orange-600 font-medium' : 'text-gray-500'}>
+                          {balanceDueDate(r.bus_end)}
+                        </span>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-xs">
+                    {r.bus_end
+                      ? <span className={today >= vatRefundDate(r.bus_end) ? 'text-violet-700 font-medium' : 'text-gray-500'}>
                           {vatRefundDate(r.bus_end)}
                         </span>
                       : <span className="text-gray-300">—</span>}
@@ -1568,11 +1584,14 @@ function ProfitView() {
                 <td className="px-3 py-2.5 text-right text-violet-700">${fmt(totVatFin)}</td>
                 <td className="px-3 py-2.5"></td>
                 <td className="px-3 py-2.5"></td>
+                <td className="px-3 py-2.5"></td>
               </tr>
             </tfoot>
           </table>
           <div className="px-3 py-2 bg-amber-50 border-t text-xs text-amber-700">
             ორივე თანხა დოლარში — პირდაპირ BALANCE ფაილებიდან. „დღგ" = დღგ-ს დაბრუნებით მოსალოდნელი თანხა. ცარიელი (—) = ტურს ჯერ არ აქვს მოგება დათვლილი.
+            <strong> გადახდის თარიღი</strong> = ბალანსის ანგარიშსწორება, ტურის დასრულებიდან 14 დღეში (სტატუსიც ამას მიჰყვება).
+            <strong> დღგ-ს დაბრუნება</strong> = მომდევნო თვის 15 რიცხვი — ცალკე, უფრო გვიანი თარიღი.
           </div>
         </div>
       )}
