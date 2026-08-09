@@ -22,7 +22,9 @@ SHEET_ID = "13FoSFZqpi4QAm2CDc1qT3uB7AKHOFEJv"
 
 TOUR_CODE_RE = re.compile(r'\b((?:ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV)-?\d{4})\b')
 DONE_MARKER = "done 2026"
-_ROOM_KEYWORD_RE = re.compile(r'\b(twin|single|double|king|suite)\b', re.IGNORECASE)
+_ROOM_KEYWORD_RE = re.compile(
+    r'\d+\s*(?:twin|single|double|king|suite)\b|\b(?:twin|single|double|king|suite)\b',
+    re.IGNORECASE)
 _ROOM_ENTRY_RE = re.compile(r'(\d+)\s*(twin|single|double|king|suite)\s*(?:\(([^)]*)\))?', re.IGNORECASE)
 
 
@@ -139,15 +141,52 @@ def fetch_active_tours() -> list:
                     rooms = _abbrev_rooms(candidate)
                     break
 
-            active.append({"code": code, "series": series, "bus_start": bs, "rooms": rooms})
+            active.append({"code": code, "series": series, "bus_start": bs,
+                           "rooms": rooms, "guide": _guide_above(grid, row_i, col_i)})
 
     print(f"[schedule_sync] active tours parsed: {len(active)}")
     return active
 
 
+# The guide's name sits a row or two above the tour code in the same column,
+# alongside the rooms line — e.g. "IM danieli" over "10 twin/19+1" over "ZT-0803".
+# There is no marker to key on, so identify it by ruling out everything else that
+# appears there: room specs, dates, counts, tour codes and section banners.
+_GUIDE_SKIP_RE = re.compile(
+    r'(in process|done|cancel|for cancell|ok\b|paid|revised)', re.IGNORECASE)
+_LETTER_RE = re.compile(r'[A-Za-z\u10A0-\u10FF]')
+# Deliberately looser than _ROOM_KEYWORD_RE: for ruling a cell OUT, any mention
+# of a room type is enough, however it is written.
+_ROOM_WORD_RE = re.compile(r'(twin|single|double|king|suite)', re.IGNORECASE)
+_NUMERIC_ONLY_RE = re.compile(r'^[\d/.\-\s:+,()]+$')
+
+
+def _looks_like_guide(text: str) -> bool:
+    s = (text or '').strip()
+    if not s or len(s) > 60:
+        return False
+    if TOUR_CODE_RE.search(s) or _ROOM_WORD_RE.search(s):
+        return False
+    if _GUIDE_SKIP_RE.search(s) or _NUMERIC_ONLY_RE.match(s):
+        return False
+    return bool(_LETTER_RE.search(s))
+
+
+def _guide_above(grid, row_i, col_i) -> str:
+    """Nearest plausible guide name in the rows just above a tour code."""
+    for look_back in range(1, 6):
+        ri = row_i - look_back
+        if ri < 0:
+            break
+        candidate = grid[ri][col_i] if col_i < len(grid[ri]) else ''
+        if _looks_like_guide(candidate):
+            return candidate.strip()
+    return ''
+
+
 def fetch_all_tour_rooms() -> dict:
-    """Return {tour_code: rooms_str} for ALL tour codes found in the main tab,
-    including completed ones past the 'done 2026' marker."""
+    """Return {tour_code: {"rooms": str, "guide": str}} for ALL tour codes in the
+    main tab, including completed ones past the 'done 2026' marker."""
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
     resp = requests.get(url, timeout=60)
     resp.raise_for_status()
@@ -190,8 +229,11 @@ def fetch_all_tour_rooms() -> dict:
                     rooms = _abbrev_rooms(candidate)
                     break
 
-            if rooms:
-                rooms_map[code] = rooms
+            guide = _guide_above(grid, row_i, col_i)
+            if rooms or guide:
+                rooms_map[code] = {"rooms": rooms, "guide": guide}
 
-    print(f"[schedule_sync] rooms found for {len(rooms_map)} tours (full sheet)")
+    n_rooms = sum(1 for v in rooms_map.values() if v["rooms"])
+    n_guide = sum(1 for v in rooms_map.values() if v["guide"])
+    print(f"[schedule_sync] full sheet: rooms for {n_rooms}, guides for {n_guide} tours")
     return rooms_map

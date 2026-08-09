@@ -112,11 +112,12 @@ def init_db():
                 conn.execute(f"ALTER TABLE tour_profit ADD COLUMN {col} {defn}")
             except Exception:
                 pass
-        # Migrate: add rooms column to tours if missing
-        try:
-            conn.execute("ALTER TABLE tours ADD COLUMN rooms TEXT DEFAULT ''")
-        except Exception:
-            pass
+        # Migrate: add rooms / guide columns to tours if missing
+        for col in ("rooms", "guide"):
+            try:
+                conn.execute(f"ALTER TABLE tours ADD COLUMN {col} TEXT DEFAULT ''")
+            except Exception:
+                pass
         # Migrate: add new columns to payment_terms if missing
         for col, defn in [
             ("unit_price",    "REAL DEFAULT 0"),
@@ -207,14 +208,14 @@ def seed_db():
             _insert_tour(conn, t["code"], t["series"], date.fromisoformat(t["bus_start"]))
 
 
-def _insert_tour(conn, code: str, series: str, bus_start: date, rooms: str = ''):
+def _insert_tour(conn, code: str, series: str, bus_start: date, rooms: str = '', guide: str = ''):
     """Insert a tour + its daily_log rows from the SERIES template."""
     duration = SERIES[series]["duration"]
     # Tour ends on the Tbilisi→Urumqi flight day = last itinerary day
     bus_end = bus_start + timedelta(days=duration - 1)
     conn.execute(
-        "INSERT INTO tours (code, series, bus_start, bus_end, rooms) VALUES (?,?,?,?,?)",
-        (code, series, bus_start.isoformat(), bus_end.isoformat(), rooms)
+        "INSERT INTO tours (code, series, bus_start, bus_end, rooms, guide) VALUES (?,?,?,?,?,?)",
+        (code, series, bus_start.isoformat(), bus_end.isoformat(), rooms, guide)
     )
     for offset, info in SERIES[series]["nights"].items():
         day_date = bus_start + timedelta(days=offset)
@@ -327,7 +328,7 @@ def get_all_tours():
 def get_tours_on_date(check_date: str):
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT t.code, t.series, t.bus_start, t.bus_end, t.notes, t.rooms, "
+            "SELECT t.code, t.series, t.bus_start, t.bus_end, t.notes, t.rooms, t.guide, "
             "dl.city, dl.hotel, dl.lunch, dl.dinner, dl.border_crossing, dl.notes as day_notes "
             "FROM tours t JOIN daily_log dl ON t.code=dl.tour_code "
             "WHERE dl.date=? ORDER BY dl.city, t.series",
@@ -348,6 +349,7 @@ def get_tours_on_date(check_date: str):
                 "day_notes": r["day_notes"],
                 "day_num": day_num, "total_days": duration,
                 "rooms": r["rooms"] or "",
+                "guide": r["guide"] or "",
                 "color": SERIES[r["series"]]["color"],
             })
         return result
@@ -379,6 +381,7 @@ def get_tour_detail(code: str):
             "status": get_tour_status(tour["bus_start"], tour["bus_end"]),
             "notes": tour["notes"],
             "rooms": tour["rooms"] or "",
+            "guide": tour["guide"] or "",
             "color": SERIES[tour["series"]]["color"],
             "series_name": SERIES[tour["series"]]["name"],
             "days": days,
@@ -1156,25 +1159,31 @@ def set_setting(key: str, value: str):
         )
 
 
-def bulk_update_rooms(rooms: dict) -> int:
-    """Write rooms from the master schedule sheet — the authoritative source.
+def bulk_update_rooms(meta: dict) -> int:
+    """Write rooms and guide from the master schedule sheet — the authoritative
+    source. `meta` is {tour_code: {"rooms": str, "guide": str}}.
 
     Overwrites whatever the DB holds whenever the sheet disagrees (e.g. a value
     previously filled in from a balance sheet); rows that already match are left
-    alone so the return value counts real changes only.
+    alone so the return value counts real changes only. A field the sheet leaves
+    blank is not written, so a gap there never erases what is already known.
     """
-    if not rooms:
+    if not meta:
         return 0
     updated = 0
     with get_db() as conn:
-        for code, room_str in rooms.items():
-            if not room_str:
-                continue
-            cur = conn.execute(
-                "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms<>?)",
-                (room_str, code, room_str)
-            )
-            updated += cur.rowcount
+        for code, info in meta.items():
+            if isinstance(info, str):          # tolerate the old rooms-only shape
+                info = {"rooms": info}
+            for field in ("rooms", "guide"):
+                val = (info.get(field) or "").strip()
+                if not val:
+                    continue
+                cur = conn.execute(
+                    f"UPDATE tours SET {field}=? WHERE code=? AND ({field} IS NULL OR {field}<>?)",
+                    (val, code, val)
+                )
+                updated += cur.rowcount
     return updated
 
 
@@ -1208,18 +1217,23 @@ def apply_schedule_sync(active: list) -> dict:
             if series not in SERIES:
                 continue
             if code in existing:
-                # Update rooms if the sheet now has info and DB is empty
+                # Update rooms / guide if the sheet now has info and the DB is empty
                 if rooms:
                     conn.execute(
                         "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms='')",
                         (rooms, code)
+                    )
+                if a.get("guide"):
+                    conn.execute(
+                        "UPDATE tours SET guide=? WHERE code=? AND (guide IS NULL OR guide='')",
+                        (a["guide"], code)
                     )
                 continue
             try:
                 bs = date.fromisoformat(a["bus_start"])
             except Exception:
                 continue
-            _insert_tour(conn, code, series, bs, rooms)
+            _insert_tour(conn, code, series, bs, rooms, a.get("guide", ""))
             added.append(code)
 
         # Removals: not in active list AND not yet completed

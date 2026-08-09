@@ -323,6 +323,9 @@ function DayView({ onSelectTour }) {
                           : t.hotel}</div>
                         <div>🍽️ <span className="text-gray-400">L:</span> <span className={t.lunch && t.lunch.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.lunch}</span></div>
                         <div>🌙 <span className="text-gray-400">V:</span> <span className={t.dinner && t.dinner.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.dinner}</span></div>
+                        {t.guide && (
+                          <div className="text-gray-500">🧭 <span className="text-gray-400">გიდი:</span> {t.guide}</div>
+                        )}
                         {t.border_crossing && (
                           <div className="text-orange-600 font-medium">🚧 {t.border_crossing}</div>
                         )}

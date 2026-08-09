@@ -28,7 +28,9 @@ SHEET_IDS = {
 TOUR_CODE_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV)-?\d{4})')
 # Group size, e.g. "19+1" = 19 tourists + 1 leader.
 PAX_RE = re.compile(r'(?<!\d)(\d{1,2})\s*\+\s*(\d{1,2})')
-_ROOM_KEYWORD_RE = re.compile(r'\b(twin|single|double|king|suite)\b', re.IGNORECASE)
+_ROOM_KEYWORD_RE = re.compile(
+    r'\d+\s*(?:twin|single|double|king|suite)\b|\b(?:twin|single|double|king|suite)\b',
+    re.IGNORECASE)
 _ROOM_ENTRY_RE = re.compile(r'(\d+)\s*(twin|single|double|king|suite)\s*(?:\(([^)]*)\))?', re.IGNORECASE)
 
 
