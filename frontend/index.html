@@ -1342,6 +1342,19 @@ function ProfitView() {
   const totVatFin  = filtered.reduce((s,r) => s + (finalVat(r) || 0), 0);
   const soldCount  = filtered.filter(isSold).length;
 
+  // When the money actually lands: every tour's VAT split by service month and
+  // gathered on the date it is repaid, so months that carry several tours add up.
+  // Amounts are the final 80%, so this totals to the "სულ დღგ საბოლოო" card.
+  const vatCalendar = (() => {
+    const byDate = {};
+    filtered.forEach(r => {
+      const fin = finalVat(r);
+      if (fin == null) return;
+      vatSplit(r).forEach(pt => { byDate[pt.date] = (byDate[pt.date] || 0) + fin * pt.share; });
+    });
+    return Object.keys(byDate).sort().map(d => ({ date: d, usd: byDate[d] }));
+  })();
+
   // ── FORECAST ──────────────────────────────────────────────────
   // Averages are based on PAID tours only — their profit is final
   // (finished-but-unpaid tours may still be adjusted downward). Every
@@ -1497,6 +1510,32 @@ function ProfitView() {
           <div className="text-2xl font-bold text-violet-700">${fmt(totVatFin)}</div>
         </div>
       </div>
+
+      {vatCalendar.length > 0 && (
+        <div className="bg-white border border-violet-200 rounded-lg px-4 py-3 mb-4">
+          <div className="text-xs text-violet-600 mb-2">
+            დღგ-ს დაბრუნების გრაფიკი — საბოლოო (80%), მომსახურების თვის მიხედვით
+          </div>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {vatCalendar.map(v => {
+              const done = today >= v.date;
+              return (
+                <div key={v.date} className="whitespace-nowrap">
+                  <div className={`text-xs ${done ? 'text-gray-400' : 'text-violet-600'}`}>
+                    {done ? '✓ ' : ''}{v.date}
+                  </div>
+                  <div className={`text-base font-bold ${done ? 'text-gray-500' : 'text-violet-700'}`}>
+                    ${fmt(v.usd)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="text-xs text-gray-400 mt-2">
+            ✓ = უკვე დაბრუნებული. თვეზე გადამდები ტური ორ თარიღზე ნაწილდება.
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-2 flex-wrap items-center">
         {[['all','ყველა'],['upcoming','🔵 მომავალი'],['active','🟢 მიმდინარე'],['finished','⚪ დასრულებული'],['paid','🟩 გადახდილი']].map(([v,l]) => (
