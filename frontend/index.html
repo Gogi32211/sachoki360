@@ -1596,11 +1596,13 @@ function ProfitView() {
                       const parts = vatSplit(r);
                       if (!parts.length) return <span className="text-gray-300">—</span>;
                       const fin = finalVat(r);
+                      // Amount sits under its date rather than beside it, so the
+                      // column only ever needs one date's width and can't clip.
                       return parts.map(pt => (
-                        <div key={pt.month} className={`flex gap-2 justify-between whitespace-nowrap ${today >= pt.date ? 'text-violet-700 font-medium' : 'text-gray-500'}`}>
-                          <span>{pt.date}</span>
+                        <div key={pt.month} className={`whitespace-nowrap ${parts.length > 1 ? 'mb-1 last:mb-0' : ''} ${today >= pt.date ? 'text-violet-700 font-medium' : 'text-gray-500'}`}>
+                          <div>{pt.date}</div>
                           {parts.length > 1 && fin != null &&
-                            <span className="text-gray-400">${fmt(fin * pt.share)}</span>}
+                            <div className="text-gray-400 text-[11px] leading-tight">${fmt(fin * pt.share)}</div>}
                         </div>
                       ));
                     })()}
