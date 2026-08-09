@@ -59,6 +59,28 @@ const vatRefundDate = iso => {
   return m === 12 ? `${y + 1}-01-15` : `${y}-${pad2(m + 1)}-15`;
 };
 
+// A tour that runs across a month boundary has its service — and so its VAT —
+// belonging to both months, each repaid on the 15th of the month after it.
+// Split by how many service days fall in each month: the balance files hold
+// amounts per supplier rather than per date, so days are the finest split
+// available. Returns [{month, days, share, date}] ordered by refund date.
+const vatSplit = (busStart, busEnd) => {
+  if (!busStart || !busEnd || busEnd < busStart) return [];
+  const perMonth = {};
+  let total = 0;
+  for (let d = busStart; d <= busEnd && total < 400; d = addDays(d, 1)) {
+    const ym = d.slice(0, 7);
+    perMonth[ym] = (perMonth[ym] || 0) + 1;
+    total++;
+  }
+  return Object.keys(perMonth).sort().map(ym => ({
+    month: ym,
+    days: perMonth[ym],
+    share: perMonth[ym] / total,
+    date: vatRefundDate(`${ym}-01`),
+  }));
+};
+
 function Badge({ series }) {
   return (
     <span className="px-2 py-0.5 rounded text-white text-xs font-bold"
@@ -1273,7 +1295,7 @@ function ProfitView() {
   // Status: upcoming → active → finished → paid.
   // The balance is settled within 14 days of the tour ending; the VAT refund is
   // a separate, later date and must not drive this.
-  const BALANCE_DAYS = 14;
+  const BALANCE_DAYS = 15;
   const balanceDueDate = iso => iso ? addDays(iso, BALANCE_DAYS) : null;
   const today = toISO(new Date());
   const payStatus = (r) => {
@@ -1514,10 +1536,10 @@ function ProfitView() {
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">დღგ საბოლოო $ (80%)</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">სტატუსი</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 leading-tight">
-                  <div>გადახდის თარიღი</div><div className="font-normal text-gray-400">ბალანსი, +14 დღე</div>
+                  <div>გადახდის თარიღი</div><div className="font-normal text-gray-400">ბალანსი, +15 დღე</div>
                 </th>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-violet-600 leading-tight">
-                  <div>დღგ-ს დაბრუნება</div><div className="font-normal text-gray-400">მომდ. თვის 15</div>
+                  <div>დღგ-ს დაბრუნება</div><div className="font-normal text-gray-400">მომსახ. თვის მიხედვით</div>
                 </th>
               </tr>
             </thead>
@@ -1565,11 +1587,18 @@ function ProfitView() {
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-xs">
-                    {r.bus_end
-                      ? <span className={today >= vatRefundDate(r.bus_end) ? 'text-violet-700 font-medium' : 'text-gray-500'}>
-                          {vatRefundDate(r.bus_end)}
-                        </span>
-                      : <span className="text-gray-300">—</span>}
+                    {(() => {
+                      const parts = vatSplit(r.bus_start, r.bus_end);
+                      if (!parts.length) return <span className="text-gray-300">—</span>;
+                      const fin = finalVat(r);
+                      return parts.map(pt => (
+                        <div key={pt.month} className={today >= pt.date ? 'text-violet-700 font-medium' : 'text-gray-500'}>
+                          {pt.date}
+                          {parts.length > 1 && fin != null &&
+                            <span className="ml-1 text-gray-400">${fmt(fin * pt.share)}</span>}
+                        </div>
+                      ));
+                    })()}
                   </td>
                 </tr>
               );})}
@@ -1590,8 +1619,9 @@ function ProfitView() {
           </table>
           <div className="px-3 py-2 bg-amber-50 border-t text-xs text-amber-700">
             ორივე თანხა დოლარში — პირდაპირ BALANCE ფაილებიდან. „დღგ" = დღგ-ს დაბრუნებით მოსალოდნელი თანხა. ცარიელი (—) = ტურს ჯერ არ აქვს მოგება დათვლილი.
-            <strong> გადახდის თარიღი</strong> = ბალანსის ანგარიშსწორება, ტურის დასრულებიდან 14 დღეში (სტატუსიც ამას მიჰყვება).
-            <strong> დღგ-ს დაბრუნება</strong> = მომდევნო თვის 15 რიცხვი — ცალკე, უფრო გვიანი თარიღი.
+            <strong> გადახდის თარიღი</strong> = ბალანსის ანგარიშსწორება, ტურის დასრულებიდან 15 დღეში (სტატუსიც ამას მიჰყვება).
+            <strong> დღგ-ს დაბრუნება</strong> = მომსახურების თვის მომდევნო თვის 15 რიცხვი. თვეზე გადამდები ტური
+            ორ თარიღად იყოფა — თითოეულ თვეში მოხვედრილი დღეების პროპორციულად (თანხა 80%-იანია).
           </div>
         </div>
       )}
