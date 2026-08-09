@@ -1524,7 +1524,7 @@ function ProfitView() {
           <div className="text-sm">მონაცემები არ არის. დააჭირე „განახლება".</div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -1592,10 +1592,10 @@ function ProfitView() {
                       if (!parts.length) return <span className="text-gray-300">—</span>;
                       const fin = finalVat(r);
                       return parts.map(pt => (
-                        <div key={pt.month} className={today >= pt.date ? 'text-violet-700 font-medium' : 'text-gray-500'}>
-                          {pt.date}
+                        <div key={pt.month} className={`flex gap-2 justify-between whitespace-nowrap ${today >= pt.date ? 'text-violet-700 font-medium' : 'text-gray-500'}`}>
+                          <span>{pt.date}</span>
                           {parts.length > 1 && fin != null &&
-                            <span className="ml-1 text-gray-400">${fmt(fin * pt.share)}</span>}
+                            <span className="text-gray-400">${fmt(fin * pt.share)}</span>}
                         </div>
                       ));
                     })()}
