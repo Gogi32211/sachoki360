@@ -979,6 +979,105 @@ def _approx_dates_from_code(code: str):
     return d.isoformat(), d.isoformat()
 
 
+# Balance sheets name suppliers in Georgian; daily_log names hotels in English.
+# Each entry pairs the words a balance row may use with the words the itinerary
+# uses for the same hotel, so a cost can be traced to the nights it was incurred.
+_HOTEL_ALIASES = [
+    (('ჰუალინგ', 'hualing'),                 ('hualing',)),
+    (('რადისონ', 'radisson'),                ('radisson',)),
+    (('აღაბაბაია', 'agababaia', 'aghababayan', 'agababayan'), ('aghababyan',)),
+    (('მარკო', 'marco'),                     ('marco polo',)),
+    (('გორი ინ', 'gori inn'),                ('gori inn',)),
+    (('გრინვუდ', 'greenwood'),               ('greenwood',)),
+    (('ახალციხ', 'akhaltsikhe'),             ('akhaltsikhe',)),
+    (('გისტოლა', 'gistola'),                 ('gistola',)),
+    (('ლილატ', 'lilat'),                     ('lilati',)),
+    (('უშბა', 'ushba'),                      ('ushba',)),
+    (('პულმან', 'pullman'),                  ('pullman',)),
+    (('პაინ', 'pine'),                       ('pine',)),
+    (('ბორჯომ', 'borjomi'),                  ('borjomi',)),
+    (('გუდაურ', 'gudauri'),                  ('gudauri',)),
+    (('ყაზბეგ', 'kazbegi'),                  ('kazbegi', 'mountain house', 'melodia', 'rooms hotel')),
+    (('ქუთაის', 'kutaisi'),                  ('kutaisi',)),
+    (('სევან', 'sevan'),                     ('sevan',)),
+]
+
+_ARMENIA_CITIES = ('yerevan', 'sevan')
+_MEAL_PREFIX_RE = _re.compile(r'^\s*(ლანჩი|ვახშამი|ვაშამი|breakfast|lunch|dinner)\s*[:：-]?\s*', _re.IGNORECASE)
+
+
+def _meal_key(text: str) -> str:
+    """Strip the 'ლანჩი:' style prefix and punctuation so a balance row and an
+    itinerary entry for the same restaurant compare equal."""
+    s = _MEAL_PREFIX_RE.sub('', (text or '').lower())
+    return _re.sub(r'[^\wႠ-ჿ]+', '', s)
+
+
+def _item_dates(item: dict, days: list) -> list:
+    """Dates in the itinerary that a balance line item was incurred on.
+
+    Hotels resolve to the nights spent there, meals to the day they were eaten,
+    Armenia to the days spent in Armenia. Everything else — bus, guide, staff —
+    runs for the whole tour. Anything that can't be placed falls back to the
+    whole tour rather than being dropped, so no cost goes missing.
+    """
+    cat = item.get('cat')
+    name = (item.get('name') or '').lower()
+    all_dates = [d['date'] for d in days]
+
+    if cat == 'hotel':
+        tokens = next((en for ka, en in _HOTEL_ALIASES if any(k in name for k in ka)), None)
+        if tokens:
+            hit = [d['date'] for d in days
+                   if any(t in (d['hotel'] or '').lower() for t in tokens)]
+            if hit:
+                return hit
+    elif cat == 'restaurant':
+        key = _meal_key(item.get('name'))
+        if key:
+            hit = [d['date'] for d in days
+                   if key and (key in _meal_key(d['lunch']) or key in _meal_key(d['dinner']))]
+            if hit:
+                return hit
+    elif cat == 'armenia':
+        hit = [d['date'] for d in days
+               if any(c in (d['city'] or '').lower() for c in _ARMENIA_CITIES)]
+        if hit:
+            return hit
+
+    return all_dates
+
+
+def _vat_months(items: list, days: list) -> list:
+    """Split a tour's cost across the calendar months it was actually incurred in.
+
+    Every line item is spread evenly over the dates it belongs to, and the months
+    those dates fall in decide each month's share. VAT follows the same shares,
+    since it is charged on the same services.
+    """
+    if not days:
+        return []
+    per_month = defaultdict(float)
+    total = 0.0
+    for it in items or []:
+        usd = it.get('usd') or 0
+        if not usd:
+            continue
+        dates = _item_dates(it, days)
+        if not dates:
+            continue
+        each = usd / len(dates)
+        for d in dates:
+            per_month[d[:7]] += each
+        total += usd
+    if total <= 0:
+        # No priced line items — fall back to an even spread over the tour's days.
+        for d in days:
+            per_month[d['date'][:7]] += 1.0
+        total = float(len(days))
+    return [{'month': m, 'share': per_month[m] / total} for m in sorted(per_month)]
+
+
 def get_tour_profit() -> list:
     """Return per-tour profit for ALL tours that have balance data,
     whether or not they're still in the schedule table.
@@ -990,6 +1089,12 @@ def get_tour_profit() -> list:
             FROM tour_profit p
             LEFT JOIN tours t ON t.code = p.tour_code
         """).fetchall()
+        # Itineraries for every tour at once — used to date each balance line item.
+        days_by_tour = defaultdict(list)
+        for d in conn.execute(
+            "SELECT tour_code, date, city, hotel, lunch, dinner FROM daily_log ORDER BY date"
+        ).fetchall():
+            days_by_tour[d['tour_code']].append(dict(d))
         result = []
         for r in rows:
             d = dict(r)
@@ -1029,6 +1134,8 @@ def get_tour_profit() -> list:
                 d['components_detail'] = _json.loads(d.get('components_detail') or '[]')
             except Exception:
                 d['components_detail'] = []
+            # Which calendar months this tour's service — and so its VAT — falls in.
+            d['vat_months'] = _vat_months(d['components_detail'], days_by_tour.get(code, []))
             result.append(d)
         result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
         return result

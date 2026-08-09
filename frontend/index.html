@@ -61,10 +61,16 @@ const vatRefundDate = iso => {
 
 // A tour that runs across a month boundary has its service — and so its VAT —
 // belonging to both months, each repaid on the 15th of the month after it.
-// Split by how many service days fall in each month: the balance files hold
-// amounts per supplier rather than per date, so days are the finest split
-// available. Returns [{month, days, share, date}] ordered by refund date.
-const vatSplit = (busStart, busEnd) => {
+// The server works out each month's share by tracing every balance line item to
+// the nights or days it was incurred on, so a month holding the expensive half
+// of a tour carries the matching half of the VAT. Falls back to an even spread
+// over the tour's days when a tour has no itinerary to trace against.
+const vatSplit = (r) => {
+  const fromServer = r && r.vat_months;
+  if (fromServer && fromServer.length) {
+    return fromServer.map(m => ({ ...m, date: vatRefundDate(`${m.month}-01`) }));
+  }
+  const busStart = r && r.bus_start, busEnd = r && r.bus_end;
   if (!busStart || !busEnd || busEnd < busStart) return [];
   const perMonth = {};
   let total = 0;
@@ -75,7 +81,6 @@ const vatSplit = (busStart, busEnd) => {
   }
   return Object.keys(perMonth).sort().map(ym => ({
     month: ym,
-    days: perMonth[ym],
     share: perMonth[ym] / total,
     date: vatRefundDate(`${ym}-01`),
   }));
@@ -1588,7 +1593,7 @@ function ProfitView() {
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-xs">
                     {(() => {
-                      const parts = vatSplit(r.bus_start, r.bus_end);
+                      const parts = vatSplit(r);
                       if (!parts.length) return <span className="text-gray-300">—</span>;
                       const fin = finalVat(r);
                       return parts.map(pt => (
