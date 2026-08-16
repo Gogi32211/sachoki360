@@ -20,7 +20,7 @@ from seed_data import SERIES_START_OFFSET
 
 SHEET_ID = "13FoSFZqpi4QAm2CDc1qT3uB7AKHOFEJv"
 
-TOUR_CODE_RE = re.compile(r'\b((?:ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV)-?\d{4})\b')
+TOUR_CODE_RE = re.compile(r'\b((?:ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-?\d{4})\b')
 DONE_MARKER = "done 2026"
 _ROOM_KEYWORD_RE = re.compile(
     r'\d+\s*(?:twin|single|double|king|suite)\b|\b(?:twin|single|double|king|suite)\b',
@@ -29,7 +29,7 @@ _ROOM_ENTRY_RE = re.compile(r'(\d+)\s*(twin|single|double|king|suite)\s*(?:\(([^
 
 
 def _norm_code(code: str) -> str:
-    return re.sub(r'(ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV)(\d{4})', r'\1-\2', code)
+    return re.sub(r'(ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)(\d{4})', r'\1-\2', code)
 
 
 def _bus_start_from_code(code: str, series: str):
