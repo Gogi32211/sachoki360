@@ -2357,6 +2357,174 @@ function VendorChart({ scope, perPax }) {
   );
 }
 
+// ── DEBTS VIEW (invoices still to arrive, and still to pay) ───
+const PHASES = {
+  1: { label: 'ფაზა 1', hint: 'ინვოისები ჯერ არ მოსულა', cls: 'bg-red-100 text-red-700' },
+  2: { label: 'ფაზა 2', hint: 'ინვოისები მოვიდა, გადასახდელია', cls: 'bg-amber-100 text-amber-700' },
+  3: { label: 'ფაზა 3', hint: 'სრულად დახურულია', cls: 'bg-emerald-100 text-emerald-700' },
+};
+
+function DebtsView() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [phaseFilter, setPhaseFilter] = useState('open');
+  const [expanded, setExpanded] = useState({});
+
+  const load = () => fetch(`${API}/tour-debts`).then(r => r.json())
+    .then(d => { setRows(d); setLoading(false); })
+    .catch(() => setLoading(false));
+  useEffect(() => { load(); }, []);
+
+  const doSync = () => {
+    setSyncing(true);
+    fetch(`${API}/sync-debts`, {method:'POST'}).then(() => load())
+      .catch(() => {}).finally(() => setSyncing(false));
+  };
+
+  const fmtU = n => (n || n === 0) ? '$' + Math.round(n).toLocaleString() : '—';
+  // The working view: anything still un-invoiced or still unpaid.
+  const isOpen = r => (r.awaited_usd || 0) > 0 || (r.due_usd || 0) > 0;
+  const shown = rows.filter(r =>
+    phaseFilter === 'all' ? true :
+    phaseFilter === 'open' ? isOpen(r) :
+    String(r.phase) === phaseFilter);
+
+  const sum = k => shown.reduce((a, r) => a + (r[k] || 0), 0);
+  const cnt = k => shown.reduce((a, r) => a + (r[k] || 0), 0);
+  const byPhase = p => rows.filter(r => r.phase === p).length;
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <h2 className="font-bold text-lg text-gray-700">🧾 დავალიანებები</h2>
+        <button onClick={doSync} disabled={syncing}
+          className="ml-auto px-3 py-1.5 bg-white border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+          {syncing ? 'განახლება…' : '🔄 განახლება'}
+        </button>
+      </div>
+
+      {loading ? <Spinner/> : (
+      <>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-red-600 mb-0.5">ინვოისი ჯერ არ მიგვიღია ($)</div>
+            <div className="text-2xl font-bold text-red-700">{fmtU(sum('awaited_usd'))}</div>
+            <div className="text-xs text-red-500 mt-1">{cnt('awaited_count')} პოზიცია</div>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-amber-600 mb-0.5">გადასახდელი ($)</div>
+            <div className="text-2xl font-bold text-amber-700">{fmtU(sum('due_usd'))}</div>
+            <div className="text-xs text-amber-500 mt-1">{cnt('due_count')} ინვოისი</div>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-emerald-600 mb-0.5">გადახდილი ($)</div>
+            <div className="text-2xl font-bold text-emerald-700">{fmtU(sum('paid_usd'))}</div>
+            <div className="text-xs text-emerald-500 mt-1">
+              ფაზა 1: {byPhase(1)} · ფაზა 2: {byPhase(2)} · ფაზა 3: {byPhase(3)}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {[['open','⚠️ ღია'],['1','ფაზა 1'],['2','ფაზა 2'],['3','ფაზა 3'],['all','ყველა']].map(([v,l]) => (
+            <button key={v} onClick={() => setPhaseFilter(v)}
+              className={`px-3 py-1.5 rounded text-sm border ${phaseFilter===v ? 'bg-slate-700 text-white border-slate-700' : 'bg-white hover:bg-gray-50'}`}>{l}</button>
+          ))}
+        </div>
+
+        {shown.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm p-10 text-center text-gray-400">
+            <div className="text-4xl mb-2">✅</div>
+            <div className="text-sm">ამ ფილტრით დავალიანება არ არის</div>
+          </div>
+        ) : (
+        <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-2 py-2 w-4"></th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">ტური</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">ფაზა</th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სულ ინვოისი</th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-red-600">არ მიგვიღია</th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-amber-600">გადასახდელი</th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-600">გადახდილი</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map(r => {
+                const open = !!expanded[r.tour_code];
+                const ph = PHASES[r.phase];
+                const lines = r.lines || [];
+                return (
+                  <React.Fragment key={r.tour_code}>
+                    <tr className={`border-b cursor-pointer ${open ? 'bg-slate-50' : 'hover:bg-gray-50'}`}
+                        onClick={() => setExpanded(e => ({...e, [r.tour_code]: !open}))}>
+                      <td className="px-2 py-2 text-gray-400 text-center">{lines.length ? (open ? '▾' : '▸') : ''}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: r.color}}/>
+                          <span className="font-bold text-gray-800">{r.tour_code}</span>
+                        </div>
+                        {r.guide && <div className="text-xs text-gray-400">🧭 {r.guide}</div>}
+                      </td>
+                      <td className="px-3 py-2">
+                        {ph ? <span className={`px-2 py-0.5 rounded text-xs font-medium ${ph.cls}`} title={ph.hint}>{ph.label}</span>
+                            : <span className="text-gray-300 text-xs">—</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-600">{fmtU(r.invoiced_usd)}</td>
+                      <td className={`px-3 py-2 text-right font-semibold ${(r.awaited_usd||0) > 0 ? 'text-red-600' : 'text-gray-300'}`}>
+                        {(r.awaited_usd||0) > 0 ? fmtU(r.awaited_usd) : '—'}
+                      </td>
+                      <td className={`px-3 py-2 text-right font-semibold ${(r.due_usd||0) > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
+                        {(r.due_usd||0) > 0 ? fmtU(r.due_usd) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right text-emerald-700">{fmtU(r.paid_usd)}</td>
+                    </tr>
+                    {open && lines.length > 0 && (
+                      <tr><td colSpan="7" className="p-0">
+                        <div className="bg-slate-50 px-6 py-2 border-b">
+                          {lines.map((l, i) => (
+                            <div key={i} className="flex items-center gap-2 py-0.5 text-xs">
+                              <span className={`px-1.5 py-0.5 rounded whitespace-nowrap ${l.received ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                {l.received ? 'ინვოისი მოვიდა' : 'ინვოისი არ მოსულა'}
+                              </span>
+                              <span className="text-gray-700">{l.name}</span>
+                              {l.note && <span className="text-gray-400">({l.note})</span>}
+                              <span className="ml-auto font-semibold text-gray-700">{fmtU(l.usd)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td></tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-50 border-t-2 border-slate-200 font-bold">
+                <td className="px-3 py-2.5 text-xs text-gray-500" colSpan="3">ჯამი ({shown.length} ტური)</td>
+                <td className="px-3 py-2.5 text-right text-gray-700">{fmtU(sum('invoiced_usd'))}</td>
+                <td className="px-3 py-2.5 text-right text-red-700">{fmtU(sum('awaited_usd'))}</td>
+                <td className="px-3 py-2.5 text-right text-amber-700">{fmtU(sum('due_usd'))}</td>
+                <td className="px-3 py-2.5 text-right text-emerald-700">{fmtU(sum('paid_usd'))}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div className="px-3 py-2 bg-amber-50 border-t text-xs text-amber-700">
+            ბალანსის ფაილებიდან: <strong>A1</strong> — ფაზა · <strong>E სვეტი</strong> — ინვოისის თანხა
+            (გამწვანებული = მიღებული და შემოწმებული, თეთრი = ჯერ არ მოსულა) ·
+            <strong> F სვეტი</strong> — გამწვანებული „ok" = გადახდილი, ყვითელი = გადასახდელი.
+          </div>
+        </div>
+        )}
+      </>
+      )}
+    </div>
+  );
+}
+
 function SettingsView() {
   const EMPTY = {vendor_name:'', vendor_type:'hotel', timing:'after', days_offset:7, notes:'', unit_price:0, currency:'GEL', series_prices:''};
   const [terms, setTerms] = useState([]);
@@ -2550,6 +2718,7 @@ function App() {
     {id:"cashflow",   label:"💵 ავანსი/ბალანსი"},
     {id:"profit",     label:"💰 მოგება"},
     {id:"stats",      label:"📊 სტატისტიკა 2026"},
+    {id:"debts",      label:"🧾 დავალიანებები"},
     {id:"settings",   label:"⚙️ პარამეტრები"},
   ];
 
@@ -2593,6 +2762,7 @@ function App() {
         {tab === "cashflow"   && <CashFlowView/>}
         {tab === "profit"     && <ProfitView/>}
         {tab === "stats"      && <StatsView/>}
+        {tab === "debts"      && <DebtsView/>}
         {tab === "settings"   && <SettingsView/>}
       </main>
     </div>

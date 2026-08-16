@@ -89,6 +89,18 @@ def init_db():
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL DEFAULT ''
             );
+            CREATE TABLE IF NOT EXISTS tour_debts (
+                tour_code     TEXT PRIMARY KEY,
+                phase         INTEGER,
+                invoiced_usd  REAL DEFAULT 0,
+                received_usd  REAL DEFAULT 0,
+                awaited_usd   REAL DEFAULT 0,
+                paid_usd      REAL DEFAULT 0,
+                due_usd       REAL DEFAULT 0,
+                awaited_count INTEGER DEFAULT 0,
+                due_count     INTEGER DEFAULT 0,
+                lines         TEXT DEFAULT '[]'
+            );
             CREATE TABLE IF NOT EXISTS tour_profit (
                 tour_code        TEXT PRIMARY KEY,
                 pax              TEXT,
@@ -965,6 +977,69 @@ def sync_tour_profit(data: dict) -> int:
                         print(f"[profit_sync] could not auto-add {code}: {e}")
             count += 1
     return count
+
+
+def sync_tour_debts(data: dict) -> int:
+    """Upsert per-tour invoice/payment state parsed from the balance workbooks."""
+    if not data:
+        return 0
+    count = 0
+    with get_db() as conn:
+        for code, d in data.items():
+            conn.execute("""
+                INSERT INTO tour_debts
+                    (tour_code, phase, invoiced_usd, received_usd, awaited_usd,
+                     paid_usd, due_usd, awaited_count, due_count, lines)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(tour_code) DO UPDATE SET
+                    phase=excluded.phase,
+                    invoiced_usd=excluded.invoiced_usd,
+                    received_usd=excluded.received_usd,
+                    awaited_usd=excluded.awaited_usd,
+                    paid_usd=excluded.paid_usd,
+                    due_usd=excluded.due_usd,
+                    awaited_count=excluded.awaited_count,
+                    due_count=excluded.due_count,
+                    lines=excluded.lines
+            """, (code, d.get('phase'), d.get('invoiced_usd', 0), d.get('received_usd', 0),
+                  d.get('awaited_usd', 0), d.get('paid_usd', 0), d.get('due_usd', 0),
+                  d.get('awaited_count', 0), d.get('due_count', 0),
+                  _json.dumps(d.get('lines') or [])))
+            count += 1
+    return count
+
+
+def get_tour_debts() -> list:
+    """Per-tour invoice and payment state, newest tours last."""
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT d.*, t.series AS t_series, t.bus_start AS t_start,
+                   t.bus_end AS t_end, t.guide AS t_guide
+            FROM tour_debts d
+            LEFT JOIN tours t ON t.code = d.tour_code
+        """).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            code = r['tour_code']
+            series = r['t_series'] or code.split('-')[0]
+            bs, be = r['t_start'], r['t_end']
+            if not (bs and be):
+                bs, be = _approx_dates_from_code(code)
+            d['series'] = series
+            d['bus_start'], d['bus_end'] = bs, be
+            d['guide'] = r['t_guide'] or ''
+            for k in ('t_series', 't_start', 't_end', 't_guide'):
+                d.pop(k, None)
+            d['status'] = get_tour_status(bs, be) if (bs and be) else 'done'
+            d['color'] = SERIES.get(series, {}).get('color', '#888')
+            try:
+                d['lines'] = _json.loads(d.get('lines') or '[]')
+            except Exception:
+                d['lines'] = []
+            result.append(d)
+        result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
+        return result
 
 
 def _approx_dates_from_code(code: str):
