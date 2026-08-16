@@ -1016,6 +1016,119 @@ def sync_tour_debts(data: dict) -> int:
     return count
 
 
+# What each cost scales with, so tours of different length and size can be
+# compared and a missing one predicted. Mirrors the stats view's basis.
+_COST_BASIS = {
+    'restaurant': ('pax', 'days'), 'attraction': ('pax', 'days'),
+    'armenia': ('pax', None),      'hotel': ('rooms', 'nights'),
+    'bus': (None, 'days'), 'guide': (None, 'days'),
+    'staff': (None, 'days'), 'other': (None, 'days'),
+}
+_ROOM_RE = _re.compile(r'(\d+)\s*(?:TG|SL|SG|T|S|D|K)', _re.IGNORECASE)
+_ESTIMATE_MIN_SAMPLE = 4
+
+
+def _pax_of(pax_str):
+    m = _re.match(r'\s*(\d+)', str(pax_str or ''))
+    return int(m.group(1)) if m else None
+
+
+def _rooms_of(rooms_str, pax=None):
+    """Rooms booked, falling back to roughly two guests per room.
+
+    Hotels are the largest single cost, so dropping a tour whose room string is
+    missing would skew the model badly; the estimate keeps it on the same footing
+    as the tours that do record it."""
+    total = sum(int(m.group(1)) for m in _ROOM_RE.finditer(str(rooms_str or '')))
+    if total:
+        return total
+    return round(pax / 2) if pax else None
+
+
+def _divisor(cat, pax, rooms, days, nights):
+    per, span = _COST_BASIS.get(cat, ('pax', None))
+    d = 1
+    if per == 'pax':
+        if not pax:
+            return None
+        d *= pax
+    elif per == 'rooms':
+        if not rooms:
+            return None
+        d *= rooms
+    if span:
+        n = days if span == 'days' else nights
+        if not n:
+            return None
+        d *= n
+    return d
+
+
+def _median(vals):
+    if not vals:
+        return None
+    v = sorted(vals)
+    mid = len(v) // 2
+    return v[mid] if len(v) % 2 else (v[mid - 1] + v[mid]) / 2
+
+
+def _cost_model(conn) -> dict:
+    """Unit costs learned from tours whose invoices are all in.
+
+    Returns {series: {component: cost per unit}} with a '_all' entry standing in
+    for series with too few closed tours to have a median of their own.
+    """
+    rows = conn.execute("""
+        SELECT p.tour_code, p.pax, p.components, t.series, t.rooms
+        FROM tour_profit p
+        LEFT JOIN tours t ON t.code = p.tour_code
+        LEFT JOIN tour_debts d ON d.tour_code = p.tour_code
+        WHERE p.components IS NOT NULL AND (d.phase IS NULL OR d.phase = 3)
+    """).fetchall()
+    samples = defaultdict(lambda: defaultdict(list))
+    for r in rows:
+        series = r['series'] or (r['tour_code'] or '').split('-')[0]
+        spec = SERIES.get(series)
+        if not spec:
+            continue
+        days = spec['duration']
+        nights = sum(1 for n in spec['nights'].values()
+                     if (n.get('hotel') or '').strip() not in ('', '—'))
+        pax = _pax_of(r['pax'])
+        rooms = _rooms_of(r['rooms'], pax)
+        try:
+            comps = _json.loads(r['components'] or '{}')
+        except Exception:
+            continue
+        for cat, usd in comps.items():
+            if not usd or usd <= 0:
+                continue
+            div = _divisor(cat, pax, rooms, days, nights)
+            if div:
+                samples[series][cat].append(usd / div)
+                samples['_all'][cat].append(usd / div)
+    model = {}
+    for series, cats in samples.items():
+        model[series] = {c: _median(v) for c, v in cats.items()
+                         if series == '_all' or len(v) >= _ESTIMATE_MIN_SAMPLE}
+    return model
+
+
+def _expected_cost(model, series, pax, rooms, days, nights):
+    """What a tour of this shape usually costs in total, or None if unknowable."""
+    rates = {**model.get('_all', {}), **model.get(series, {})}
+    if not rates or not days:
+        return None
+    total, priced = 0.0, 0
+    for cat, rate in rates.items():
+        div = _divisor(cat, pax, rooms, days, nights)
+        if div and rate:
+            total += rate * div
+            priced += 1
+    # Too few components priced means the total would be missing real costs.
+    return round(total, 2) if priced >= 4 else None
+
+
 def _debt_by_date(items: list, days: list) -> list:
     """Spread a tour's invoice lines over the dates they were incurred on.
 
@@ -1066,6 +1179,10 @@ def get_tour_debts() -> list:
             "SELECT tour_code, date, city, hotel, lunch, dinner FROM daily_log ORDER BY date"
         ).fetchall():
             days_by_tour[r['tour_code']].append(dict(r))
+        model = _cost_model(conn)
+        shape = {r['code']: (r['pax'], r['rooms']) for r in conn.execute(
+            "SELECT t.code, t.rooms, p.pax FROM tours t "
+            "LEFT JOIN tour_profit p ON p.tour_code = t.code").fetchall()}
         result = []
         for r in rows:
             d = dict(r)
@@ -1091,6 +1208,25 @@ def get_tour_debts() -> list:
                 items = []
             d.pop('items', None)
             d['by_date'] = _debt_by_date(items, days_by_tour.get(code, []))
+
+            # While invoices are still outstanding the sheet understates the tour.
+            # Estimate the finished cost from tours that are already closed, so a
+            # phase 1 tour shows roughly what it will owe rather than only what
+            # has been billed so far.
+            spec = SERIES.get(series)
+            expected = None
+            if spec:
+                pax_s, rooms_s = shape.get(code, (None, None))
+                nights = sum(1 for n in spec['nights'].values()
+                             if (n.get('hotel') or '').strip() not in ('', '—'))
+                pax_n = _pax_of(pax_s)
+                expected = _expected_cost(model, series, pax_n, _rooms_of(rooms_s, pax_n),
+                                          spec['duration'], nights)
+            d['expected_usd'] = expected
+            # Only meaningful while invoices are missing; a closed tour needs none.
+            d['estimated_missing_usd'] = (
+                round(max(0.0, expected - (d.get('invoiced_usd') or 0)), 2)
+                if expected is not None and d.get('phase') == 1 else 0.0)
             result.append(d)
         result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
         return result

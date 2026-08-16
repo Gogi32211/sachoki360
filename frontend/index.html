@@ -2439,6 +2439,8 @@ function DebtsView() {
       // Counts describe whole invoices, so they only hold for a complete tour.
       awaited_count: full ? r.awaited_count : 0,
       due_count: full ? r.due_count : 0,
+      // A tour still running hasn't finished running up costs, so don't project.
+      estimated_missing_usd: full ? r.estimated_missing_usd : 0,
       partial: !full};
   };
 
@@ -2462,7 +2464,7 @@ function DebtsView() {
 
       {loading ? <Spinner/> : (
       <>
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-4 gap-3 mb-4">
           <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
             <div className="text-xs text-red-600 mb-0.5">ინვოისი ჯერ არ მიგვიღია ($)</div>
             <div className="text-2xl font-bold text-red-700">{fmtU(sum('awaited_usd'))}</div>
@@ -2472,6 +2474,11 @@ function DebtsView() {
             <div className="text-xs text-amber-600 mb-0.5">გადასახდელი ($)</div>
             <div className="text-2xl font-bold text-amber-700">{fmtU(sum('due_usd'))}</div>
             <div className="text-xs text-amber-500 mt-1">{cnt('due_count')} ინვოისი</div>
+          </div>
+          <div className="bg-violet-50 border border-violet-200 rounded-lg px-4 py-3">
+            <div className="text-xs text-violet-600 mb-0.5">სავარაუდოდ ჯერ არ გამოწერილი ($)</div>
+            <div className="text-2xl font-bold text-violet-700">{fmtU(sum('estimated_missing_usd'))}</div>
+            <div className="text-xs text-violet-500 mt-1">დახურული ტურების სტატისტიკით</div>
           </div>
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
             <div className="text-xs text-emerald-600 mb-0.5">გადახდილი ($)</div>
@@ -2515,6 +2522,9 @@ function DebtsView() {
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">ფაზა</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სულ ინვოისი</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-red-600">არ მიგვიღია</th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-violet-600 leading-tight">
+                  <div>ჯერ არ გამოწერილი</div><div className="font-normal text-gray-400">სავარაუდო</div>
+                </th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-amber-600">გადასახდელი</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-600">გადახდილი</th>
               </tr>
@@ -2546,13 +2556,17 @@ function DebtsView() {
                       <td className={`px-3 py-2 text-right font-semibold ${(r.awaited_usd||0) > 0 ? 'text-red-600' : 'text-gray-300'}`}>
                         {(r.awaited_usd||0) > 0 ? fmtU(r.awaited_usd) : '—'}
                       </td>
+                      <td className={`px-3 py-2 text-right ${(r.estimated_missing_usd||0) > 0 ? 'text-violet-600 font-semibold' : 'text-gray-300'}`}
+                          title={r.expected_usd ? `მოსალოდნელი სრული ხარჯი ${fmtU(r.expected_usd)}` : ''}>
+                        {(r.estimated_missing_usd||0) > 0 ? '≈ ' + fmtU(r.estimated_missing_usd) : '—'}
+                      </td>
                       <td className={`px-3 py-2 text-right font-semibold ${(r.due_usd||0) > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
                         {(r.due_usd||0) > 0 ? fmtU(r.due_usd) : '—'}
                       </td>
                       <td className="px-3 py-2 text-right text-emerald-700">{fmtU(r.paid_usd)}</td>
                     </tr>
                     {open && lines.length > 0 && (
-                      <tr><td colSpan="7" className="p-0">
+                      <tr><td colSpan="8" className="p-0">
                         <div className="bg-slate-50 px-6 py-2 border-b">
                           {lines.map((l, i) => (
                             <div key={i} className="flex items-center gap-2 py-0.5 text-xs">
@@ -2576,6 +2590,7 @@ function DebtsView() {
                 <td className="px-3 py-2.5 text-xs text-gray-500" colSpan="3">ჯამი ({shown.length} ტური)</td>
                 <td className="px-3 py-2.5 text-right text-gray-700">{fmtU(sum('invoiced_usd'))}</td>
                 <td className="px-3 py-2.5 text-right text-red-700">{fmtU(sum('awaited_usd'))}</td>
+                <td className="px-3 py-2.5 text-right text-violet-700">{fmtU(sum('estimated_missing_usd'))}</td>
                 <td className="px-3 py-2.5 text-right text-amber-700">{fmtU(sum('due_usd'))}</td>
                 <td className="px-3 py-2.5 text-right text-emerald-700">{fmtU(sum('paid_usd'))}</td>
               </tr>
@@ -2589,6 +2604,8 @@ function DebtsView() {
             ფაზა 3 = მიღებულიც და სრულად გადახდილიც.
             <strong> მდგომარეობით</strong> — ხარჯი დღეებზეა გაწერილი (სასტუმრო ღამეებზე, კვება იმ დღეს),
             ამიტომ თარიღზე გადამდები ტურიდან მხოლოდ გაწეული ნაწილი ითვლება.
+            <strong> ჯერ არ გამოწერილი</strong> — ფაზა 1-ის ტურებზე შეფასება დახურული ტურების სტატისტიკიდან:
+            კვება და ატრაქციონები ითვლება 1 სტუმარზე, სასტუმრო 1 ოთახზე, ავტობუსი და გიდი ტურზე.
           </div>
         </div>
         )}
