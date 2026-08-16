@@ -110,9 +110,12 @@ def _parse_worksheet(ws):
         f_shade = _shade(status_cell)
         status_text = str(status_cell.value or '').strip()
 
-        received = e_shade == 'green'
+        # "ok" in a green F cell means settled — that is the reliable marker.
         paid = f_shade == 'green' and bool(_OK_RE.search(status_text))
-        due = f_shade == 'yellow' or (not paid and received)
+        # An invoice that has been paid was necessarily received, whatever colour
+        # E carries: older tours predate the convention of greening it.
+        received = paid or e_shade == 'green'
+        due = (not paid) and (f_shade == 'yellow' or received)
 
         out['invoiced_usd'] += usd
         if received:
@@ -136,6 +139,22 @@ def _parse_worksheet(ws):
 
     if not code:
         return None, None
+
+    # A1 states where the tour stands, and it outranks the cell colouring: a tour
+    # marked phase 2 or 3 has every invoice in hand even where E was never
+    # greened, and phase 3 is settled in full.
+    if out['phase'] in (2, 3):
+        out['received_usd'] = out['invoiced_usd']
+        out['awaited_usd'] = 0.0
+        out['awaited_count'] = 0
+        for line in out['lines']:
+            line['received'] = True
+    if out['phase'] == 3:
+        out['paid_usd'] = out['invoiced_usd']
+        out['due_usd'] = 0.0
+        out['due_count'] = 0
+        out['lines'] = []
+
     for k in ('invoiced_usd', 'received_usd', 'awaited_usd', 'paid_usd', 'due_usd'):
         out[k] = round(out[k], 2)
     out['lines'].sort(key=lambda l: -l['usd'])
