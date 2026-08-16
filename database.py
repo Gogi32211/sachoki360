@@ -1114,19 +1114,43 @@ def _cost_model(conn) -> dict:
     return model
 
 
-def _expected_cost(model, series, pax, rooms, days, nights):
-    """What a tour of this shape usually costs in total, or None if unknowable."""
+def _expected_cost(model, series, pax, rooms, days, nights, only=None):
+    """What a tour of this shape usually costs, or None if unknowable.
+
+    `only` restricts the sum to certain components, which is how the missing
+    ones get priced without the rest of the estimate drifting from the tour's
+    own invoices.
+    """
     rates = {**model.get('_all', {}), **model.get(series, {})}
     if not rates or not days:
         return None
     total, priced = 0.0, 0
     for cat, rate in rates.items():
+        if only is not None and cat not in only:
+            continue
         div = _divisor(cat, pax, rooms, days, nights)
         if div and rate:
             total += rate * div
             priced += 1
+    if only is not None:
+        return round(total, 2)
     # Too few components priced means the total would be missing real costs.
     return round(total, 2) if priced >= 4 else None
+
+
+def _unbilled_cost(model, series, comps, pax, rooms, days, nights):
+    """Value of the cost components the balance sheet carries nothing for.
+
+    A missing invoice shows up as a whole component absent from the tab — no
+    hotel line at all, no bus line at all — so only those are priced. Comparing
+    the tour's total against the model instead would report ordinary variance
+    between a tour and the average as though it were a missing invoice.
+    """
+    rates = {**model.get('_all', {}), **model.get(series, {})}
+    missing = [c for c in rates if not (comps or {}).get(c)]
+    if not missing:
+        return 0.0
+    return _expected_cost(model, series, pax, rooms, days, nights, only=set(missing)) or 0.0
 
 
 def _debt_by_date(items: list, days: list) -> list:
@@ -1180,9 +1204,14 @@ def get_tour_debts() -> list:
         ).fetchall():
             days_by_tour[r['tour_code']].append(dict(r))
         model = _cost_model(conn)
-        shape = {r['code']: (r['pax'], r['rooms']) for r in conn.execute(
-            "SELECT t.code, t.rooms, p.pax FROM tours t "
-            "LEFT JOIN tour_profit p ON p.tour_code = t.code").fetchall()}
+        shape = {}
+        for r in conn.execute("SELECT t.code, t.rooms, p.pax, p.components FROM tours t "
+                              "LEFT JOIN tour_profit p ON p.tour_code = t.code").fetchall():
+            try:
+                comps = _json.loads(r['components'] or '{}')
+            except Exception:
+                comps = {}
+            shape[r['code']] = (r['pax'], r['rooms'], comps)
         result = []
         for r in rows:
             d = dict(r)
@@ -1214,19 +1243,21 @@ def get_tour_debts() -> list:
             # phase 1 tour shows roughly what it will owe rather than only what
             # has been billed so far.
             spec = SERIES.get(series)
-            expected = None
+            expected = unbilled = None
             if spec:
-                pax_s, rooms_s = shape.get(code, (None, None))
+                pax_s, rooms_s, comps = shape.get(code, (None, None, {}))
                 nights = sum(1 for n in spec['nights'].values()
                              if (n.get('hotel') or '').strip() not in ('', '—'))
                 pax_n = _pax_of(pax_s)
-                expected = _expected_cost(model, series, pax_n, _rooms_of(rooms_s, pax_n),
+                rooms_n = _rooms_of(rooms_s, pax_n)
+                expected = _expected_cost(model, series, pax_n, rooms_n,
+                                          spec['duration'], nights)
+                unbilled = _unbilled_cost(model, series, comps, pax_n, rooms_n,
                                           spec['duration'], nights)
             d['expected_usd'] = expected
-            # Only meaningful while invoices are missing; a closed tour needs none.
+            # Only while invoices are outstanding; later phases have them all.
             d['estimated_missing_usd'] = (
-                round(max(0.0, expected - (d.get('invoiced_usd') or 0)), 2)
-                if expected is not None and d.get('phase') == 1 else 0.0)
+                round(unbilled, 2) if unbilled and d.get('phase') == 1 else 0.0)
             result.append(d)
         result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
         return result
