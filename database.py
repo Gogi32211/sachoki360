@@ -99,7 +99,8 @@ def init_db():
                 due_usd       REAL DEFAULT 0,
                 awaited_count INTEGER DEFAULT 0,
                 due_count     INTEGER DEFAULT 0,
-                lines         TEXT DEFAULT '[]'
+                lines         TEXT DEFAULT '[]',
+                items         TEXT DEFAULT '[]'
             );
             CREATE TABLE IF NOT EXISTS tour_profit (
                 tour_code        TEXT PRIMARY KEY,
@@ -124,6 +125,10 @@ def init_db():
                 conn.execute(f"ALTER TABLE tour_profit ADD COLUMN {col} {defn}")
             except Exception:
                 pass
+        try:
+            conn.execute("ALTER TABLE tour_debts ADD COLUMN items TEXT DEFAULT '[]'")
+        except Exception:
+            pass
         # Migrate: add rooms / guide columns to tours if missing
         for col in ("rooms", "guide"):
             try:
@@ -989,8 +994,8 @@ def sync_tour_debts(data: dict) -> int:
             conn.execute("""
                 INSERT INTO tour_debts
                     (tour_code, phase, invoiced_usd, received_usd, awaited_usd,
-                     paid_usd, due_usd, awaited_count, due_count, lines)
-                VALUES (?,?,?,?,?,?,?,?,?,?)
+                     paid_usd, due_usd, awaited_count, due_count, lines, items)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(tour_code) DO UPDATE SET
                     phase=excluded.phase,
                     invoiced_usd=excluded.invoiced_usd,
@@ -1000,13 +1005,51 @@ def sync_tour_debts(data: dict) -> int:
                     due_usd=excluded.due_usd,
                     awaited_count=excluded.awaited_count,
                     due_count=excluded.due_count,
-                    lines=excluded.lines
+                    lines=excluded.lines,
+                    items=excluded.items
             """, (code, d.get('phase'), d.get('invoiced_usd', 0), d.get('received_usd', 0),
                   d.get('awaited_usd', 0), d.get('paid_usd', 0), d.get('due_usd', 0),
                   d.get('awaited_count', 0), d.get('due_count', 0),
-                  _json.dumps(d.get('lines') or [])))
+                  _json.dumps(d.get('lines') or []),
+                  _json.dumps(d.get('items') or [])))
             count += 1
     return count
+
+
+def _debt_by_date(items: list, days: list) -> list:
+    """Spread a tour's invoice lines over the dates they were incurred on.
+
+    Same tracing the VAT split uses: a hotel belongs to the nights spent there, a
+    meal to the day it was eaten, and anything that runs all tour spreads across
+    it. Lets a total be taken as at a date part-way through a tour instead of
+    counting the whole tour or none of it.
+    """
+    if not days or not items:
+        return []
+    buckets = {}
+    for it in items:
+        usd = it.get('usd') or 0
+        if not usd:
+            continue
+        dates = _item_dates(it, days)
+        if not dates:
+            continue
+        each = usd / len(dates)
+        for d in dates:
+            b = buckets.setdefault(d, {'date': d, 'invoiced': 0.0, 'awaited': 0.0,
+                                       'paid': 0.0, 'due': 0.0})
+            b['invoiced'] += each
+            if not it.get('received'):
+                b['awaited'] += each
+            if it.get('paid'):
+                b['paid'] += each
+            elif it.get('due'):
+                b['due'] += each
+    out = []
+    for d in sorted(buckets):
+        b = buckets[d]
+        out.append({k: (round(v, 2) if k != 'date' else v) for k, v in b.items()})
+    return out
 
 
 def get_tour_debts() -> list:
@@ -1018,6 +1061,11 @@ def get_tour_debts() -> list:
             FROM tour_debts d
             LEFT JOIN tours t ON t.code = d.tour_code
         """).fetchall()
+        days_by_tour = defaultdict(list)
+        for r in conn.execute(
+            "SELECT tour_code, date, city, hotel, lunch, dinner FROM daily_log ORDER BY date"
+        ).fetchall():
+            days_by_tour[r['tour_code']].append(dict(r))
         result = []
         for r in rows:
             d = dict(r)
@@ -1037,6 +1085,12 @@ def get_tour_debts() -> list:
                 d['lines'] = _json.loads(d.get('lines') or '[]')
             except Exception:
                 d['lines'] = []
+            try:
+                items = _json.loads(d.get('items') or '[]')
+            except Exception:
+                items = []
+            d.pop('items', None)
+            d['by_date'] = _debt_by_date(items, days_by_tour.get(code, []))
             result.append(d)
         result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
         return result

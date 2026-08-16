@@ -2418,10 +2418,33 @@ function DebtsView() {
     phaseFilter === 'all' ? true :
     phaseFilter === 'open' ? isOpen(r) :
     String(r.phase) === phaseFilter;
-  // A missing end date means the tour's dates are unknown, so it is never hidden.
-  const finishedBy = r => !asOf || !r.bus_end || r.bus_end <= asOf;
-  const shown = rows.filter(r => byPhaseFilter(r) && finishedBy(r));
-  const laterCount = rows.filter(r => byPhaseFilter(r) && !finishedBy(r)).length;
+
+  // A tour's costs are dated day by day, so a cutoff part-way through one counts
+  // only the nights and meals up to it rather than the whole tour or none of it.
+  const asAt = r => {
+    if (!asOf) return r;
+    const buckets = (r.by_date || []).filter(b => b.date <= asOf);
+    if (!buckets.length) {
+      // No dated costs yet — nothing of this tour had been incurred by then.
+      return (r.bus_start && r.bus_start > asOf)
+        ? null
+        : {...r, invoiced_usd: 0, awaited_usd: 0, due_usd: 0, paid_usd: 0,
+           awaited_count: 0, due_count: 0, lines: []};
+    }
+    const sum = k => buckets.reduce((a, b) => a + (b[k] || 0), 0);
+    const full = (r.by_date || []).length === buckets.length;
+    return {...r,
+      invoiced_usd: sum('invoiced'), awaited_usd: sum('awaited'),
+      due_usd: sum('due'), paid_usd: sum('paid'),
+      // Counts describe whole invoices, so they only hold for a complete tour.
+      awaited_count: full ? r.awaited_count : 0,
+      due_count: full ? r.due_count : 0,
+      partial: !full};
+  };
+
+  const shown = rows.filter(byPhaseFilter).map(asAt).filter(Boolean)
+                    .filter(r => !asOf || (r.invoiced_usd || 0) > 0);
+  const laterCount = rows.filter(byPhaseFilter).length - shown.length;
 
   const sum = k => shown.reduce((a, r) => a + (r[k] || 0), 0);
   const cnt = k => shown.reduce((a, r) => a + (r[k] || 0), 0);
@@ -2474,7 +2497,7 @@ function DebtsView() {
             ყველა თარიღი
           </button>
           {asOf && laterCount > 0 &&
-            <span className="text-xs text-gray-400">({laterCount} ტური ამ თარიღის შემდეგ სრულდება — არ ითვლება)</span>}
+            <span className="text-xs text-gray-400">({laterCount} ტური ამ თარიღამდე არ დაწყებულა)</span>}
         </div>
 
         {shown.length === 0 ? (
@@ -2510,6 +2533,8 @@ function DebtsView() {
                         <div className="flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: SERIES_COLORS[r.series] || r.color || '#888'}}/>
                           <span className="font-bold text-gray-800">{r.tour_code}</span>
+                          {r.partial && <span className="text-[10px] text-amber-600 bg-amber-50 rounded px-1"
+                                              title="ტური ამ თარიღზე ჯერ მიმდინარეობდა — ითვლება მხოლოდ გაწეული ნაწილი">ნაწილობრივ</span>}
                         </div>
                         {r.guide && <div className="text-xs text-gray-400">🧭 {r.guide}</div>}
                       </td>
@@ -2562,7 +2587,8 @@ function DebtsView() {
             <strong> F სვეტი</strong> — გამწვანებული „ok" = გადახდილი, ყვითელი = გადასახდელი.
             <strong> ფაზა</strong> ფერზე მაღლა დგას: ფაზა 2 = ყველა ინვოისი მიღებულია,
             ფაზა 3 = მიღებულიც და სრულად გადახდილიც.
-            <strong> მდგომარეობით</strong> — ითვლება მხოლოდ ის ტურები, რომლებიც ამ თარიღისთვის უკვე დასრულდა.
+            <strong> მდგომარეობით</strong> — ხარჯი დღეებზეა გაწერილი (სასტუმრო ღამეებზე, კვება იმ დღეს),
+            ამიტომ თარიღზე გადამდები ტურიდან მხოლოდ გაწეული ნაწილი ითვლება.
           </div>
         </div>
         )}

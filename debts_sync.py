@@ -21,7 +21,8 @@ import re
 import requests
 from openpyxl import load_workbook
 
-from profit_sync import SHEET_IDS, TOUR_CODE_RE, _norm_code, _num, _SUMMARY_KEYS
+from profit_sync import (SHEET_IDS, TOUR_CODE_RE, _norm_code, _num,
+                         _SUMMARY_KEYS, _categorize)
 
 PHASE_RE = re.compile(r'(?:ფაზა|phase)\s*([123])', re.IGNORECASE)
 _OK_RE = re.compile(r'\bok\b', re.IGNORECASE)
@@ -88,6 +89,7 @@ def _parse_worksheet(ws):
         'awaited_count': 0,
         'due_count': 0,
         'lines': [],              # the outstanding ones, for the detail view
+        'items': [],              # every line, so the total can be dated
     }
 
     for row in ws.iter_rows(min_col=1, max_col=STATUS_COL):
@@ -129,6 +131,17 @@ def _parse_worksheet(ws):
             out['due_usd'] += usd
             out['due_count'] += 1
 
+        # Categorised so the itinerary can date it: a hotel belongs to the nights
+        # spent there, a meal to the day it was eaten.
+        out['items'].append({
+            'name': name,
+            'cat': _categorize(name) or 'other',
+            'usd': round(usd, 2),
+            'received': received,
+            'paid': paid,
+            'due': due,
+        })
+
         if not paid:
             out['lines'].append({
                 'name': name,
@@ -149,11 +162,16 @@ def _parse_worksheet(ws):
         out['awaited_count'] = 0
         for line in out['lines']:
             line['received'] = True
+        for item in out['items']:
+            item['received'] = True
     if out['phase'] == 3:
         out['paid_usd'] = out['invoiced_usd']
         out['due_usd'] = 0.0
         out['due_count'] = 0
         out['lines'] = []
+        for item in out['items']:
+            item['paid'] = True
+            item['due'] = False
 
     for k in ('invoiced_usd', 'received_usd', 'awaited_usd', 'paid_usd', 'due_usd'):
         out[k] = round(out[k], 2)
