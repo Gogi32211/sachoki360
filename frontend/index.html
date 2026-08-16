@@ -2396,6 +2396,9 @@ function DebtsView() {
   const [syncing, setSyncing] = useState(false);
   const [phaseFilter, setPhaseFilter] = useState('open');
   const [expanded, setExpanded] = useState({});
+  // Debt as it stood on a chosen day: a tour that hadn't finished by then had
+  // not yet run up its bills, so it doesn't count towards that day's total.
+  const [asOf, setAsOf] = useState(toISO(new Date()));
 
   const load = () => fetch(`${API}/tour-debts`).then(r => r.json())
     .then(d => { setRows(d); setLoading(false); })
@@ -2411,10 +2414,14 @@ function DebtsView() {
   const fmtU = n => (n || n === 0) ? '$' + Math.round(n).toLocaleString() : '—';
   // The working view: anything still un-invoiced or still unpaid.
   const isOpen = r => (r.awaited_usd || 0) > 0 || (r.due_usd || 0) > 0;
-  const shown = rows.filter(r =>
+  const byPhaseFilter = r =>
     phaseFilter === 'all' ? true :
     phaseFilter === 'open' ? isOpen(r) :
-    String(r.phase) === phaseFilter);
+    String(r.phase) === phaseFilter;
+  // A missing end date means the tour's dates are unknown, so it is never hidden.
+  const finishedBy = r => !asOf || !r.bus_end || r.bus_end <= asOf;
+  const shown = rows.filter(r => byPhaseFilter(r) && finishedBy(r));
+  const laterCount = rows.filter(r => byPhaseFilter(r) && !finishedBy(r)).length;
 
   const sum = k => shown.reduce((a, r) => a + (r[k] || 0), 0);
   const cnt = k => shown.reduce((a, r) => a + (r[k] || 0), 0);
@@ -2452,11 +2459,22 @@ function DebtsView() {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-3 flex-wrap">
+        <div className="flex gap-2 mb-3 flex-wrap items-center">
           {[['open','⚠️ ღია'],['1','ფაზა 1'],['2','ფაზა 2'],['3','ფაზა 3'],['all','ყველა']].map(([v,l]) => (
             <button key={v} onClick={() => setPhaseFilter(v)}
               className={`px-3 py-1.5 rounded text-sm border ${phaseFilter===v ? 'bg-slate-700 text-white border-slate-700' : 'bg-white hover:bg-gray-50'}`}>{l}</button>
           ))}
+          <span className="ml-3 text-xs text-gray-500">მდგომარეობით:</span>
+          <input type="date" value={asOf} onChange={e => setAsOf(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"/>
+          <button onClick={() => setAsOf(toISO(new Date()))}
+            className="px-2 py-1 rounded text-xs border bg-white hover:bg-gray-50">დღეს</button>
+          <button onClick={() => setAsOf('')}
+            className={`px-2 py-1 rounded text-xs border ${asOf ? 'bg-white hover:bg-gray-50' : 'bg-slate-700 text-white border-slate-700'}`}>
+            ყველა თარიღი
+          </button>
+          {asOf && laterCount > 0 &&
+            <span className="text-xs text-gray-400">({laterCount} ტური ამ თარიღის შემდეგ სრულდება — არ ითვლება)</span>}
         </div>
 
         {shown.length === 0 ? (
@@ -2544,6 +2562,7 @@ function DebtsView() {
             <strong> F სვეტი</strong> — გამწვანებული „ok" = გადახდილი, ყვითელი = გადასახდელი.
             <strong> ფაზა</strong> ფერზე მაღლა დგას: ფაზა 2 = ყველა ინვოისი მიღებულია,
             ფაზა 3 = მიღებულიც და სრულად გადახდილიც.
+            <strong> მდგომარეობით</strong> — ითვლება მხოლოდ ის ტურები, რომლებიც ამ თარიღისთვის უკვე დასრულდა.
           </div>
         </div>
         )}
