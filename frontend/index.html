@@ -1411,8 +1411,10 @@ function ProfitView() {
   const fcVatReal    = forecast.reduce((s,f) => s + f.vatRealistic, 0);
   const fcVatIdeal   = forecast.reduce((s,f) => s + f.vatIdeal, 0);
 
+  // Same frame as the other tabs, and the same in both modes so switching
+  // between them doesn't resize the page.
   return (
-    <div className={`p-4 mx-auto ${viewMode === 'forecast' ? 'max-w-6xl' : 'max-w-4xl'}`}>
+    <div className="p-4 max-w-7xl mx-auto">
       <div className="flex gap-2 mb-4">
         <button onClick={() => setViewMode('table')}
           className={`px-4 py-1.5 rounded text-sm font-medium ${viewMode==='table' ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>📋 ცხრილი</button>
