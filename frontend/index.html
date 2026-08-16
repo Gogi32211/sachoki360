@@ -1286,6 +1286,7 @@ function ProfitView() {
   const [filter, setFilter] = useState('all');
   const [seriesFilter, setSeriesFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
+  const [phaseFilter, setPhaseFilter] = useState('all');
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'forecast'
 
   const load = () => {
@@ -1331,6 +1332,7 @@ function ProfitView() {
   const filtered = rows
     .filter(r => filter === 'all' || payStatus(r) === filter)
     .filter(r => seriesFilter === 'all' || r.series === seriesFilter)
+    .filter(r => phaseFilter === 'all' || String(r.phase) === phaseFilter)
     .slice()
     .sort((a, b) => {
       if (sortBy === 'profit') return (b.profit_usd||0) - (a.profit_usd||0);
@@ -1569,6 +1571,18 @@ function ProfitView() {
           <button key={s} onClick={() => setSeriesFilter(s)}
             className={`px-3 py-1 rounded text-xs font-bold ${seriesFilter===s ? 'text-white' : 'bg-white border hover:bg-gray-50'}`}
             style={seriesFilter===s ? {background: SERIES_COLORS[s]} : {color: SERIES_COLORS[s]}}>{s}</button>
+        ))}
+      </div>
+
+      <div className="flex gap-2 mb-3 flex-wrap items-center">
+        <span className="text-xs text-gray-400 mr-1">ფაზა:</span>
+        <button onClick={() => setPhaseFilter('all')}
+          className={`px-3 py-1 rounded text-xs ${phaseFilter==='all' ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>ყველა</button>
+        {[1, 2, 3].map(n => (
+          <button key={n} onClick={() => setPhaseFilter(String(n))} title={PHASES[n].hint}
+            className={`px-3 py-1 rounded text-xs font-medium ${phaseFilter===String(n) ? 'bg-slate-700 text-white' : PHASES[n].cls + ' hover:opacity-80'}`}>
+            {PHASES[n].label}
+          </button>
         ))}
       </div>
 
