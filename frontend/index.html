@@ -2432,6 +2432,7 @@ function DebtsView() {
            awaited_count: 0, due_count: 0, lines: []};
     }
     const sum = k => buckets.reduce((a, b) => a + (b[k] || 0), 0);
+    const allInvoiced = t => (t.by_date || []).reduce((a, b) => a + (b.invoiced || 0), 0);
     const full = (r.by_date || []).length === buckets.length;
     return {...r,
       invoiced_usd: sum('invoiced'), awaited_usd: sum('awaited'),
@@ -2439,8 +2440,11 @@ function DebtsView() {
       // Counts describe whole invoices, so they only hold for a complete tour.
       awaited_count: full ? r.awaited_count : 0,
       due_count: full ? r.due_count : 0,
-      // A tour still running hasn't finished running up costs, so don't project.
-      estimated_missing_usd: full ? r.estimated_missing_usd : 0,
+      // Part-way through a tour, only the share of its costs already incurred is
+      // owed, so the estimate is prorated the same way the invoices are.
+      estimated_missing_usd: full
+        ? r.estimated_missing_usd
+        : (r.estimated_missing_usd || 0) * (sum('invoiced') / (allInvoiced(r) || 1)),
       partial: !full};
   };
 
@@ -2575,7 +2579,11 @@ function DebtsView() {
                               </span>
                               <span className="text-gray-700">{l.name}</span>
                               {l.note && <span className="text-gray-400">({l.note})</span>}
-                              <span className="ml-auto font-semibold text-gray-700">{fmtU(l.usd)}</span>
+                              {!l.received && l.est_usd != null && (
+                                <span className="ml-auto text-violet-600 whitespace-nowrap"
+                                      title="ამ პოზიციის საშუალო დახურული ტურებიდან">≈ {fmtU(l.est_usd)}</span>
+                              )}
+                              <span className={`font-semibold text-gray-700 ${(!l.received && l.est_usd != null) ? 'ml-4 w-20 text-right' : 'ml-auto'}`}>{fmtU(l.usd)}</span>
                             </div>
                           ))}
                         </div>

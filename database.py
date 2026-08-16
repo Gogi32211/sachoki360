@@ -1187,22 +1187,28 @@ def _line_model(conn) -> dict:
 
 
 def _estimate_missing_lines(line_model, series, items, pax, rooms, days, nights):
-    """Value of the invoices that haven't arrived, priced from past tours.
+    """Price each invoice that hasn't arrived, from past tours.
 
     Each outstanding line is looked up by supplier — first among tours of its own
     series, then across all of them — and priced at that line's usual rate for a
     tour this size. A supplier never seen before keeps whatever the sheet says.
+
+    Returns (total, {supplier: estimate}) so the estimate can be shown against
+    the line it belongs to and not only as a tour total.
     """
     own, allr = line_model.get(series, {}), line_model.get('_all', {})
-    total = 0.0
+    total, per_line = 0.0, {}
     for it in items or []:
         if it.get('received'):
             continue
         key = _line_key(it.get('name'))
         rate = own.get(key, allr.get(key))
         div = _divisor(it.get('cat') or 'other', pax, rooms, days, nights)
-        total += (rate * div) if (rate and div) else (it.get('usd') or 0)
-    return round(total, 2)
+        est = (rate * div) if (rate and div) else (it.get('usd') or 0)
+        total += est
+        if key:
+            per_line[key] = round(est, 2)
+    return round(total, 2), per_line
 
 
 def _unbilled_cost(model, series, comps, pax, rooms, days, nights):
@@ -1323,10 +1329,15 @@ def get_tour_debts() -> list:
                 # Price the invoices still to arrive, line by line. Any cost
                 # component the sheet carries nothing for is missing wholesale,
                 # so it is priced too.
-                unbilled = _estimate_missing_lines(line_model, series, items, pax_n,
-                                                   rooms_n, spec['duration'], nights)
+                unbilled, per_line = _estimate_missing_lines(
+                    line_model, series, items, pax_n, rooms_n, spec['duration'], nights)
                 unbilled += _unbilled_cost(model, series, comps, pax_n, rooms_n,
                                            spec['duration'], nights)
+                # Carry each line's own estimate through, so the expanded tour
+                # shows what every outstanding invoice is expected to come to.
+                for line in d['lines']:
+                    if not line.get('received'):
+                        line['est_usd'] = per_line.get(_line_key(line.get('name')))
             d['expected_usd'] = expected
             # Only while invoices are outstanding; later phases have them all.
             d['estimated_missing_usd'] = (
