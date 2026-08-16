@@ -1138,6 +1138,73 @@ def _expected_cost(model, series, pax, rooms, days, nights, only=None):
     return round(total, 2) if priced >= 4 else None
 
 
+_NAME_KEY_RE = _re.compile(r'[^\w\u10A0-\u10FF]+')
+
+
+def _line_key(name: str) -> str:
+    """Normalised supplier name, so the same line matches across tours."""
+    return _NAME_KEY_RE.sub('', (name or '').lower())
+
+
+def _line_model(conn) -> dict:
+    """Unit rates for individual line items, learned from closed tours.
+
+    {series: {supplier: rate}} plus '_all'. Rates are per unit — per guest per
+    day for a meal, per room per night for a hotel — so a line learned from a
+    19+1 tour still prices correctly on an 11+1 one.
+    """
+    rows = conn.execute("""
+        SELECT p.tour_code, p.pax, p.components_detail, t.series, t.rooms
+        FROM tour_profit p
+        LEFT JOIN tours t ON t.code = p.tour_code
+        LEFT JOIN tour_debts d ON d.tour_code = p.tour_code
+        WHERE p.components_detail IS NOT NULL AND (d.phase IS NULL OR d.phase = 3)
+    """).fetchall()
+    samples = defaultdict(lambda: defaultdict(list))
+    for r in rows:
+        series = r['series'] or (r['tour_code'] or '').split('-')[0]
+        spec = SERIES.get(series)
+        if not spec:
+            continue
+        days = spec['duration']
+        nights = sum(1 for n in spec['nights'].values()
+                     if (n.get('hotel') or '').strip() not in ('', '—'))
+        pax = _pax_of(r['pax'])
+        rooms = _rooms_of(r['rooms'], pax)
+        try:
+            items = _json.loads(r['components_detail'] or '[]')
+        except Exception:
+            continue
+        for it in items:
+            usd, key = it.get('usd') or 0, _line_key(it.get('name'))
+            if not usd or usd <= 0 or not key:
+                continue
+            div = _divisor(it.get('cat') or 'other', pax, rooms, days, nights)
+            if div:
+                samples[series][key].append(usd / div)
+                samples['_all'][key].append(usd / div)
+    return {s: {k: _median(v) for k, v in d.items()} for s, d in samples.items()}
+
+
+def _estimate_missing_lines(line_model, series, items, pax, rooms, days, nights):
+    """Value of the invoices that haven't arrived, priced from past tours.
+
+    Each outstanding line is looked up by supplier — first among tours of its own
+    series, then across all of them — and priced at that line's usual rate for a
+    tour this size. A supplier never seen before keeps whatever the sheet says.
+    """
+    own, allr = line_model.get(series, {}), line_model.get('_all', {})
+    total = 0.0
+    for it in items or []:
+        if it.get('received'):
+            continue
+        key = _line_key(it.get('name'))
+        rate = own.get(key, allr.get(key))
+        div = _divisor(it.get('cat') or 'other', pax, rooms, days, nights)
+        total += (rate * div) if (rate and div) else (it.get('usd') or 0)
+    return round(total, 2)
+
+
 def _unbilled_cost(model, series, comps, pax, rooms, days, nights):
     """Value of the cost components the balance sheet carries nothing for.
 
@@ -1204,6 +1271,7 @@ def get_tour_debts() -> list:
         ).fetchall():
             days_by_tour[r['tour_code']].append(dict(r))
         model = _cost_model(conn)
+        line_model = _line_model(conn)
         shape = {}
         for r in conn.execute("SELECT t.code, t.rooms, p.pax, p.components FROM tours t "
                               "LEFT JOIN tour_profit p ON p.tour_code = t.code").fetchall():
@@ -1252,8 +1320,13 @@ def get_tour_debts() -> list:
                 rooms_n = _rooms_of(rooms_s, pax_n)
                 expected = _expected_cost(model, series, pax_n, rooms_n,
                                           spec['duration'], nights)
-                unbilled = _unbilled_cost(model, series, comps, pax_n, rooms_n,
-                                          spec['duration'], nights)
+                # Price the invoices still to arrive, line by line. Any cost
+                # component the sheet carries nothing for is missing wholesale,
+                # so it is priced too.
+                unbilled = _estimate_missing_lines(line_model, series, items, pax_n,
+                                                   rooms_n, spec['duration'], nights)
+                unbilled += _unbilled_cost(model, series, comps, pax_n, rooms_n,
+                                           spec['duration'], nights)
             d['expected_usd'] = expected
             # Only while invoices are outstanding; later phases have them all.
             d['estimated_missing_usd'] = (

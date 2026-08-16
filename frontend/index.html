@@ -2476,7 +2476,7 @@ function DebtsView() {
             <div className="text-xs text-amber-500 mt-1">{cnt('due_count')} ინვოისი</div>
           </div>
           <div className="bg-violet-50 border border-violet-200 rounded-lg px-4 py-3">
-            <div className="text-xs text-violet-600 mb-0.5">სავარაუდოდ ჯერ არ გამოწერილი ($)</div>
+            <div className="text-xs text-violet-600 mb-0.5">მოუსვლელი ინვოისები ≈ ($)</div>
             <div className="text-2xl font-bold text-violet-700">{fmtU(sum('estimated_missing_usd'))}</div>
             <div className="text-xs text-violet-500 mt-1">დახურული ტურების სტატისტიკით</div>
           </div>
@@ -2523,7 +2523,7 @@ function DebtsView() {
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სულ ინვოისი</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-red-600">არ მიგვიღია</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-violet-600 leading-tight">
-                  <div>ჯერ არ გამოწერილი</div><div className="font-normal text-gray-400">სავარაუდო</div>
+                  <div>მოუსვლელი ინვოისი</div><div className="font-normal text-gray-400">≈ სტატისტიკით</div>
                 </th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-amber-600">გადასახდელი</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-600">გადახდილი</th>
@@ -2604,10 +2604,10 @@ function DebtsView() {
             ფაზა 3 = მიღებულიც და სრულად გადახდილიც.
             <strong> მდგომარეობით</strong> — ხარჯი დღეებზეა გაწერილი (სასტუმრო ღამეებზე, კვება იმ დღეს),
             ამიტომ თარიღზე გადამდები ტურიდან მხოლოდ გაწეული ნაწილი ითვლება.
-            <strong> ჯერ არ გამოწერილი</strong> — ფაზა 1-ის ტურებზე ფასდება მხოლოდ ის კომპონენტები,
-            რომლებზეც ბალანსში <em>არცერთი</em> ჩანაწერი არ არის (მაგ. სასტუმრო საერთოდ არ ფიგურირებს).
-            ფასი დახურული ტურების სტატისტიკიდან: კვება და ატრაქციონები 1 სტუმარზე, სასტუმრო 1 ოთახზე,
-            ავტობუსი და გიდი ტურზე.
+            <strong> ≈ სტატისტიკით</strong> — ფაზა 1-ზე თითოეული მოუსვლელი ინვოისი ფასდება იმავე
+            პოზიციის საშუალოთი დახურული ტურებიდან: ჯერ იმავე სერიიდან, თუ იქ არ მოიძებნა — ყველა სერიიდან.
+            ფასი ჯგუფის ზომაზეა გადათვლილი (კვება 1 სტუმარზე, სასტუმრო 1 ოთახზე, ავტობუსი და გიდი ტურზე),
+            ამიტომ პატარა ჯგუფზე ნაკლები გამოდის. უცნობი მომწოდებლის შემთხვევაში ფურცლის თანხა რჩება.
           </div>
         </div>
         )}
