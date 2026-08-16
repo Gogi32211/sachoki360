@@ -1163,9 +1163,10 @@ def get_tour_profit() -> list:
     with get_db() as conn:
         rows = conn.execute("""
             SELECT p.*, t.series AS t_series, t.bus_start AS t_start,
-                   t.bus_end AS t_end, t.rooms AS t_rooms
+                   t.bus_end AS t_end, t.rooms AS t_rooms, d.phase AS d_phase
             FROM tour_profit p
             LEFT JOIN tours t ON t.code = p.tour_code
+            LEFT JOIN tour_debts d ON d.tour_code = p.tour_code
         """).fetchall()
         # Itineraries for every tour at once — used to date each balance line item.
         days_by_tour = defaultdict(list)
@@ -1188,6 +1189,9 @@ def get_tour_profit() -> list:
             d['status'] = get_tour_status(bs, be) if (bs and be) else 'done'
             d['rooms'] = r['t_rooms'] or ''
             d.pop('t_rooms', None)
+            # Paperwork stage, so the profit table can show it alongside the money.
+            d['phase'] = r['d_phase']
+            d.pop('d_phase', None)
             d['color'] = SERIES.get(series, {}).get('color', '#888')
             # Itinerary length, so the UI can put costs on a per-day / per-night
             # footing: `days` counts every itinerary day, `nights` only the ones

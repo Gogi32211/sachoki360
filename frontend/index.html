@@ -41,6 +41,13 @@ const TOUR_PRICE = { ZT: 20300, LN: 17350, KT: 13600, DT1: 13300, DT2: 13300, LT
                      HM: 0, HM1: 0, HM2: 0, HT: 0,
                      TH: 0, TK: 0, TM: 0, TV: 0, MT: 0, ST: 0 };
 
+// Where a tour's paperwork stands, as marked in A1 of its balance tab.
+const PHASES = {
+  1: { label: 'ფაზა 1', hint: 'ინვოისები ჯერ არ მოსულა', cls: 'bg-red-100 text-red-700' },
+  2: { label: 'ფაზა 2', hint: 'ინვოისები მოვიდა, გადასახდელია', cls: 'bg-amber-100 text-amber-700' },
+  3: { label: 'ფაზა 3', hint: 'სრულად დახურულია', cls: 'bg-emerald-100 text-emerald-700' },
+};
+
 const pad2 = n => String(n).padStart(2, "0");
 const addDays = (iso, n) => {
   const [y, m, d] = iso.split("-").map(Number);
@@ -1582,6 +1589,7 @@ function ProfitView() {
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სავარაუდო დღგ $</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">დღგ საბოლოო $ (80%)</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">სტატუსი</th>
+                <th className="text-center px-2 py-2 text-xs font-semibold text-gray-500">ფაზა</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 leading-tight">
                   <div>გადახდის თარიღი</div><div className="font-normal text-gray-400">ბალანსი, +15 დღე</div>
                 </th>
@@ -1626,6 +1634,14 @@ function ProfitView() {
                   <td className="px-3 py-2 whitespace-nowrap">
                     {st && <span className={`px-2 py-0.5 rounded text-xs font-medium ${STAT[st].cls}`}>{STAT[st].label}</span>}
                   </td>
+                  <td className="px-2 py-2 text-center">
+                    {PHASES[r.phase]
+                      ? <span className={`inline-block w-5 h-5 leading-5 rounded text-xs font-bold ${PHASES[r.phase].cls}`}
+                              title={`${PHASES[r.phase].label} — ${PHASES[r.phase].hint}`}>
+                          {r.phase}
+                        </span>
+                      : <span className="text-gray-300 text-xs">—</span>}
+                  </td>
                   <td className="px-3 py-2 whitespace-nowrap text-xs">
                     {r.bus_end
                       ? <span className={st === 'paid' ? 'text-emerald-700 font-medium' : st === 'finished' ? 'text-orange-600 font-medium' : 'text-gray-500'}>
@@ -1660,6 +1676,7 @@ function ProfitView() {
                 <td className={`px-3 py-2.5 text-right ${prClr(totProfit)}`}>${fmt(totProfit)}</td>
                 <td className="px-3 py-2.5 text-right text-indigo-700">${fmt(totVat)}</td>
                 <td className="px-3 py-2.5 text-right text-violet-700">${fmt(totVatFin)}</td>
+                <td className="px-3 py-2.5"></td>
                 <td className="px-3 py-2.5"></td>
                 <td className="px-3 py-2.5"></td>
                 <td className="px-3 py-2.5"></td>
@@ -2359,12 +2376,6 @@ function VendorChart({ scope, perPax }) {
 }
 
 // ── DEBTS VIEW (invoices still to arrive, and still to pay) ───
-const PHASES = {
-  1: { label: 'ფაზა 1', hint: 'ინვოისები ჯერ არ მოსულა', cls: 'bg-red-100 text-red-700' },
-  2: { label: 'ფაზა 2', hint: 'ინვოისები მოვიდა, გადასახდელია', cls: 'bg-amber-100 text-amber-700' },
-  3: { label: 'ფაზა 3', hint: 'სრულად დახურულია', cls: 'bg-emerald-100 text-emerald-700' },
-};
-
 function DebtsView() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
