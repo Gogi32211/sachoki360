@@ -1028,6 +1028,12 @@ def sync_archive_tours(tours: list) -> int:
     with get_db() as conn:
         for year in {t['year'] for t in tours}:
             conn.execute("DELETE FROM tour_archive WHERE year=?", (year,))
+        # A tour that has moved into the archive (e.g. a workbook that used to
+        # be synced as part of the current season, like the HM one) must not
+        # linger in the live tables too — a code only means one thing.
+        for code in {t['tour_code'] for t in tours}:
+            conn.execute("DELETE FROM tour_profit WHERE tour_code=?", (code,))
+            conn.execute("DELETE FROM tour_debts WHERE tour_code=?", (code,))
         for t in tours:
             conn.execute("""
                 INSERT INTO tour_archive
