@@ -19,7 +19,7 @@ from collections import Counter, defaultdict
 import requests
 from openpyxl import load_workbook
 
-from profit_sync import _parse_worksheet, _usd_from_row
+from profit_sync import _parse_worksheet, _run_of_dates, _usd_from_row
 
 # The archived balance workbooks, same Drive folder as the current ones.
 ARCHIVE_SHEET_IDS = {
@@ -54,26 +54,6 @@ def _dates_in(ws) -> list:
         elif isinstance(v, _dt.date):
             out.append(v)
     return out
-
-
-def _run_of_dates(dates: list) -> list:
-    """The tour's own days, picked out of everything column A mentions.
-
-    A tab usually dates one row per service, day after day, but a few also
-    carry a stray date either side — a deposit paid a week early, a bill
-    settled after the group left. Splitting the dates into runs and keeping the
-    longest leaves the tour itself and drops those.
-    """
-    ordered = sorted(set(dates))
-    runs, current = [], [ordered[0]]
-    for prev, cur in zip(ordered, ordered[1:]):
-        if (cur - prev).days <= 2:
-            current.append(cur)
-        else:
-            runs.append(current)
-            current = [cur]
-    runs.append(current)
-    return max(runs, key=len)
 
 
 def _month_split(ws, span: list) -> list:
@@ -111,7 +91,8 @@ def _parse_tab(ws) -> dict:
     # A tab can hold a stray date from a neighbouring season; the year that most
     # of the itinerary sits in is the tour's own.
     year = Counter(d.year for d in dates).most_common(1)[0][0]
-    in_year = _run_of_dates([d for d in dates if d.year == year])
+    in_year = [_dt.date.fromisoformat(d) for d in
+               _run_of_dates([d.isoformat() for d in dates if d.year == year])]
     start, end = min(in_year), max(in_year)
 
     code, data = _parse_worksheet(ws, ARCHIVE_CODE_RE, _norm_archive_code)

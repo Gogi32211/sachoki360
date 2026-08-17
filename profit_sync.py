@@ -15,6 +15,8 @@ READ-ONLY on the sheets.
 """
 import io
 import re
+from datetime import date
+
 import requests
 from openpyxl import load_workbook
 
@@ -24,7 +26,12 @@ SHEET_IDS = {
     "LN":    "1p5rgt6w_1hGpDr2W3Mug1p7rYWi7L7ZR",
     "ZT":    "1aWUi7GuMFZLuSq1dp2MgP_KV4rmwXGAE",
     "MT_ST": "1bzsKKc6lHIDuoeuK1WCbK_lG1mbPlkYN",
+    "HM":    "1TxlCGnPjPbi4hlw4CDTPF-mVw6oQ72URIuk-m0zdX6s",
 }
+
+# Workbooks whose tours belong in the money but not in the schedule: another
+# desk runs them, so they must not turn up in the day view or the timeline.
+FINANCE_ONLY = ("MT_ST", "HM")
 
 TOUR_CODE_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-?\d{4})')
 # Group size, e.g. "19+1" = 19 tourists + 1 leader.
@@ -158,6 +165,31 @@ def _categorize(name: str):
     return 'other'
 
 
+_DATE_RE = re.compile(r'(\d{4}-\d{2}-\d{2})')
+
+
+def _run_of_dates(dates: list) -> list:
+    """The tour's own days, picked out of everything column A mentions.
+
+    A tab usually dates one row per service, day after day, but some also carry
+    a stray date either side — a deposit paid a week early, a bill settled
+    after the group left. Splitting the dates into runs and keeping the longest
+    leaves the tour itself and drops those.
+    """
+    ordered = sorted(set(dates))
+    if not ordered:
+        return []
+    runs, current = [], [ordered[0]]
+    for prev, cur in zip(ordered, ordered[1:]):
+        if (date.fromisoformat(cur) - date.fromisoformat(prev)).days <= 2:
+            current.append(cur)
+        else:
+            runs.append(current)
+            current = [cur]
+    runs.append(current)
+    return max(runs, key=len)
+
+
 def _norm_code(code: str) -> str:
     return re.sub(r'(ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)(\d{4})', r'\1-\2', code)
 
@@ -201,9 +233,13 @@ def _parse_worksheet(ws, code_re=None, norm=None) -> tuple:
     }
     comp = {}
     items = []  # [{name, cat, usd}] — individual line items
+    dates = []  # column A dates: the tab's own itinerary
 
     for row in ws.iter_rows(values_only=True):
         cells = [str(c).strip() if c is not None else '' for c in row]
+        d = _DATE_RE.match(cells[0]) if cells else None
+        if d:
+            dates.append(d.group(1))
         if not code:
             for cell in cells[:4]:
                 mm = code_re.search(cell)
@@ -267,13 +303,17 @@ def _parse_worksheet(ws, code_re=None, norm=None) -> tuple:
         return None, None
     out['components'] = comp
     out['items'] = items
+    # A tour the schedule sheet doesn't carry still knows when it ran: the tab
+    # dates every line of its itinerary.
+    run = _run_of_dates(dates)
+    out['first_date'], out['last_date'] = (run[0], run[-1]) if run else (None, None)
     # Derive profit_after_vat if the sheet didn't carry it explicitly.
     if out['profit_after_vat'] is None and out['profit_usd'] is not None and out['vat_usd'] is not None:
         out['profit_after_vat'] = round(out['profit_usd'] + out['vat_usd'], 2)
     return code, out
 
 
-def _fetch_workbook_profit(sheet_id: str) -> dict:
+def _fetch_workbook_profit(sheet_id: str, scheduled: bool = True) -> dict:
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
     results: dict = {}
     try:
@@ -283,6 +323,7 @@ def _fetch_workbook_profit(sheet_id: str) -> dict:
         for ws in wb.worksheets:
             code, data = _parse_worksheet(ws)
             if code and data and any(v is not None for v in data.values()):
+                data['scheduled'] = scheduled
                 results[code] = data
         wb.close()
         print(f"[profit_sync] {sheet_id}: parsed profit for {len(results)} tours")
@@ -295,6 +336,6 @@ def fetch_tour_profit() -> dict:
     """Return {tour_code: {profit_usd, vat_usd, ...}} across all balance files."""
     results: dict = {}
     for key, sheet_id in SHEET_IDS.items():
-        results.update(_fetch_workbook_profit(sheet_id))
+        results.update(_fetch_workbook_profit(sheet_id, key not in FINANCE_ONLY))
     print(f"[profit_sync] Total: profit for {len(results)} tours")
     return results

@@ -143,6 +143,7 @@ def init_db():
             ("profit_after_vat", "REAL"), ("spent_usd", "REAL"),
             ("revenue_usd", "REAL"), ("components", "TEXT"),
             ("components_detail", "TEXT"),
+            ("first_date", "TEXT"), ("last_date", "TEXT"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE tour_profit ADD COLUMN {col} {defn}")
@@ -968,19 +969,22 @@ def sync_tour_profit(data: dict) -> int:
         for code, d in data.items():
             conn.execute("""
                 INSERT INTO tour_profit
-                    (tour_code, pax, profit_usd, vat_usd, profit_after_vat, spent_usd, revenue_usd, components, components_detail)
-                VALUES (?,?,?,?,?,?,?,?,?)
+                    (tour_code, pax, profit_usd, vat_usd, profit_after_vat, spent_usd,
+                     revenue_usd, components, components_detail, first_date, last_date)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(tour_code) DO UPDATE SET
                     pax=excluded.pax,
                     profit_usd=excluded.profit_usd, vat_usd=excluded.vat_usd,
                     profit_after_vat=excluded.profit_after_vat,
                     spent_usd=excluded.spent_usd, revenue_usd=excluded.revenue_usd,
                     components=excluded.components,
-                    components_detail=excluded.components_detail
+                    components_detail=excluded.components_detail,
+                    first_date=excluded.first_date, last_date=excluded.last_date
             """, (code, d.get('pax'), d.get('profit_usd'), d.get('vat_usd'),
                   d.get('profit_after_vat'), d.get('spent_usd'), d.get('revenue_usd'),
                   _json.dumps(d.get('components') or {}),
-                  _json.dumps(d.get('items') or [])))
+                  _json.dumps(d.get('items') or []),
+                  d.get('first_date'), d.get('last_date')))
             # Rooms from the balance sheet are only a fallback — the master
             # schedule sheet is authoritative, so fill in blanks and never
             # overwrite a value it already set.
@@ -990,8 +994,11 @@ def sync_tour_profit(data: dict) -> int:
                     "UPDATE tours SET rooms=? WHERE code=? AND (rooms IS NULL OR rooms='')",
                     (rooms, code)
                 )
-            # Auto-add to tours table if missing (e.g. not yet in the master schedule sheet)
-            if code not in existing_codes:
+            # Auto-add to tours table if missing (e.g. not yet in the master
+            # schedule sheet). Tours from a finance-only workbook are deliberately
+            # left out: they are counted in the money but another desk runs them,
+            # so they have no place in the day view or the timeline.
+            if code not in existing_codes and d.get('scheduled', True):
                 series = code.split('-')[0]
                 off = SERIES_START_OFFSET.get(series)
                 m = _re.search(r'-(\d{2})(\d{2})$', code)
@@ -1547,6 +1554,16 @@ def _vat_months(items: list, days: list) -> list:
     return [{'month': m, 'share': per_month[m] / total} for m in sorted(per_month)]
 
 
+def _days_between(start: str, end: str) -> list:
+    """A bare itinerary — dates only — for a tour the schedule never carried."""
+    if not (start and end) or end < start:
+        return []
+    a, b = date.fromisoformat(start), date.fromisoformat(end)
+    return [{'date': (a + timedelta(days=i)).isoformat(), 'city': '', 'hotel': '',
+             'lunch': '', 'dinner': ''}
+            for i in range((b - a).days + 1)]
+
+
 def get_tour_profit() -> list:
     """Return per-tour profit for ALL tours that have balance data,
     whether or not they're still in the schedule table.
@@ -1573,6 +1590,10 @@ def get_tour_profit() -> list:
             d['series'] = series
             d.pop('t_series', None)
             bs, be = r['t_start'], r['t_end']
+            if not (bs and be):
+                # No schedule row: the balance tab dates its own itinerary, and
+                # only when it doesn't is the code's own MMDD guessed at.
+                bs, be = r['first_date'], r['last_date']
             if not (bs and be):
                 bs, be = _approx_dates_from_code(code)
             d['bus_start'], d['bus_end'] = bs, be
@@ -1608,7 +1629,11 @@ def get_tour_profit() -> list:
             except Exception:
                 d['components_detail'] = []
             # Which calendar months this tour's service — and so its VAT — falls in.
-            d['vat_months'] = _vat_months(d['components_detail'], days_by_tour.get(code, []))
+            # An unscheduled tour has no itinerary rows, so its days are stood
+            # up from the dates the tab itself gives; without them its VAT would
+            # have no month to fall in.
+            itinerary = days_by_tour.get(code) or _days_between(bs, be)
+            d['vat_months'] = _vat_months(d['components_detail'], itinerary)
             result.append(d)
         result.sort(key=lambda x: (x.get('bus_start') or '', x['tour_code']))
         return result
