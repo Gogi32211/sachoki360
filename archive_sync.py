@@ -164,18 +164,47 @@ def parse_workbook(content: bytes) -> list:
     return out
 
 
-def fetch_archive_tours() -> list:
-    """Every tour in the archived workbooks, newest season included."""
+def _download(sheet_id: str) -> bytes:
+    """The workbook's bytes, however Drive happens to be holding it.
+
+    A balance file the team built in Sheets is exported; one they uploaded as
+    .xlsx is downloaded as the file it already is. Neither URL errors when it
+    can't serve the file — Drive answers with an HTML page asking to sign in —
+    so what comes back is checked for being a workbook (a zip, "PK") rather
+    than trusted on the status code.
+    """
+    problems = []
+    for url in (f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx",
+                f"https://drive.google.com/uc?export=download&id={sheet_id}"):
+        try:
+            resp = requests.get(url, timeout=120, allow_redirects=True)
+            resp.raise_for_status()
+            if resp.content[:2] == b'PK':
+                return resp.content
+            problems.append(f"{url.split('//')[1][:30]}… answered "
+                            f"{resp.headers.get('content-type', '?')} "
+                            f"({len(resp.content)} bytes), not a workbook — "
+                            f"is the file shared with anyone holding the link?")
+        except Exception as e:
+            problems.append(f"{url.split('//')[1][:30]}… {e}")
+    raise RuntimeError('; '.join(problems))
+
+
+def fetch_archive() -> dict:
+    """Every tour in the archived workbooks, plus how each workbook fared.
+
+    One workbook failing is easy to miss — the tab still fills up from the
+    others — so what each one contributed is reported alongside the tours.
+    """
     results = []
+    files = []
     seen = set()
     for name, sheet_id in ARCHIVE_SHEET_IDS.items():
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
         try:
-            resp = requests.get(url, timeout=90)
-            resp.raise_for_status()
-            tours = parse_workbook(resp.content)
+            tours = parse_workbook(_download(sheet_id))
         except Exception as e:
             print(f"[archive_sync] Could not fetch/parse {name}: {e}")
+            files.append({'file': name, 'ok': False, 'tours': 0, 'error': str(e)})
             continue
         for t in tours:
             key = (t['year'], t['tour_code'])
@@ -183,7 +212,12 @@ def fetch_archive_tours() -> list:
                 continue
             seen.add(key)
             results.append(t)
-        by_year = Counter(t['year'] for t in tours)
-        print(f"[archive_sync] {name}: {len(tours)} tours {dict(sorted(by_year.items()))}")
+        by_year = {str(y): n for y, n in sorted(Counter(t['year'] for t in tours).items())}
+        files.append({'file': name, 'ok': True, 'tours': len(tours), 'years': by_year})
+        print(f"[archive_sync] {name}: {len(tours)} tours {by_year}")
     print(f"[archive_sync] Total: {len(results)} archived tours")
-    return results
+    return {'tours': results, 'files': files}
+
+
+def fetch_archive_tours() -> list:
+    return fetch_archive()['tours']

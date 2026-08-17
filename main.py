@@ -15,7 +15,7 @@ from profit_sync import fetch_tour_profit
 from schedule_sync import fetch_active_tours, fetch_all_tour_rooms
 from cancel_sync import fetch_cancelled_tour_codes
 from debts_sync import fetch_tour_debts
-from archive_sync import fetch_archive_tours
+from archive_sync import fetch_archive, fetch_archive_tours
 
 app = FastAPI(title="ki.360")
 
@@ -413,9 +413,11 @@ def archive_years():
 @app.post("/api/sync-archive")
 def sync_archive():
     try:
-        tours = fetch_archive_tours()
-        updated = db.sync_archive_tours(tours)
-        return {"ok": True, "updated": updated}
+        got = fetch_archive()
+        updated = db.sync_archive_tours(got['tours'])
+        # Per-workbook detail, so a file that couldn't be read is visible here
+        # rather than only in the logs.
+        return {"ok": True, "updated": updated, "files": got['files']}
     except Exception as e:
         raise HTTPException(500, str(e))
 
