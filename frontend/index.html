@@ -1745,6 +1745,22 @@ const STAT_COMPONENTS = [
   ['other',      'სხვა',         '#94a3b8'],
 ];
 
+// Visual grouping only: Armenia and Azerbaijan are both a short, bundled
+// leg abroad, so they're shown together under one heading — but each keeps
+// its own total and its own colour; nothing about how costs are counted or
+// compared changes. A single-key group renders exactly like a bare entry.
+const STAT_GROUPS = [
+  { label: null,            keys: ['restaurant'] },
+  { label: null,            keys: ['hotel'] },
+  { label: null,            keys: ['bus'] },
+  { label: 'საზღვარგარეთ', keys: ['armenia', 'azerbaijan'] },
+  { label: null,            keys: ['attraction'] },
+  { label: null,            keys: ['guide'] },
+  { label: null,            keys: ['staff'] },
+  { label: null,            keys: ['other'] },
+];
+const componentOf = k => STAT_COMPONENTS.find(([key]) => key === k);
+
 // What each cost is divided by before tours are compared: a head/room count,
 // a length, or both. Chosen from how much each option actually tightens the
 // spread between series (measured on 2026 data, CV = spread across series):
@@ -1820,39 +1836,57 @@ function TourDetailPanel({ r, perPax }) {
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {STAT_COMPONENTS.map(([k, label, color]) => {
-          const catItems = bycat[k];
-          if (!catItems || !catItems.length) return null;
-          const catTotal = catItems.reduce((a, it) => a + it.usd, 0);
-          return (
-            <div key={k} className="bg-white rounded-lg border shadow-sm overflow-hidden">
-              <div className="px-3 py-1.5 flex items-center justify-between" style={{background: color}}>
-                <span className="text-xs font-bold text-white">{label}</span>
-                <span className="text-xs font-bold text-white/90">{fmtV(catTotal)}</span>
+        {STAT_GROUPS.map(g => {
+          const present = g.keys.filter(k => bycat[k] && bycat[k].length);
+          if (!present.length) return null;
+
+          const card = k => {
+            const [, label, color] = componentOf(k);
+            const catItems = bycat[k];
+            const catTotal = catItems.reduce((a, it) => a + it.usd, 0);
+            return (
+              <div key={k} className="bg-white rounded-lg border shadow-sm overflow-hidden">
+                <div className="px-3 py-1.5 flex items-center justify-between" style={{background: color}}>
+                  <span className="text-xs font-bold text-white">{label}</span>
+                  <span className="text-xs font-bold text-white/90">{fmtV(catTotal)}</span>
+                </div>
+                <div className="divide-y">
+                  {catItems.map((it, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-1.5 gap-2">
+                      <span className="text-xs text-gray-700 leading-tight flex-1 min-w-0 truncate" title={it.name}>{it.name}</span>
+                      <div className="flex-shrink-0 text-right">
+                        <span className="text-xs font-semibold text-gray-800">{fmtV(it.usd)}</span>
+                        {perPax && paxCount && (
+                          <span className="text-xs text-gray-400 ml-1">(${Math.round(it.usd)})</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {catItems.length > 1 && (
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50">
+                      <span className="text-xs text-gray-400">ჯამი</span>
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-gray-700">{fmtV(catTotal)}</span>
+                        {perPax && paxCount && (
+                          <span className="text-xs text-gray-400 ml-1">(${Math.round(catTotal)})</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="divide-y">
-                {catItems.map((it, i) => (
-                  <div key={i} className="flex items-center justify-between px-3 py-1.5 gap-2">
-                    <span className="text-xs text-gray-700 leading-tight flex-1 min-w-0 truncate" title={it.name}>{it.name}</span>
-                    <div className="flex-shrink-0 text-right">
-                      <span className="text-xs font-semibold text-gray-800">{fmtV(it.usd)}</span>
-                      {perPax && paxCount && (
-                        <span className="text-xs text-gray-400 ml-1">(${Math.round(it.usd)})</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {catItems.length > 1 && (
-                  <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50">
-                    <span className="text-xs text-gray-400">ჯამი</span>
-                    <div className="text-right">
-                      <span className="text-xs font-bold text-gray-700">{fmtV(catTotal)}</span>
-                      {perPax && paxCount && (
-                        <span className="text-xs text-gray-400 ml-1">(${Math.round(catTotal)})</span>
-                      )}
-                    </div>
-                  </div>
-                )}
+            );
+          };
+
+          // A labelled group (Armenia/Azerbaijan) gets its own boxed, titled
+          // area holding both cards — a display grouping only, so a tour
+          // that only visited one still shows just the one card inside it.
+          if (!g.label) return card(present[0]);
+          return (
+            <div key={g.label} className="sm:col-span-2 rounded-lg border-2 border-sky-100 bg-sky-50/50 p-2">
+              <div className="text-[10px] font-semibold text-sky-500 uppercase tracking-wide mb-1.5 px-0.5">{g.label}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {present.map(card)}
               </div>
             </div>
           );
@@ -2078,17 +2112,29 @@ function StatsView({ src = '/tour-profit', syncPath = '/sync-profit',
             {perPax && avgPax && <span className="ml-2 text-xs text-indigo-500 font-normal">საშ. ჯგ. {avgPax} კაცი</span>}
           </div>
           <div className="space-y-1.5">
-            {STAT_COMPONENTS.map(([k, label, color]) => (
-              <div key={k} className="flex items-center gap-2">
-                <div className="w-24 text-xs text-gray-600 text-right flex-shrink-0">{label}</div>
-                <div className="flex-1 bg-gray-100 rounded h-5 relative">
-                  <div className="h-5 rounded" style={{width: `${Math.max(2, (stats[k].mean / maxMean) * 100)}%`, background: color}}/>
-                </div>
-                <div className="w-20 text-xs font-semibold text-gray-700 text-right flex-shrink-0">
-                  ${perPax ? fmtDec(stats[k].mean) : fmt(stats[k].mean)}
-                </div>
-                <div className="w-16 text-xs text-gray-400 text-right flex-shrink-0">
-                  ±{perPax ? fmtDec(stats[k].sd) : fmt(stats[k].sd)}
+            {STAT_GROUPS.map(g => (
+              <div key={g.keys.join('+')}>
+                {g.label && (
+                  <div className="text-[10px] font-semibold text-sky-500 uppercase tracking-wide mt-2 mb-0.5 ml-[6.5rem]">{g.label}</div>
+                )}
+                <div className={g.label ? 'space-y-1.5 pl-2 border-l-2 border-sky-100' : 'space-y-1.5'}>
+                  {g.keys.map(k => {
+                    const [, label, color] = componentOf(k);
+                    return (
+                      <div key={k} className="flex items-center gap-2">
+                        <div className="w-24 text-xs text-gray-600 text-right flex-shrink-0">{label}</div>
+                        <div className="flex-1 bg-gray-100 rounded h-5 relative">
+                          <div className="h-5 rounded" style={{width: `${Math.max(2, (stats[k].mean / maxMean) * 100)}%`, background: color}}/>
+                        </div>
+                        <div className="w-20 text-xs font-semibold text-gray-700 text-right flex-shrink-0">
+                          ${perPax ? fmtDec(stats[k].mean) : fmt(stats[k].mean)}
+                        </div>
+                        <div className="w-16 text-xs text-gray-400 text-right flex-shrink-0">
+                          ±{perPax ? fmtDec(stats[k].sd) : fmt(stats[k].sd)}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -2099,18 +2145,35 @@ function StatsView({ src = '/tour-profit', syncPath = '/sync-profit',
         <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
           <table className="w-full text-xs whitespace-nowrap">
             <thead className="bg-gray-50 border-b">
+              {/* Row 1: every column that stands alone, plus one spanning
+                  header for the Armenia/Azerbaijan pair (display only). */}
               <tr>
-                <th className="text-left px-2 py-2 font-semibold text-gray-500 w-4"></th>
-                <th className="text-left px-2 py-2 font-semibold text-gray-500">ტური</th>
-                <th className="text-left px-2 py-2 font-semibold text-gray-500">ჯგ.</th>
-                <th className="text-left px-2 py-2 font-semibold text-gray-400 font-mono">ოთახები</th>
-                {STAT_COMPONENTS.map(([k, label, color]) => (
-                  <th key={k} className="text-right px-2 py-2 font-semibold" style={{color}}>
-                    {label}{perPax ? <span className="text-gray-400 font-normal">/კ</span> : ''}
-                  </th>
-                ))}
-                <th className="text-right px-2 py-2 font-semibold text-gray-500">ხარჯი{perPax ? '/კ' : ''}</th>
-                <th className="text-right px-2 py-2 font-semibold text-gray-500">მოგება{perPax ? '/კ' : ''}</th>
+                <th rowSpan="2" className="text-left px-2 py-2 font-semibold text-gray-500 w-4 align-bottom"></th>
+                <th rowSpan="2" className="text-left px-2 py-2 font-semibold text-gray-500 align-bottom">ტური</th>
+                <th rowSpan="2" className="text-left px-2 py-2 font-semibold text-gray-500 align-bottom">ჯგ.</th>
+                <th rowSpan="2" className="text-left px-2 py-2 font-semibold text-gray-400 font-mono align-bottom">ოთახები</th>
+                {STAT_GROUPS.map(g => g.label
+                  ? <th key={g.label} colSpan={g.keys.length}
+                        className="text-center px-2 py-1 font-semibold text-sky-500 text-[10px] uppercase tracking-wide border-b border-sky-100">
+                      {g.label}
+                    </th>
+                  : (() => { const [, label, color] = componentOf(g.keys[0]); return (
+                      <th key={g.keys[0]} rowSpan="2" className="text-right px-2 py-2 font-semibold align-bottom" style={{color}}>
+                        {label}{perPax ? <span className="text-gray-400 font-normal">/კ</span> : ''}
+                      </th>
+                    ); })()
+                )}
+                <th rowSpan="2" className="text-right px-2 py-2 font-semibold text-gray-500 align-bottom">ხარჯი{perPax ? '/კ' : ''}</th>
+                <th rowSpan="2" className="text-right px-2 py-2 font-semibold text-gray-500 align-bottom">მოგება{perPax ? '/კ' : ''}</th>
+              </tr>
+              {/* Row 2: only the columns the row-1 spanning header covers. */}
+              <tr>
+                {STAT_COMPONENTS.filter(([k]) => STAT_GROUPS.some(g => g.label && g.keys.includes(k)))
+                  .map(([k, label, color]) => (
+                    <th key={k} className="text-right px-2 py-1.5 font-semibold" style={{color}}>
+                      {label}{perPax ? <span className="text-gray-400 font-normal">/კ</span> : ''}
+                    </th>
+                  ))}
               </tr>
             </thead>
             <tbody>
