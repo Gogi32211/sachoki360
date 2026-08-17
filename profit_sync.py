@@ -26,12 +26,11 @@ SHEET_IDS = {
     "LN":    "1p5rgt6w_1hGpDr2W3Mug1p7rYWi7L7ZR",
     "ZT":    "1aWUi7GuMFZLuSq1dp2MgP_KV4rmwXGAE",
     "MT_ST": "1bzsKKc6lHIDuoeuK1WCbK_lG1mbPlkYN",
-    "HM":    "1TxlCGnPjPbi4hlw4CDTPF-mVw6oQ72URIuk-m0zdX6s",
 }
 
 # Workbooks whose tours belong in the money but not in the schedule: another
 # desk runs them, so they must not turn up in the day view or the timeline.
-FINANCE_ONLY = ("MT_ST", "HM")
+FINANCE_ONLY = ("MT_ST",)
 
 TOUR_CODE_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-?\d{4})')
 # Group size, e.g. "19+1" = 19 tourists + 1 leader.

@@ -10,6 +10,10 @@ tab, and the summary block at the bottom is the same one the 2026 sheets use.
 
 Which year a tab belongs to is decided by those dates rather than by its title:
 tour codes are only MMDD, so the workbooks hold several seasons side by side.
+
+A "year" here is a tourism season, not a calendar one: the business's year
+starts in April, so a tour run in, say, February 2026 is still part of the
+2025 season — the season that opened the previous April hasn't closed yet.
 """
 import io
 import re
@@ -21,12 +25,26 @@ from openpyxl import load_workbook
 
 from profit_sync import _parse_worksheet, _run_of_dates, _usd_from_row
 
-# The archived balance workbooks, same Drive folder as the current ones.
+# The archived balance workbooks, same Drive folder as the current ones. The
+# HM workbook is titled "2026" and is still being written to, but its earliest
+# tours predate the 2026 season's April start, so it belongs here too: which
+# rows land in this year's archive and which in the live 2026 tabs is decided
+# per tab, by _season_year(), not by the workbook.
 ARCHIVE_SHEET_IDS = {
     "TK_TV":   "1wOatDOmgZ8ri532Qas_hvRe8MYXFgNNBlm-AHoZtvU4",
     "TN_TE_M": "1hCd7l1PIafoV9-rdb0vUzqLI2MnQFSLf",
     "HM_HT_H": "1FjMTzkHtZ0KOwI5Id_x50Y-7jDossfZ8",
+    "HM_2026": "1TxlCGnPjPbi4hlw4CDTPF-mVw6oQ72URIuk-m0zdX6s",
 }
+
+SEASON_START_MONTH = 4  # April
+
+
+def _season_year(d) -> int:
+    """The tourism season a date belongs to: the business's year starts in
+    April, so January–March still belong to the season that opened the
+    April before."""
+    return d.year if d.month >= SEASON_START_MONTH else d.year - 1
 
 # Older seasons used series the current schedule no longer runs (TN, KN, AZ,
 # TE, H, M …), and often wrote the code without its dash. Longer prefixes come
@@ -88,11 +106,11 @@ def _parse_tab(ws) -> dict:
     dates = _dates_in(ws)
     if not dates:
         return None
-    # A tab can hold a stray date from a neighbouring season; the year that most
-    # of the itinerary sits in is the tour's own.
-    year = Counter(d.year for d in dates).most_common(1)[0][0]
+    # A tab can hold a stray date from a neighbouring season; the season that
+    # most of the itinerary sits in is the tour's own.
+    year = Counter(_season_year(d) for d in dates).most_common(1)[0][0]
     in_year = [_dt.date.fromisoformat(d) for d in
-               _run_of_dates([d.isoformat() for d in dates if d.year == year])]
+               _run_of_dates([d.isoformat() for d in dates if _season_year(d) == year])]
     start, end = min(in_year), max(in_year)
 
     code, data = _parse_worksheet(ws, ARCHIVE_CODE_RE, _norm_archive_code)
