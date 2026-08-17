@@ -82,14 +82,22 @@ _SUMMARY_KEYS = ('დღგ სავარაუდო', 'დაიხარჯ
 
 
 def _usd_from_row(cells) -> float:
-    """Best-effort USD amount for a line item.
-    A GEL/USD pair shows up as adjacent numbers with ratio ~2.4–2.95;
-    otherwise the amount is entered directly in USD (a lone number)."""
+    """Best-effort USD amount for a line item. `cells` is the row from column A.
+
+    A GEL/USD pair shows up as adjacent numbers with ratio ~2.4–2.95; otherwise
+    the amount is entered directly in USD, always in column E — the same slot
+    a paired row keeps its own USD figure in, one place left of the GEL total.
+    A handful of rows carry a stray unrelated number further along the row (a
+    leftover note, a different currency), so scanning the row for the largest
+    number picks that up instead; column E doesn't have that problem."""
     nums = [n for n in (_num(c) for c in cells) if n is not None]
     for i in range(len(nums) - 1):
         a, b = nums[i], nums[i + 1]
         if b and 2.4 <= a / b <= 2.95:
             return b
+    e = _num(cells[4]) if len(cells) > 4 else None
+    if e is not None and e >= 5:
+        return e
     cand = [n for n in nums if n >= 5]
     return max(cand) if cand else 0.0
 
@@ -118,8 +126,6 @@ def _categorize(name: str):
     n = name.lower().strip()
     if not n:
         return None
-    if 'აზერბაიჯ' in n:                    # Azerbaijan — excluded from stats
-        return None
     is_meal = any(k in n for k in ('ლანჩი', 'ვახშამ', 'ვაშამ'))
     # Wine/food tastings are an activity, not a meal → counted as an attraction.
     is_tasting = 'დეგუსტაცი' in n
@@ -129,6 +135,12 @@ def _categorize(name: str):
         if is_meal or is_tasting:
             return None
         return 'armenia'
+    if 'აზერბაიჯ' in n:
+        # Same as Armenia: a diary meal row here is already paid for in the
+        # bundled guide/hotel/bus line, not a cost of its own.
+        if is_meal or is_tasting:
+            return None
+        return 'azerbaijan'
     if 'ავტობუს' in n or 'სპრინტერ' in n:
         return 'bus'
     is_guide_ref  = 'გიდ' in n

@@ -1119,7 +1119,8 @@ def sync_tour_debts(data: dict) -> int:
 # compared and a missing one predicted. Mirrors the stats view's basis.
 _COST_BASIS = {
     'restaurant': ('pax', 'days'), 'attraction': ('pax', 'days'),
-    'armenia': ('pax', None),      'hotel': ('rooms', 'nights'),
+    'armenia': ('pax', None),      'azerbaijan': ('pax', None),
+    'hotel': ('rooms', 'nights'),
     'bus': (None, 'days'), 'guide': (None, 'days'),
     'staff': (None, 'days'), 'other': (None, 'days'),
 }

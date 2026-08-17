@@ -1738,6 +1738,7 @@ const STAT_COMPONENTS = [
   ['hotel',      'სასტუმრო',    '#3b82f6'],
   ['bus',        'ავტობუსი',     '#10b981'],
   ['armenia',    'სომხეთი',      '#ef4444'],
+  ['azerbaijan', 'აზერბაიჯანი',  '#0ea5e9'],
   ['attraction', 'ატრაქციონები', '#8b5cf6'],
   ['guide',      'გიდი',         '#ec4899'],
   ['staff',      'პერსონალი',    '#14b8a6'],
@@ -1751,12 +1752,15 @@ const STAT_COMPONENTS = [
 //   meals  ÷ guest ÷ day    24% → 13%      tickets ÷ guest ÷ day 27% → 17%
 // Armenia is a fixed 1-2 night leg, so dividing it by the whole tour's length
 // penalises short tours and made it worse (19% → 26%) — it stays per guest.
+// Azerbaijan is billed the same way — one bundled guide/hotel/bus line for a
+// short leg some series still run — so it gets the same basis.
 // Bus and staff don't unify (a sprinter and a coach are different vehicles;
 // staff cost follows the itinerary), so their baseline stays per series.
 const COST_BASIS = {
   restaurant: { per: 'pax',   time: 'days'   },
   attraction: { per: 'pax',   time: 'days'   },
   armenia:    { per: 'pax',   time: null     },
+  azerbaijan: { per: 'pax',   time: null     },
   hotel:      { per: 'rooms', time: 'nights' },
   bus:        { per: null,    time: 'days'   },
   guide:      { per: null,    time: 'days'   },

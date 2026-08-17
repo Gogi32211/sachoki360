@@ -90,7 +90,7 @@ def _month_split(ws, span: list) -> list:
             d = d.date()
         if not isinstance(d, _dt.date):
             continue
-        usd = _usd_from_row(cells[1:])
+        usd = _usd_from_row(cells)
         if usd:
             per_month[d.isoformat()[:7]] += usd
             total += usd
