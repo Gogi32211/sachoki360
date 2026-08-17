@@ -1737,27 +1737,28 @@ const STAT_COMPONENTS = [
   ['restaurant', 'რესტორანი',   '#f59e0b'],
   ['hotel',      'სასტუმრო',    '#3b82f6'],
   ['bus',        'ავტობუსი',     '#10b981'],
-  ['armenia',    'სომხეთი',      '#ef4444'],
-  ['azerbaijan', 'აზერბაიჯანი',  '#0ea5e9'],
   ['attraction', 'ატრაქციონები', '#8b5cf6'],
   ['guide',      'გიდი',         '#ec4899'],
   ['staff',      'პერსონალი',    '#14b8a6'],
   ['other',      'სხვა',         '#94a3b8'],
+  ['armenia',    'სომხეთი',      '#ef4444'],
+  ['azerbaijan', 'აზერბაიჯანი',  '#0ea5e9'],
 ];
 
 // Visual grouping only: Armenia and Azerbaijan are both a short, bundled
 // leg abroad, so they're shown together under one heading — but each keeps
 // its own total and its own colour; nothing about how costs are counted or
 // compared changes. A single-key group renders exactly like a bare entry.
+// Ordered last, after every domestic category, to match STAT_COMPONENTS.
 const STAT_GROUPS = [
   { label: null,            keys: ['restaurant'] },
   { label: null,            keys: ['hotel'] },
   { label: null,            keys: ['bus'] },
-  { label: 'საზღვარგარეთ', keys: ['armenia', 'azerbaijan'] },
   { label: null,            keys: ['attraction'] },
   { label: null,            keys: ['guide'] },
   { label: null,            keys: ['staff'] },
   { label: null,            keys: ['other'] },
+  { label: 'საზღვარგარეთ', keys: ['armenia', 'azerbaijan'] },
 ];
 const componentOf = k => STAT_COMPONENTS.find(([key]) => key === k);
 
