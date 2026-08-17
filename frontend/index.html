@@ -36,6 +36,17 @@ const SERIES_COLORS = {
   MT: "#0F766E", ST: "#B45309",
 };
 
+// Series that only ran in earlier seasons. Kept apart from SERIES_COLORS so the
+// 2026 tabs don't offer filters for tours that are no longer scheduled, and
+// listed in the order the archive runs them.
+const ARCHIVE_SERIES_COLORS = {
+  HM: "#F59E0B", HT: "#6366F1", TK: "#7C3AED", TV: "#65A30D", TM: "#0891B2",
+  TN: "#0EA5E9", LT: "#26A69A", KT: "#FF7043", KN: "#DB2777", AZ: "#84CC16",
+  "სხვა": "#64748B",
+};
+
+const seriesColor = s => SERIES_COLORS[s] || ARCHIVE_SERIES_COLORS[s] || '#888';
+
 // Approx tour price (USD) for a 19+1 group — revenue from clients.
 const TOUR_PRICE = { ZT: 20300, LN: 17350, KT: 13600, DT1: 13300, DT2: 13300, LT: 20300,
                      HM: 0, HM1: 0, HM2: 0, HT: 0,
@@ -1278,7 +1289,11 @@ function CashFlowView() {
 }
 
 // ── PROFIT VIEW (estimated profit from BALANCE sheets) ─────────
-function ProfitView() {
+// The same table serves the running season and an archived one; only where it
+// reads from differs. `toursSrc` is null for a finished season — nothing is
+// planned any more, so there is no schedule to forecast against.
+function ProfitView({ src = '/tour-profit', syncPath = '/sync-profit',
+                      toursSrc = '/tours', colors = SERIES_COLORS }) {
   const [rows, setRows] = useState([]);
   const [allTours, setAllTours] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1292,8 +1307,8 @@ function ProfitView() {
   const load = () => {
     setLoading(true);
     Promise.all([
-      fetch(`${API}/tour-profit`).then(r => r.json()),
-      fetch(`${API}/tours`).then(r => r.json()),
+      fetch(`${API}${src}`).then(r => r.json()),
+      toursSrc ? fetch(`${API}${toursSrc}`).then(r => r.json()) : Promise.resolve([]),
     ]).then(([p, t]) => { setRows(p); setAllTours(t); setLoading(false); })
       .catch(() => setLoading(false));
   };
@@ -1301,7 +1316,7 @@ function ProfitView() {
 
   const syncAndReload = () => {
     setSyncing(true);
-    fetch(`${API}/sync-profit`, {method:'POST'})
+    fetch(`${API}${syncPath}`, {method:'POST'})
       .then(() => load()).catch(() => load())
       .finally(() => setSyncing(false));
   };
@@ -1341,6 +1356,10 @@ function ProfitView() {
       return (a.bus_start||'').localeCompare(b.bus_start||'');
     });
 
+  // Phases are the current season's paperwork; a closed one carries none, so
+  // its filter and column would be a row of dashes.
+  const hasPhase = rows.some(r => r.phase != null);
+
   // Final VAT = estimated VAT * 80%.
   const finalVat = (r) => r.vat_usd != null ? r.vat_usd * 0.80 : null;
 
@@ -1376,7 +1395,7 @@ function ProfitView() {
   const paidByCode = {};
   rows.forEach(r => { if (isPaid(r)) paidByCode[r.tour_code] = r; });
 
-  const SERIES_LIST = Object.keys(SERIES_COLORS);
+  const SERIES_LIST = Object.keys(colors);
   const mean = (arr) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
   const overallAvg = mean(rows.filter(isPaid).map(r => r.profit_usd));
   const overallAvgVat = mean(rows.filter(isPaid).map(r => finalVat(r) || 0));
@@ -1569,14 +1588,14 @@ function ProfitView() {
         <span className="text-xs text-gray-400 mr-1">სერია:</span>
         <button onClick={() => setSeriesFilter('all')}
           className={`px-3 py-1 rounded text-xs ${seriesFilter==='all' ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>ყველა</button>
-        {Object.keys(SERIES_COLORS).map(s => (
+        {Object.keys(colors).map(s => (
           <button key={s} onClick={() => setSeriesFilter(s)}
             className={`px-3 py-1 rounded text-xs font-bold ${seriesFilter===s ? 'text-white' : 'bg-white border hover:bg-gray-50'}`}
-            style={seriesFilter===s ? {background: SERIES_COLORS[s]} : {color: SERIES_COLORS[s]}}>{s}</button>
+            style={seriesFilter===s ? {background: colors[s]} : {color: colors[s]}}>{s}</button>
         ))}
       </div>
 
-      <div className="flex gap-2 mb-3 flex-wrap items-center">
+      {hasPhase && <div className="flex gap-2 mb-3 flex-wrap items-center">
         <span className="text-xs text-gray-400 mr-1">ფაზა:</span>
         <button onClick={() => setPhaseFilter('all')}
           className={`px-3 py-1 rounded text-xs ${phaseFilter==='all' ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>ყველა</button>
@@ -1586,7 +1605,7 @@ function ProfitView() {
             {PHASES[n].label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {loading ? <Spinner/> : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
@@ -1605,7 +1624,7 @@ function ProfitView() {
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">სავარაუდო დღგ $</th>
                 <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500">დღგ საბოლოო $ (80%)</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">სტატუსი</th>
-                <th className="text-center px-2 py-2 text-xs font-semibold text-gray-500">ფაზა</th>
+                {hasPhase && <th className="text-center px-2 py-2 text-xs font-semibold text-gray-500">ფაზა</th>}
                 <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 leading-tight">
                   <div>გადახდის თარიღი</div><div className="font-normal text-gray-400">ბალანსი, +15 დღე</div>
                 </th>
@@ -1621,7 +1640,7 @@ function ProfitView() {
                 <tr key={r.tour_code} className="border-b hover:bg-gray-50">
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: SERIES_COLORS[r.series] || r.color || '#888'}}/>
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: seriesColor(r.series) || r.color}}/>
                       <span className="font-bold text-gray-800 whitespace-nowrap">{r.tour_code}</span>
                     </div>
                   </td>
@@ -1650,14 +1669,14 @@ function ProfitView() {
                   <td className="px-3 py-2 whitespace-nowrap">
                     {st && <span className={`px-2 py-0.5 rounded text-xs font-medium ${STAT[st].cls}`}>{STAT[st].label}</span>}
                   </td>
-                  <td className="px-2 py-2 text-center">
+                  {hasPhase && <td className="px-2 py-2 text-center">
                     {PHASES[r.phase]
                       ? <span className={`inline-block w-5 h-5 leading-5 rounded text-xs font-bold ${PHASES[r.phase].cls}`}
                               title={`${PHASES[r.phase].label} — ${PHASES[r.phase].hint}`}>
                           {r.phase}
                         </span>
                       : <span className="text-gray-300 text-xs">—</span>}
-                  </td>
+                  </td>}
                   <td className="px-3 py-2 whitespace-nowrap text-xs">
                     {r.bus_end
                       ? <span className={st === 'paid' ? 'text-emerald-700 font-medium' : st === 'finished' ? 'text-orange-600 font-medium' : 'text-gray-500'}>
@@ -1839,7 +1858,8 @@ function TourDetailPanel({ r, perPax }) {
   );
 }
 
-function StatsView() {
+function StatsView({ src = '/tour-profit', syncPath = '/sync-profit',
+                     colors = SERIES_COLORS }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sFilter, setSFilter] = useState('all');
@@ -1848,7 +1868,7 @@ function StatsView() {
   const [syncing, setSyncing] = useState(false);
 
   const loadData = () => {
-    fetch(`${API}/tour-profit`).then(r => r.json())
+    fetch(`${API}${src}`).then(r => r.json())
       .then(d => { setRows(d); setLoading(false); })
       .catch(() => setLoading(false));
   };
@@ -1857,7 +1877,7 @@ function StatsView() {
 
   const handleSync = () => {
     setSyncing(true);
-    fetch(`${API}/sync-profit`, {method: 'POST'})
+    fetch(`${API}${syncPath}`, {method: 'POST'})
       .then(() => loadData())
       .catch(() => {})
       .finally(() => setSyncing(false));
@@ -1991,10 +2011,10 @@ function StatsView() {
         <span className="text-xs text-gray-400 mr-1">სერია:</span>
         <button onClick={() => setSFilter('all')}
           className={`px-3 py-1 rounded text-xs ${sFilter==='all' ? 'bg-slate-700 text-white' : 'bg-white border hover:bg-gray-50'}`}>ყველა</button>
-        {Object.keys(SERIES_COLORS).map(s => (
+        {Object.keys(colors).map(s => (
           <button key={s} onClick={() => setSFilter(s)}
             className={`px-3 py-1 rounded text-xs font-bold ${sFilter===s ? 'text-white' : 'bg-white border hover:bg-gray-50'}`}
-            style={sFilter===s ? {background: SERIES_COLORS[s]} : {color: SERIES_COLORS[s]}}>{s}</button>
+            style={sFilter===s ? {background: colors[s]} : {color: colors[s]}}>{s}</button>
         ))}
         <button onClick={handleSync} disabled={syncing}
           className="px-3 py-1.5 text-xs font-semibold bg-white border rounded-lg shadow-sm hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
@@ -2104,7 +2124,7 @@ function StatsView() {
                       </td>
                       <td className="px-2 py-1.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: SERIES_COLORS[r.series] || r.color || '#888'}}/>
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: seriesColor(r.series) || r.color}}/>
                           <span className="font-bold text-gray-800">{r.tour_code}</span>
                         </div>
                       </td>
@@ -2562,7 +2582,7 @@ function DebtsView() {
                       <td className="px-2 py-2 text-gray-400 text-center">{lines.length ? (open ? '▾' : '▸') : ''}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: SERIES_COLORS[r.series] || r.color || '#888'}}/>
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background: seriesColor(r.series) || r.color}}/>
                           <span className="font-bold text-gray-800">{r.tour_code}</span>
                           {r.partial && <span className="text-[10px] text-amber-600 bg-amber-50 rounded px-1"
                                               title="ტური ამ თარიღზე ჯერ მიმდინარეობდა — ითვლება მხოლოდ გაწეული ნაწილი">ნაწილობრივ</span>}
@@ -2842,6 +2862,8 @@ function App() {
     {id:"profit",     label:"💰 მოგება"},
     {id:"stats",      label:"📊 სტატისტიკა 2026"},
     {id:"debts",      label:"🧾 დავალიანებები"},
+    {id:"profit25",   label:"💰 მოგება 2025"},
+    {id:"stats25",    label:"📊 სტატისტიკა 2025"},
     {id:"settings",   label:"⚙️ პარამეტრები"},
   ];
 
@@ -2864,7 +2886,7 @@ function App() {
           </div>
         </div>
         <div className="border-t border-slate-700">
-          <div className="max-w-screen-xl mx-auto px-4 flex">
+          <div className="max-w-screen-xl mx-auto px-4 flex flex-wrap">
             {tabs.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-5 py-3 text-sm font-medium transition-colors ${
@@ -2886,6 +2908,14 @@ function App() {
         {tab === "profit"     && <ProfitView/>}
         {tab === "stats"      && <StatsView/>}
         {tab === "debts"      && <DebtsView/>}
+        {/* 2025 is a closed season read from the archived balance workbooks:
+            the same two views, pointed at the archive. */}
+        {tab === "profit25"   && <ProfitView src="/archive-profit?year=2025"
+                                             syncPath="/sync-archive" toursSrc={null}
+                                             colors={ARCHIVE_SERIES_COLORS}/>}
+        {tab === "stats25"    && <StatsView src="/archive-profit?year=2025"
+                                            syncPath="/sync-archive"
+                                            colors={ARCHIVE_SERIES_COLORS}/>}
         {tab === "settings"   && <SettingsView/>}
       </main>
     </div>

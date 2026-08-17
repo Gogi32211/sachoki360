@@ -35,10 +35,10 @@ _ROOM_KEYWORD_RE = re.compile(
 _ROOM_ENTRY_RE = re.compile(r'(\d+)\s*(twin|single|double|king|suite)\s*(?:\(([^)]*)\))?', re.IGNORECASE)
 
 
-def _extract_pax(text: str):
+def _extract_pax(text: str, code_re=None):
     # Tab titles concatenate code+pax (e.g. "LT-070811+1" = LT-0708, 11+1):
     # strip the tour code first so its digits can't bleed into the pax match.
-    cleaned = TOUR_CODE_RE.sub(' ', text or '')
+    cleaned = (code_re or TOUR_CODE_RE).sub(' ', text or '')
     m = PAX_RE.search(cleaned)
     return f"{m.group(1)}+{m.group(2)}" if m else None
 
@@ -174,13 +174,20 @@ def _num(v):
         return None
 
 
-def _parse_worksheet(ws) -> tuple:
-    """Return (tour_code, profit_dict) or (None, None) if no code found."""
+def _parse_worksheet(ws, code_re=None, norm=None) -> tuple:
+    """Return (tour_code, profit_dict) or (None, None) if no code found.
+
+    Earlier seasons number their tours differently, so the caller can hand in
+    its own code pattern; everything below the code is the same workbook
+    template either way.
+    """
+    code_re = code_re or TOUR_CODE_RE
+    norm = norm or _norm_code
     code = None
-    m = TOUR_CODE_RE.search(ws.title or '')
+    m = code_re.search(ws.title or '')
     if m:
-        code = _norm_code(m.group(1))
-    pax = _extract_pax(ws.title)
+        code = norm(m.group(1))
+    pax = _extract_pax(ws.title, code_re)
 
     out = {
         'pax': pax,               # group size, e.g. "19+1"
@@ -199,9 +206,9 @@ def _parse_worksheet(ws) -> tuple:
         cells = [str(c).strip() if c is not None else '' for c in row]
         if not code:
             for cell in cells[:4]:
-                mm = TOUR_CODE_RE.search(cell)
+                mm = code_re.search(cell)
                 if mm:
-                    code = _norm_code(mm.group(1))
+                    code = norm(mm.group(1))
                     # Also scan the same row for room configuration
                     for rc in cells:
                         if _ROOM_KEYWORD_RE.search(rc):
@@ -212,7 +219,7 @@ def _parse_worksheet(ws) -> tuple:
                     break
         if not out['pax']:
             for cell in cells[:4]:
-                p = _extract_pax(cell)
+                p = _extract_pax(cell, code_re)
                 if p:
                     out['pax'] = p
                     break
@@ -228,7 +235,7 @@ def _parse_worksheet(ws) -> tuple:
         # ── Cost-component breakdown from line items ──
         name = _fix_name(cells[1].strip() if len(cells) > 1 else '')
         if name and not any(name.startswith(k) for k in _SUMMARY_KEYS) \
-                and not TOUR_CODE_RE.search(name):
+                and not code_re.search(name):
             cat = _categorize(name)
             if cat:
                 usd = _usd_from_row(cells)

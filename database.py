@@ -102,6 +102,29 @@ def init_db():
                 lines         TEXT DEFAULT '[]',
                 items         TEXT DEFAULT '[]'
             );
+            -- Past seasons, read from the archived balance workbooks. They are
+            -- self-contained: no schedule row backs them, so the dates and the
+            -- itinerary length are stored alongside the money.
+            CREATE TABLE IF NOT EXISTS tour_archive (
+                year             INTEGER NOT NULL,
+                tour_code        TEXT NOT NULL,
+                series           TEXT,
+                pax              TEXT,
+                rooms            TEXT,
+                profit_usd       REAL,
+                vat_usd          REAL,
+                profit_after_vat REAL,
+                spent_usd        REAL,
+                revenue_usd      REAL,
+                components       TEXT DEFAULT '{}',
+                components_detail TEXT DEFAULT '[]',
+                bus_start        TEXT,
+                bus_end          TEXT,
+                days             INTEGER,
+                nights           INTEGER,
+                vat_months       TEXT DEFAULT '[]',
+                PRIMARY KEY (year, tour_code)
+            );
             CREATE TABLE IF NOT EXISTS tour_profit (
                 tour_code        TEXT PRIMARY KEY,
                 pax              TEXT,
@@ -982,6 +1005,69 @@ def sync_tour_profit(data: dict) -> int:
                         print(f"[profit_sync] could not auto-add {code}: {e}")
             count += 1
     return count
+
+
+def sync_archive_tours(tours: list) -> int:
+    """Replace the archived seasons with what the workbooks now say.
+
+    A season is closed history, so the whole set is rewritten rather than
+    merged: a tab renamed or removed in the workbook should disappear here too.
+    Years the sync returned nothing for are left alone, so one unreachable
+    workbook can't wipe a season.
+    """
+    if not tours:
+        return 0
+    count = 0
+    with get_db() as conn:
+        for year in {t['year'] for t in tours}:
+            conn.execute("DELETE FROM tour_archive WHERE year=?", (year,))
+        for t in tours:
+            conn.execute("""
+                INSERT INTO tour_archive
+                    (year, tour_code, series, pax, rooms, profit_usd, vat_usd,
+                     profit_after_vat, spent_usd, revenue_usd, components,
+                     components_detail, bus_start, bus_end, days, nights, vat_months)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (t['year'], t['tour_code'], t.get('series'), t.get('pax'),
+                  t.get('rooms'), t.get('profit_usd'), t.get('vat_usd'),
+                  t.get('profit_after_vat'), t.get('spent_usd'), t.get('revenue_usd'),
+                  _json.dumps(t.get('components') or {}),
+                  _json.dumps(t.get('components_detail') or []),
+                  t.get('bus_start'), t.get('bus_end'), t.get('days'), t.get('nights'),
+                  _json.dumps(t.get('vat_months') or [])))
+            count += 1
+    return count
+
+
+def get_archive_profit(year: int) -> list:
+    """A past season's tours, shaped exactly like get_tour_profit's rows so the
+    profit and statistics views can read either without knowing the difference."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tour_archive WHERE year=? ORDER BY bus_start, tour_code",
+            (year,)).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        for key, default in (('components', {}), ('components_detail', []),
+                             ('vat_months', [])):
+            try:
+                d[key] = _json.loads(d.get(key) or '')
+            except Exception:
+                d[key] = default
+        # The season is over, so every tour is settled; the paperwork phase only
+        # exists for the current year's debts tab.
+        d['status'] = 'done'
+        d['phase'] = None
+        d['color'] = SERIES.get(d['series'], {}).get('color', '#888')
+        result.append(d)
+    return result
+
+
+def archive_years() -> list:
+    with get_db() as conn:
+        return [r[0] for r in conn.execute(
+            "SELECT DISTINCT year FROM tour_archive ORDER BY year DESC").fetchall()]
 
 
 def sync_tour_debts(data: dict) -> int:

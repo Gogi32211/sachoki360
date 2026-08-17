@@ -15,6 +15,7 @@ from profit_sync import fetch_tour_profit
 from schedule_sync import fetch_active_tours, fetch_all_tour_rooms
 from cancel_sync import fetch_cancelled_tour_codes
 from debts_sync import fetch_tour_debts
+from archive_sync import fetch_archive_tours
 
 app = FastAPI(title="ki.360")
 
@@ -175,6 +176,12 @@ def _background_sync():
             db.sync_tour_debts(debts)
     except Exception as e:
         print(f"Debts sync warning: {e}")
+    try:
+        archive = fetch_archive_tours()
+        if archive:
+            db.sync_archive_tours(archive)
+    except Exception as e:
+        print(f"Archive sync warning: {e}")
     print("[startup] background sync complete")
 
 
@@ -391,6 +398,23 @@ def sync_profit():
     try:
         data = fetch_tour_profit()
         updated = db.sync_tour_profit(data)
+        return {"ok": True, "updated": updated}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.get("/api/archive-profit")
+def archive_profit(year: int = 2025):
+    return db.get_archive_profit(year)
+
+@app.get("/api/archive-years")
+def archive_years():
+    return db.archive_years()
+
+@app.post("/api/sync-archive")
+def sync_archive():
+    try:
+        tours = fetch_archive_tours()
+        updated = db.sync_archive_tours(tours)
         return {"ok": True, "updated": updated}
     except Exception as e:
         raise HTTPException(500, str(e))
