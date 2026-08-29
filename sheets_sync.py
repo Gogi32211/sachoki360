@@ -2,7 +2,7 @@ import csv
 import io
 import re
 import requests
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 # The live master schedule ("TOURS_All Dates_2026"), not the one-off personal
 # copy this used to point at — that copy stopped being updated back in June,
@@ -131,15 +131,30 @@ def _clean(name: str) -> str:
     return s.title() if s else ''
 
 
+def _code_date(code: str):
+    """The tour code's own MMDD as a date — unambiguous, unlike the cells
+    in the grid below it, and close to that block's first row regardless
+    of a series' start-offset (at most a few days off)."""
+    m = re.match(r'^[A-Z0-9]+-(\d{2})(\d{2})$', code)
+    if not m:
+        return None
+    try:
+        return date(2026, int(m.group(1)), int(m.group(2)))
+    except ValueError:
+        return None
+
+
 def _parse_date(cell: str, expected=None):
     """Return date object or None. Handles m/d/yy, m/d/yyyy, d/m/yy, d/m/yyyy.
 
     A cell like "1/9" is genuinely ambiguous (Jan 9 or Sep 1?) and which one
     the sheet means depends on its locale, which isn't ours to assume. Each
     tour's rows run one calendar day after the next, though, so when a cell
-    has more than one valid reading, `expected` (the previous row's date + 1)
-    picks the one that keeps that run going instead of silently taking
-    whichever format happens to match first.
+    has more than one valid reading, `expected` — the previous row's date + 1,
+    or (for a block's first row) the tour code's own MMDD, which is never
+    ambiguous — picks whichever reading lands closest to it, instead of
+    silently taking whichever format happens to match first. A genuine
+    misread lands weeks or months away; the real date never does.
     """
     s = cell.strip()
     if not s:
@@ -158,10 +173,8 @@ def _parse_date(cell: str, expected=None):
             candidates.append(d)
     if not candidates:
         return None
-    if expected is not None:
-        for d in candidates:
-            if d == expected:
-                return d
+    if expected is not None and len(candidates) > 1:
+        return min(candidates, key=lambda d: abs((d - expected).days))
     return candidates[0]
 
 
@@ -203,7 +216,10 @@ def fetch_hotel_assignments() -> dict:
         if new_cols:
             active_cols = new_cols
             expected_dates = {}
-            for code in new_cols.values():
+            for col, code in new_cols.items():
+                anchor = _code_date(code)
+                if anchor:
+                    expected_dates[col] = anchor
                 if code not in assignments:
                     assignments[code] = {}
             cancelled_section = False
