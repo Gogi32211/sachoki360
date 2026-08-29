@@ -27,7 +27,6 @@ SHEET_IDS = {
     "ZT":    "1aWUi7GuMFZLuSq1dp2MgP_KV4rmwXGAE",
     "MT_ST": "1bzsKKc6lHIDuoeuK1WCbK_lG1mbPlkYN",
     "TM":    "1I_mMGVWcel93pNH72fYVM6sYlxOrPj0HHQiSxq2pS_o",
-    "HM_HT": "1HCg4JqkNgA9f1SX1gXVr_7mp-WRIu0pDz1wlgrtrgRU",
 }
 
 # Workbooks whose tours belong in the money but not in the schedule: another
