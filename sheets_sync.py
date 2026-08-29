@@ -2,7 +2,7 @@ import csv
 import io
 import re
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # The live master schedule ("TOURS_All Dates_2026"), not the one-off personal
 # copy this used to point at — that copy stopped being updated back in June,
@@ -131,22 +131,38 @@ def _clean(name: str) -> str:
     return s.title() if s else ''
 
 
-def _parse_date(cell: str):
-    """Return date object or None. Handles m/d/yy, m/d/yyyy, d/m/yy."""
+def _parse_date(cell: str, expected=None):
+    """Return date object or None. Handles m/d/yy, m/d/yyyy, d/m/yy, d/m/yyyy.
+
+    A cell like "1/9" is genuinely ambiguous (Jan 9 or Sep 1?) and which one
+    the sheet means depends on its locale, which isn't ours to assume. Each
+    tour's rows run one calendar day after the next, though, so when a cell
+    has more than one valid reading, `expected` (the previous row's date + 1)
+    picks the one that keeps that run going instead of silently taking
+    whichever format happens to match first.
+    """
     s = cell.strip()
     if not s:
         return None
+    candidates = []
     for fmt in ('%m/%d/%y', '%m/%d/%Y', '%d/%m/%y', '%d/%m/%Y'):
         try:
             d = datetime.strptime(s, fmt).date()
-            if d.year == 2026:
-                return d
-            if d.year == 26:
-                return d.replace(year=2026)
-            return None
         except ValueError:
             continue
-    return None
+        if d.year == 26:
+            d = d.replace(year=2026)
+        elif d.year != 2026:
+            continue
+        if d not in candidates:
+            candidates.append(d)
+    if not candidates:
+        return None
+    if expected is not None:
+        for d in candidates:
+            if d == expected:
+                return d
+    return candidates[0]
 
 
 def fetch_hotel_assignments() -> dict:
@@ -168,6 +184,7 @@ def fetch_hotel_assignments() -> dict:
 
     assignments: dict = {}
     active_cols: dict = {}
+    expected_dates: dict = {}
     cancelled_section = False
 
     for row in rows:
@@ -185,6 +202,7 @@ def fetch_hotel_assignments() -> dict:
 
         if new_cols:
             active_cols = new_cols
+            expected_dates = {}
             for code in new_cols.values():
                 if code not in assignments:
                     assignments[code] = {}
@@ -198,10 +216,11 @@ def fetch_hotel_assignments() -> dict:
         for col_idx, tour_code in active_cols.items():
             if col_idx >= len(row):
                 continue
-            date_obj = _parse_date(row[col_idx])
+            date_obj = _parse_date(row[col_idx], expected_dates.get(col_idx))
             if date_obj is None:
                 continue
             found_any_date = True
+            expected_dates[col_idx] = date_obj + timedelta(days=1)
             hotel_raw = row[col_idx + 1].strip() if col_idx + 1 < len(row) else ''
             hotel = _clean(hotel_raw)
             if hotel:
