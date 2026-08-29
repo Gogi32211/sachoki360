@@ -79,11 +79,19 @@ def _is_authed(request: Request) -> bool:
 @app.middleware("http")
 async def auth_gate(request: Request, call_next):
     path = request.url.path
-    if path in ("/login", "/logout"):
+    if path in ("/login", "/logout", "/health"):
         return await call_next(request)
     if not _is_authed(request):
         return RedirectResponse("/login", status_code=302)
     return await call_next(request)
+
+
+@app.get("/health")
+def health():
+    # Public, unauthenticated — this is what Railway's healthcheck hits.
+    # Everything else redirects unauthenticated requests to /login (302),
+    # which a healthcheck never follows.
+    return {"ok": True}
 
 
 @app.get("/login", response_class=HTMLResponse)
