@@ -4,14 +4,21 @@ import re
 import requests
 from datetime import datetime
 
-SHEET_ID = "1HSqlZfuatE5xb9lPP1_-A_RKXaTR0YMq"
+# The live master schedule ("TOURS_All Dates_2026"), not the one-off personal
+# copy this used to point at — that copy stopped being updated back in June,
+# so it never carried TH/TK/TM/TV (added later) and was slowly falling behind
+# on every other series too.
+SHEET_ID = "13FoSFZqpi4QAm2CDc1qT3uB7AKHOFEJv"
 SHEET_GID = "549302577"
 CSV_URL = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
     f"/export?format=csv&gid={SHEET_GID}"
 )
 
-TOUR_RE = re.compile(r'^(ZT|LN|KT|DT1|DT2|LT|ST|MT|HM)-\d{4}$')
+# Same series set the rest of the app recognizes — this used to omit
+# HM1/HM2/HT/TH/TK/TM/TV, so those tours' columns were never even seen and
+# their nights stayed on the seed template's placeholder hotel.
+TOUR_RE = re.compile(r'^(ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-\d{4}$')
 
 # Hotels outside GEO/ARM — skip updating daily_log for these
 SKIP_HOTELS = {
