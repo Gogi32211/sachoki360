@@ -1,6 +1,7 @@
 import os
 import secrets
 import threading
+import time
 from datetime import date, timedelta
 from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, Response, RedirectResponse, FileResponse
@@ -193,6 +194,22 @@ def _background_sync():
     print("[startup] background sync complete")
 
 
+# Google Sheets are the office's live working copy — edited throughout the
+# day, not just at deploy time. A sync that only ran once at startup would
+# freeze the app on whatever the sheets looked like at that moment, so it
+# repeats on this interval for as long as the process runs.
+SYNC_INTERVAL_SECONDS = 15 * 60
+
+
+def _background_sync_loop():
+    while True:
+        try:
+            _background_sync()
+        except Exception as e:
+            print(f"[sync loop] warning: {e}")
+        time.sleep(SYNC_INTERVAL_SECONDS)
+
+
 @app.on_event("startup")
 def startup():
     db.init_db()
@@ -203,7 +220,7 @@ def startup():
             db.seed_excel_data(parsed)
     except Exception as e:
         print(f"Excel parse warning: {e}")
-    threading.Thread(target=_background_sync, daemon=True).start()
+    threading.Thread(target=_background_sync_loop, daemon=True).start()
 
 
 class NoteUpdate(BaseModel):
