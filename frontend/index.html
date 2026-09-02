@@ -553,7 +553,7 @@ function MenuView() {
         </form>
       </div>
 
-      {active && (active.yesterday.length + active.today.length + active.tomorrow.length > 0) && (
+      {active && (
         <div className="bg-white rounded-xl shadow p-5 mb-5">
           <div className="grid sm:grid-cols-3 gap-4">
             {["yesterday","today","tomorrow"].map(g => (
@@ -622,6 +622,8 @@ function MenuView() {
                       <div key={mk} className="border rounded-lg p-3">
                         {day.meals[mk].at_hotel ? (
                           <div className="text-sm text-gray-500">{MEAL_LABEL[mk]} სასტუმროში</div>
+                        ) : day.meals[mk].own_expense ? (
+                          <div className="text-sm text-gray-500">{MEAL_LABEL[mk]} საკუთარი ხარჯებით</div>
                         ) : (
                           <>
                             <div className="text-xs font-semibold text-gray-500 mb-1">{MEAL_LABEL[mk]} — {day.meals[mk].restaurant}</div>

@@ -1,14 +1,23 @@
 """
-Sync restaurant/meal data from private Google Sheets financial files.
+Sync restaurant/meal data from the same balance workbooks profit_sync reads —
+one tab per tour, each dating its own lunch/dinner lines with a restaurant
+name. Live fetch downloads the workbook and reads every tab directly with
+openpyxl, the same way profit_sync and archive_sync do; a CSV export only
+ever returns one tab, which doesn't fit a one-tab-per-tour workbook, so the
+sheets aren't fetched that way here.
 
-Live fetch is attempted via CSV export (requires sheets to be publicly shared).
-If that fails, the static fallback data (pre-parsed by Claude Code) is used.
+If a workbook can't be reached at all, the static fallback data (pre-parsed
+by Claude Code, from whenever it was last refreshed) is used for whatever
+tours live fetch didn't cover.
 """
-import csv
 import io
 import re
 import requests
-from datetime import datetime
+from datetime import date as _date, datetime
+
+from openpyxl import load_workbook
+
+from profit_sync import TOUR_CODE_RE, _norm_code, _num, _usd_from_row
 
 # Same workbooks profit_sync reads (each covers more series than its key
 # suggests — KT_DT also has DT1, ZT also has LT). MT_ST is left out: those
@@ -21,76 +30,62 @@ SHEET_IDS = {
     "HM_HT": "1HCg4JqkNgA9f1SX1gXVr_7mp-WRIu0pDz1wlgrtrgRU",
 }
 
-# Same series set the rest of the app recognizes.
-_SERIES_RE = r'ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST'
-TOUR_SECTION_RE = re.compile(rf'((?:{_SERIES_RE})-?\d{{4}})\s*/')
-DATE_MEAL_RE    = re.compile(r'(\d{1,2}/\d{1,2}/\d{4}),((?:ლანჩი|ვახშამი|ვაშამი|დეგუსტაცია)[^,]*),([^,]*),([^,]*),([^,]*)')
+MEAL_LINE_RE = re.compile(r'^(ლანჩი|ვახშამი|ვაშამი)\s*-\s*(.+)$')
 
-def _norm_code(code: str) -> str:
-    return re.sub(rf'({_SERIES_RE})(\d{{4}})', r'\1-\2', code)
+# Armenia days never name a restaurant at all — nothing to attach a menu to,
+# unlike an own-expense or hotel meal, which at least names a place.
+_NO_VENUE_RE = re.compile(r'სომხეთი')
 
-def _parse_sheet_text(text: str) -> dict:
+
+def _parse_workbook_meals(content: bytes) -> dict:
+    wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
     results: dict = {}
-    positions = [(m.start(), _norm_code(m.group(1))) for m in TOUR_SECTION_RE.finditer(text)]
-
-    for i, (pos, tour_code) in enumerate(positions):
-        end = positions[i + 1][0] if i + 1 < len(positions) else len(text)
-        section = text[pos:end]
+    for ws in wb.worksheets:
+        m = TOUR_CODE_RE.search(ws.title or '')
+        if not m:
+            continue
+        code = _norm_code(m.group(1))
         meals = []
-        for m in DATE_MEAL_RE.finditer(section):
-            date_str, meal_str = m.group(1), m.group(2).strip()
-            gel_str, usd_str   = m.group(4).strip(), m.group(5).strip()
-            try:
-                d = datetime.strptime(date_str, '%m/%d/%Y').date()
-            except ValueError:
+        for row in ws.iter_rows(values_only=True):
+            if not row or row[0] is None:
                 continue
-
-            if meal_str.startswith('ლანჩი - '):
-                mtype = 'lunch'
-                rest  = meal_str[len('ლანჩი - '):].strip()
-            elif meal_str.startswith('ვახშამი - ') or meal_str.startswith('ვაშამი - '):
-                mtype = 'dinner'
-                rest  = re.sub(r'^(ვახშამი|ვაშამი) - ', '', meal_str).strip()
-            elif meal_str.startswith('დეგუსტაცია'):
-                mtype = 'degustation'
-                rest  = meal_str[len('დეგუსტაცია'):].strip()
-            else:
+            d = row[0]
+            if isinstance(d, datetime):
+                d = d.date()
+            if not isinstance(d, _date):
                 continue
-
-            rest = rest.strip()
-            if not rest or 'სომხეთი' in rest or 'საკუთარი ხარჯებით' in rest or 'საკუტარი ხარჯებით' in rest:
+            desc = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ''
+            mm = MEAL_LINE_RE.match(desc)
+            if not mm:
                 continue
-
-            try:
-                gel = float(gel_str.replace(',', ''))
-            except ValueError:
-                gel = 0.0
-            try:
-                usd = float(usd_str.replace(',', ''))
-            except ValueError:
-                usd = 0.0
-
+            mtype = 'lunch' if mm.group(1) == 'ლანჩი' else 'dinner'
+            rest = mm.group(2).strip()
+            if not rest or _NO_VENUE_RE.search(rest):
+                continue
+            cells = list(row)
+            gel = _num(cells[3]) if len(cells) > 3 else None
+            usd = _usd_from_row(cells)
             meals.append({
                 "date": d.isoformat(),
                 "meal_type": mtype,
                 "restaurant": rest,
-                "gel_amount": gel,
-                "usd_amount": usd,
+                "gel_amount": gel or 0.0,
+                "usd_amount": usd or 0.0,
             })
         if meals:
-            results[tour_code] = meals
+            results[code] = meals
+    wb.close()
     return results
 
 
 def _fetch_sheet(sheet_id: str) -> dict:
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
     try:
-        resp = requests.get(url, timeout=20)
+        resp = requests.get(url, timeout=60)
         resp.raise_for_status()
-        text = ' '.join(resp.text.split())
-        return _parse_sheet_text(text)
+        return _parse_workbook_meals(resp.content)
     except Exception as e:
-        print(f"[meals_sync] Could not fetch sheet {sheet_id}: {e}")
+        print(f"[meals_sync] Could not fetch/parse {sheet_id}: {e}")
         return {}
 
 
@@ -441,9 +436,10 @@ STATIC_MEALS: dict = {
 
 def fetch_all_meals() -> dict:
     """
-    Try live CSV fetch from each financial sheet.
-    Falls back to STATIC_MEALS if sheets are not publicly accessible.
-    Always fills in missing tours from STATIC_MEALS.
+    Read every tab of each balance workbook. Falls back to STATIC_MEALS if
+    a workbook can't be reached at all, and always backfills any tour live
+    fetch didn't return (an older tour past its own workbook's window, say)
+    from STATIC_MEALS too.
     """
     live: dict = {}
     for key, sheet_id in SHEET_IDS.items():

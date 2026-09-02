@@ -443,13 +443,13 @@ def get_tour_menu(code: str):
     WHICH restaurant a tour eats at, on which day, comes straight from that
     tour's own balance workbook tab (tour_meals — every tab dates each
     lunch/dinner line with a restaurant name) rather than a per-series
-    guess, so this covers any tour tour_meals has data for. A line costing
-    nothing (own-expense meals, Armenia days) never makes it into tour_meals
-    to begin with; a line at the hotel itself is still recorded there, at
-    zero cost, so it's told apart that way and marked "at_hotel" instead of
-    given a restaurant. A restaurant tour_meals does have isn't necessarily
-    one we have a dish list for yet — that day still shows the restaurant,
-    just without dishes or a reservation message.
+    guess, so this covers any tour tour_meals has data for. Armenia days
+    name no restaurant at all and never make it into tour_meals to begin
+    with. A line marked "საკუთარი ხარჯებით" (own expense) is shown as such
+    rather than a restaurant; any other line costing nothing is the hotel's
+    own meal, shown as "at_hotel". A restaurant tour_meals does have isn't
+    necessarily one we have a dish list for yet — that day still shows the
+    restaurant, just without dishes or a reservation message.
 
     Portions need the tour's own headcount, so a tour whose pax isn't known
     yet (profit sheet not synced for it) comes back with `pax_unknown: true`
@@ -490,6 +490,9 @@ def get_tour_menu(code: str):
         meals = {}
         for meal_key, r in by_date[day_iso].items():
             restaurant = r["restaurant"]
+            if "საკუთარი ხარჯებით" in restaurant:
+                meals[meal_key] = {"own_expense": True}
+                continue
             if not (r["gel_amount"] or r["usd_amount"]):
                 meals[meal_key] = {"at_hotel": True}
                 continue
