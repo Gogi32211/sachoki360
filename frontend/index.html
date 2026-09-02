@@ -494,6 +494,96 @@ function TourDetailView({ initialCode, onBack }) {
   );
 }
 
+// ── MENU VIEW (restaurant menus + portions, per tour) ───────────
+function MenuView() {
+  const [search, setSearch] = useState("");
+  const [menu, setMenu] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  const loadMenu = code => {
+    if (!code) return;
+    setLoading(true);
+    setNotFound(false);
+    fetch(`${API}/tour/${code.toUpperCase()}/menu`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => { setMenu(d); setLoading(false); })
+      .catch(() => { setMenu(null); setNotFound(true); setLoading(false); });
+  };
+
+  const MEAL_LABEL = { lunch: "🍽️ სადილი", dinner: "🌙 ვახშამი" };
+
+  return (
+    <div className="p-4 max-w-4xl mx-auto">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <form onSubmit={e => { e.preventDefault(); loadMenu(search); }} className="flex gap-2">
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="კოდი: ZT-0817 ..."
+            className="border rounded px-3 py-2 text-sm w-44"/>
+          <button type="submit"
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">ძებნა</button>
+        </form>
+      </div>
+
+      {loading ? <Spinner/> : notFound ? (
+        <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
+          <div className="text-5xl mb-3">🍽️</div>
+          <div>ტური ვერ მოიძებნა</div>
+        </div>
+      ) : !menu ? (
+        <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
+          <div className="text-5xl mb-3">🍽️</div>
+          <div>ჩაწერე ტურის კოდი ძებნის ველში</div>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-xl shadow p-5 mb-5">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge series={menu.series}/>
+              <h2 className="text-xl font-bold">{menu.code}</h2>
+              {menu.pax && <span className="font-mono text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 text-xs">{menu.pax}</span>}
+              <span className="text-xs text-gray-400">პორცია: {menu.portion_label}</span>
+            </div>
+          </div>
+
+          {menu.days.length === 0 ? (
+            <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
+              ამ სერიისთვის მენიუ ჯერ არ არის დამატებული
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {menu.days.map(day => (
+                <div key={day.day_num} className="bg-white rounded-xl shadow p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="font-bold text-gray-400">დღე {day.day_num}</span>
+                    <span className="text-sm text-gray-500">{day.date}</span>
+                    <span className="font-medium text-sm">📍 {day.city}</span>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {["lunch","dinner"].map(mk => day.meals[mk] && (
+                      <div key={mk} className="border rounded-lg p-3">
+                        <div className="text-xs font-semibold text-gray-500 mb-1">{MEAL_LABEL[mk]} — {day.meals[mk].restaurant}</div>
+                        <ul className="text-sm space-y-0.5">
+                          {day.meals[mk].dishes.map((d,i) => (
+                            <li key={i} className="flex justify-between gap-2">
+                              <span className="text-gray-700">{d.name}</span>
+                              <span className="text-gray-400 text-xs shrink-0">{d.portions}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── ACCOUNTING VIEW ────────────────────────────────────────────
 function AccountingView({ onSelectTour }) {
   const [data, setData] = useState([]);
@@ -2923,6 +3013,7 @@ function App() {
     {id:"timeline",   label:"📊 Timeline"},
     {id:"day",        label:"📅 დღის ხედი"},
     {id:"detail",     label:"🔍 ტურის დეტალი"},
+    {id:"menu",       label:"🍽️ მენიუ"},
     {id:"payments",   label:"💳 წინასწარ გადასახდელი"},
     {id:"prepaystat", label:"📈 წინასტატი"},
     {id:"buses",      label:"🚌 ავტობუსები"},
@@ -2969,6 +3060,7 @@ function App() {
         {tab === "timeline"   && <TimelineView onSelectTour={handleSelectTour}/>}
         {tab === "day"        && <DayView onSelectTour={handleSelectTour}/>}
         {tab === "detail"     && <TourDetailView initialCode={selectedTour} onBack={() => setTab("day")}/>}
+        {tab === "menu"       && <MenuView/>}
         {tab === "payments"   && <PaymentsView/>}
         {tab === "prepaystat" && <PrepayStatsView/>}
         {tab === "buses"      && <BusView/>}

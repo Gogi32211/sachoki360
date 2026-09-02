@@ -275,6 +275,14 @@ def tour_detail(code: str):
     return t
 
 
+@app.get("/api/tour/{code}/menu")
+def tour_menu(code: str):
+    m = db.get_tour_menu(code)
+    if not m:
+        raise HTTPException(404, "Tour not found")
+    return m
+
+
 @app.get("/api/timeline")
 def timeline(from_date: str = None, to_date: str = None):
     if not from_date:

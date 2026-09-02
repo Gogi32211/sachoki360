@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from datetime import date, timedelta, datetime, timezone
 import re as _re
 from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET
+from menu_data import SERIES_MENUS, portions_for, portion_label
 
 DB_PATH = "gtc360.db"
 
@@ -427,6 +428,54 @@ def get_tour_detail(code: str):
             "series_name": SERIES[tour["series"]]["name"],
             "days": days,
         }
+
+def get_tour_menu(code: str):
+    """Per-day lunch/dinner menu + portions for a tour, sized to its own pax.
+
+    Only covers the series in SERIES_MENUS so far (ZT first, more to follow);
+    everything else — and any day within a covered series that has no
+    restaurant on file (own-expense meals, hotel restaurants, border days) —
+    comes back with an empty `days` list or missing meals, not an error.
+    """
+    with get_db() as conn:
+        tour = conn.execute("SELECT * FROM tours WHERE code=?", (code,)).fetchone()
+        if not tour:
+            return None
+        prof = conn.execute(
+            "SELECT pax FROM tour_profit WHERE tour_code=?", (code,)
+        ).fetchone()
+    tourists = _pax_of(prof["pax"]) if prof else None
+    label = portion_label(tourists)
+
+    series_menu = SERIES_MENUS.get(tour["series"], {})
+    bs = date.fromisoformat(tour["bus_start"])
+    days = []
+    for offset in sorted(series_menu):
+        info = SERIES[tour["series"]]["nights"].get(offset, {})
+        meals = {}
+        for meal_key in ("lunch", "dinner"):
+            meal = series_menu[offset].get(meal_key)
+            if not meal:
+                continue
+            meals[meal_key] = {
+                "restaurant": meal["restaurant"],
+                "dishes": [{"name": d, "portions": label} for d in meal["dishes"]],
+            }
+        if not meals:
+            continue
+        days.append({
+            "day_num": offset + 1,
+            "date": (bs + timedelta(days=offset)).isoformat(),
+            "city": info.get("city", ""),
+            "meals": meals,
+        })
+    return {
+        "code": tour["code"], "series": tour["series"],
+        "pax": prof["pax"] if prof else None,
+        "portion_label": label,
+        "days": days,
+    }
+
 
 def get_timeline(from_date: str, to_date: str):
     with get_db() as conn:
