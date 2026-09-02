@@ -447,9 +447,10 @@ def get_tour_menu(code: str):
     name no restaurant at all and never make it into tour_meals to begin
     with. A line marked "საკუთარი ხარჯებით" (own expense) is shown as such
     rather than a restaurant; any other line costing nothing is the hotel's
-    own meal, shown as "at_hotel". A restaurant tour_meals does have isn't
-    necessarily one we have a dish list for yet — that day still shows the
-    restaurant, just without dishes or a reservation message.
+    own meal, shown as "at_hotel". Every other day gets a reservation
+    message regardless — the office needs to call the restaurant whether or
+    not we've typed its dishes in yet — but the dish list itself only shows
+    up once a restaurant has one on file.
 
     Portions need the tour's own headcount, so a tour whose pax isn't known
     yet (profit sheet not synced for it) comes back with `pax_unknown: true`
@@ -497,18 +498,20 @@ def get_tour_menu(code: str):
                 meals[meal_key] = {"at_hotel": True}
                 continue
             dishes = menu_for_restaurant(restaurant)
-            entry = {"restaurant": restaurant}
+            entry = {
+                "restaurant": restaurant,
+                "reservation_text": reservation_text(
+                    meal=meal_key, restaurant=restaurant,
+                    date_str=day_date.strftime("%-d.%m.%y"),
+                    tour_code=tour["code"], tourists=tourists,
+                    portion_label=label, guide=guide,
+                ),
+            }
             if dishes:
                 entry["dishes"] = [
                     {"name": d, "portions": dish_portion_label(restaurant, d, tourists)}
                     for d in dishes
                 ]
-                entry["reservation_text"] = reservation_text(
-                    meal=meal_key, restaurant=restaurant,
-                    date_str=day_date.strftime("%-d.%m.%y"),
-                    tour_code=tour["code"], tourists=tourists,
-                    portion_label=label, guide=guide,
-                )
             meals[meal_key] = entry
         days.append({
             "day_num": offset + 1,
