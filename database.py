@@ -5,7 +5,8 @@ from contextlib import contextmanager
 from datetime import date, timedelta, datetime, timezone
 import re as _re
 from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET
-from menu_data import SERIES_MENUS, portions_for, portion_label
+from menu_data import (SERIES_MENUS, AT_HOTEL, portion_label,
+                        dish_portion_label, reservation_text)
 
 DB_PATH = "gtc360.db"
 
@@ -429,52 +430,117 @@ def get_tour_detail(code: str):
             "days": days,
         }
 
+def _pax_for_menu(conn, code: str):
+    prof = conn.execute(
+        "SELECT pax FROM tour_profit WHERE tour_code=?", (code,)
+    ).fetchone()
+    return _pax_of(prof["pax"]) if prof else None
+
+
 def get_tour_menu(code: str):
     """Per-day lunch/dinner menu + portions for a tour, sized to its own pax.
 
     Only covers the series in SERIES_MENUS so far (ZT first, more to follow);
     everything else — and any day within a covered series that has no
-    restaurant on file (own-expense meals, hotel restaurants, border days) —
-    comes back with an empty `days` list or missing meals, not an error.
+    restaurant on file (own-expense meals, border days) — comes back with an
+    empty `days` list or missing meals, not an error. A dinner already
+    covered by the hotel is marked AT_HOTEL rather than given a restaurant.
+
+    Portions need the tour's own headcount, so a tour whose pax isn't known
+    yet (profit sheet not synced for it) comes back with `pax_unknown: true`
+    and no days — there's nothing honest to show without a real number.
     """
     with get_db() as conn:
         tour = conn.execute("SELECT * FROM tours WHERE code=?", (code,)).fetchone()
         if not tour:
             return None
-        prof = conn.execute(
-            "SELECT pax FROM tour_profit WHERE tour_code=?", (code,)
-        ).fetchone()
-    tourists = _pax_of(prof["pax"]) if prof else None
-    label = portion_label(tourists)
+        tourists = _pax_for_menu(conn, code)
+        guide = tour["guide"] or ""
 
+    if tourists is None:
+        return {
+            "code": tour["code"], "series": tour["series"],
+            "pax": None, "portion_label": None, "pax_unknown": True,
+            "days": [],
+        }
+
+    label = portion_label(tourists)
     series_menu = SERIES_MENUS.get(tour["series"], {})
     bs = date.fromisoformat(tour["bus_start"])
     days = []
     for offset in sorted(series_menu):
         info = SERIES[tour["series"]]["nights"].get(offset, {})
+        day_date = bs + timedelta(days=offset)
         meals = {}
         for meal_key in ("lunch", "dinner"):
             meal = series_menu[offset].get(meal_key)
             if not meal:
                 continue
+            if meal == AT_HOTEL:
+                meals[meal_key] = {"at_hotel": True}
+                continue
+            restaurant = meal["restaurant"]
             meals[meal_key] = {
-                "restaurant": meal["restaurant"],
-                "dishes": [{"name": d, "portions": label} for d in meal["dishes"]],
+                "restaurant": restaurant,
+                "dishes": [
+                    {"name": d, "portions": dish_portion_label(restaurant, d, tourists)}
+                    for d in meal["dishes"]
+                ],
+                "reservation_text": reservation_text(
+                    meal=meal_key, restaurant=restaurant,
+                    date_str=day_date.strftime("%-d.%m.%y"),
+                    tour_code=tour["code"], tourists=tourists,
+                    portion_label=label, guide=guide,
+                ),
             }
         if not meals:
             continue
         days.append({
             "day_num": offset + 1,
-            "date": (bs + timedelta(days=offset)).isoformat(),
+            "date": day_date.isoformat(),
             "city": info.get("city", ""),
             "meals": meals,
         })
     return {
         "code": tour["code"], "series": tour["series"],
-        "pax": prof["pax"] if prof else None,
-        "portion_label": label,
+        "pax": f"{tourists}+1", "portion_label": label, "pax_unknown": False,
         "days": days,
     }
+
+
+def get_active_menu_tours():
+    """Yesterday/today/tomorrow's tours for the menu tab's landing list.
+
+    Skips any tour whose pax isn't known yet — same rule as get_tour_menu,
+    so nothing shows up here that would just open to a "pax unknown" page.
+    """
+    today = today_tbilisi()
+    spans = {
+        "yesterday": (today - timedelta(days=1)).isoformat(),
+        "today": today.isoformat(),
+        "tomorrow": (today + timedelta(days=1)).isoformat(),
+    }
+    with get_db() as conn:
+        result = {}
+        for label, d in spans.items():
+            rows = conn.execute(
+                "SELECT t.code, t.series, t.guide, dl.city "
+                "FROM tours t JOIN daily_log dl ON t.code=dl.tour_code "
+                "WHERE dl.date=? ORDER BY t.series, t.code",
+                (d,)
+            ).fetchall()
+            out = []
+            for r in rows:
+                tourists = _pax_for_menu(conn, r["code"])
+                if tourists is None:
+                    continue
+                out.append({
+                    "code": r["code"], "series": r["series"],
+                    "city": r["city"], "guide": r["guide"] or "",
+                    "pax": f"{tourists}+1",
+                })
+            result[label] = out
+    return result
 
 
 def get_timeline(from_date: str, to_date: str):

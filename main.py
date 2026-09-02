@@ -275,6 +275,11 @@ def tour_detail(code: str):
     return t
 
 
+@app.get("/api/menu/active-tours")
+def menu_active_tours():
+    return db.get_active_menu_tours()
+
+
 @app.get("/api/tour/{code}/menu")
 def tour_menu(code: str):
     m = db.get_tour_menu(code)
