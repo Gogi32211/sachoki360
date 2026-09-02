@@ -5,8 +5,8 @@ from contextlib import contextmanager
 from datetime import date, timedelta, datetime, timezone
 import re as _re
 from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET
-from menu_data import (SERIES_MENUS, AT_HOTEL, portion_label,
-                        dish_portion_label, reservation_text)
+from menu_data import (portion_label, dish_portion_label, reservation_text,
+                        menu_for_restaurant)
 
 DB_PATH = "gtc360.db"
 
@@ -440,11 +440,16 @@ def _pax_for_menu(conn, code: str):
 def get_tour_menu(code: str):
     """Per-day lunch/dinner menu + portions for a tour, sized to its own pax.
 
-    Only covers the series in SERIES_MENUS so far (ZT first, more to follow);
-    everything else — and any day within a covered series that has no
-    restaurant on file (own-expense meals, border days) — comes back with an
-    empty `days` list or missing meals, not an error. A dinner already
-    covered by the hotel is marked AT_HOTEL rather than given a restaurant.
+    WHICH restaurant a tour eats at, on which day, comes straight from that
+    tour's own balance workbook tab (tour_meals — every tab dates each
+    lunch/dinner line with a restaurant name) rather than a per-series
+    guess, so this covers any tour tour_meals has data for. A line costing
+    nothing (own-expense meals, Armenia days) never makes it into tour_meals
+    to begin with; a line at the hotel itself is still recorded there, at
+    zero cost, so it's told apart that way and marked "at_hotel" instead of
+    given a restaurant. A restaurant tour_meals does have isn't necessarily
+    one we have a dish list for yet — that day still shows the restaurant,
+    just without dishes or a reservation message.
 
     Portions need the tour's own headcount, so a tour whose pax isn't known
     yet (profit sheet not synced for it) comes back with `pax_unknown: true`
@@ -456,6 +461,11 @@ def get_tour_menu(code: str):
             return None
         tourists = _pax_for_menu(conn, code)
         guide = tour["guide"] or ""
+        meal_rows = conn.execute(
+            "SELECT date, meal_type, restaurant, gel_amount, usd_amount "
+            "FROM tour_meals WHERE tour_code=? ORDER BY date, meal_type",
+            (code,)
+        ).fetchall()
 
     if tourists is None:
         return {
@@ -465,39 +475,41 @@ def get_tour_menu(code: str):
         }
 
     label = portion_label(tourists)
-    series_menu = SERIES_MENUS.get(tour["series"], {})
     bs = date.fromisoformat(tour["bus_start"])
+    by_date: dict = {}
+    for r in meal_rows:
+        if r["meal_type"] not in ("lunch", "dinner"):
+            continue
+        by_date.setdefault(r["date"], {})[r["meal_type"]] = r
+
     days = []
-    for offset in sorted(series_menu):
+    for day_iso in sorted(by_date):
+        day_date = date.fromisoformat(day_iso)
+        offset = (day_date - bs).days
         info = SERIES[tour["series"]]["nights"].get(offset, {})
-        day_date = bs + timedelta(days=offset)
         meals = {}
-        for meal_key in ("lunch", "dinner"):
-            meal = series_menu[offset].get(meal_key)
-            if not meal:
-                continue
-            if meal == AT_HOTEL:
+        for meal_key, r in by_date[day_iso].items():
+            restaurant = r["restaurant"]
+            if not (r["gel_amount"] or r["usd_amount"]):
                 meals[meal_key] = {"at_hotel": True}
                 continue
-            restaurant = meal["restaurant"]
-            meals[meal_key] = {
-                "restaurant": restaurant,
-                "dishes": [
+            dishes = menu_for_restaurant(restaurant)
+            entry = {"restaurant": restaurant}
+            if dishes:
+                entry["dishes"] = [
                     {"name": d, "portions": dish_portion_label(restaurant, d, tourists)}
-                    for d in meal["dishes"]
-                ],
-                "reservation_text": reservation_text(
+                    for d in dishes
+                ]
+                entry["reservation_text"] = reservation_text(
                     meal=meal_key, restaurant=restaurant,
                     date_str=day_date.strftime("%-d.%m.%y"),
                     tour_code=tour["code"], tourists=tourists,
                     portion_label=label, guide=guide,
-                ),
-            }
-        if not meals:
-            continue
+                )
+            meals[meal_key] = entry
         days.append({
             "day_num": offset + 1,
-            "date": day_date.isoformat(),
+            "date": day_iso,
             "city": info.get("city", ""),
             "meals": meals,
         })

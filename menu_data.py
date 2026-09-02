@@ -1,22 +1,20 @@
 """
-Restaurant menus per series/day, for the "მენიუ" (meals) view. No prices —
-just what's served and how many portions, computed from the tour's own pax.
+Restaurant dish lists, for the "მენიუ" (meals) view. No prices — just what's
+served and how many portions, computed from the tour's own pax.
 
-Sourced from the office's per-restaurant costing sheet (Menu_2026.xlsx):
-each dish there was portioned for a specific past group, so the quantities in
-that sheet aren't reused here — only the dish names are. Portions for any
-given tour are computed fresh from PORTION_TABLE, except a few dishes that
-the office orders by a different ratio (see DISH_OVERRIDES below).
+WHICH restaurant a tour eats at, on which day, comes from that tour's own
+balance workbook tab (via tour_meals — see meals_sync.py / database.py's
+get_tour_menu): every tour's finance sheet already dates each lunch/dinner
+line with a restaurant name, so that's the real, per-tour source, not a
+per-series guess. This module only holds WHAT each restaurant serves, keyed
+by that same restaurant name, sourced from the office's per-restaurant
+costing sheet (Menu_2026.xlsx) — dish names only, no prices; the quantities
+there were sized for one past group and aren't reused here.
 
-Breakfast is always at the hotel, so only lunch and dinner are tracked. A
-night's dinner already at the hotel is marked AT_HOTEL rather than given a
-restaurant — there's nothing to order. Nights with neither (own-expense
-meals, or no menu on file yet) simply have no entry; the view leaves them
-blank.
+A restaurant not listed here just means its menu hasn't been typed in yet —
+the tour's day still shows the restaurant name, without a dish breakdown.
 """
 import math
-
-AT_HOTEL = "at_hotel"
 
 # tourists (excluding the driver+guide table) -> portions of most dishes for
 # the tourists' table. The driver+guide table is always a flat 1 portion,
@@ -67,23 +65,13 @@ def dish_portion_label(restaurant, dish, tourists):
     return portion_label(tourists)
 
 
-# Default arrival window and restaurant phone numbers, for the reservation
-# text. Phones aren't tracked anywhere yet — fill them in as the office
-# supplies them; a restaurant with no number just prints a blank to fill by
-# hand.
+# Default arrival window, for the reservation text.
 MEAL_TIME_WINDOW = {"lunch": "12:00 - 13:00", "dinner": "19:00 - 20:00"}
 MEAL_LABEL_GEO = {"lunch": "ლანჩი", "dinner": "ვახშამი"}
 
-RESTAURANT_PHONES = {
-    "ბალკონი": None,
-    "კტვ": None,
-    "ზღაპარი": None,
-    "დიარონი": None,
-    "ლუშნუ ქორი": None,
-    "ენგური": None,
-    "ლუიზასთან": None,
-    "სალობიე": None,
-}
+# Restaurant phone numbers for the reservation text — not tracked anywhere
+# yet. A restaurant with no number here just prints a blank to fill by hand.
+RESTAURANT_PHONES = {}
 
 
 def reservation_text(*, meal, restaurant, date_str, tour_code, tourists,
@@ -103,79 +91,77 @@ def reservation_text(*, meal, restaurant, date_str, tour_code, tourists,
     )
 
 
-SERIES_MENUS = {
-    "ZT": {
-        0: {
-            "lunch": {"restaurant": "ბალკონი", "dishes": [
-                "კიტრი-პომიდვრის სალათი", "ქამა სოკო კეცზე", "ლობიანი",
-                "ოჯახური ღორის", "ხბოს ჩაშუშული", "პური", "წყალი",
-            ]},
-            "dinner": {"restaurant": "კტვ", "dishes": [
-                "ხინკალი", "მწვადი ღორის", "აჯაფსანდალი კეცზე", "შოთის პური",
-                "ქათმის შქმერული", "კიტრი-პომიდვრის სალათი", "ხაჭაპური", "წყალი",
-            ]},
-        },
-        2: {"dinner": AT_HOTEL},  # Akhaltsikhe Inn
-        3: {
-            "lunch": {"restaurant": "ზღაპარი", "dishes": [
-                "სუფი", "კიტრი პომიდვრის სალათი", "კარტოფილი ფრი",
-                "ღორის მწვადი", "ხაჭაპური იმერული", "ხბოს მწვადი კეცზე",
-                "პური", "წყალი",
-            ]},
-        },
-        4: {
-            "lunch": {"restaurant": "დიარონი", "dishes": [
-                "ბოსტნეულის სალათი", "სოკოს სუპი", "საფირმო დიარონი",
-                "ბრინჯი", "ხბოს ნეკნი აჯიკით", "პურის ასორტი", "წყალი",
-            ]},
-            "dinner": {"restaurant": "ლუშნუ ქორი", "dishes": [
-                "ჭარხალი ტყემალში", "ხბოს ჩაშუშული ტომატში",
-                "ტაფაზე შემწვარი კარტოფილი", "ოჯახური სოკ. და ბოსტნეულით",
-                "ხაჭაპური სვანური მწვანე ფეტვით", "ღორის მწვადი ბულგარული",
-                "პური", "წყალი",
-            ]},
-        },
-        5: {
-            "lunch": {"restaurant": "ენგური", "dishes": [
-                "კიტრი პომიდორი", "კარტოფილი გლეხურად", "კუბდარი",
-                "ქათმის მწვადი", "ბრინჯი ბოსტნეულით", "ხაჭაპური",
-                "პური", "წყალი",
-            ]},
-            "dinner": {"restaurant": "ლუიზასთან", "dishes": [
-                "მჭადი", "კიტრი პომიდვრის სალათი", "მაკარონი", "ხაშლამა",
-                "ბოსტნეულის პიცა", "ლობიო აზელილი", "ჩახოხბილი",
-                "პური", "წყალი",
-            ]},
-        },
-        6: {
-            "lunch": {"restaurant": "დიარონი", "dishes": [
-                "ბოსტნეული კორსიკულაად", "ბოსტნეულის სუპი", "ხბოს ოჯახური",
-                "ბრინჯი", "ქათმის მწვადი", "პურის ასორტი", "წყალი",
-            ]},
-            "dinner": AT_HOTEL,  # Gori Inn
-        },
-        7: {
-            "lunch": {"restaurant": "სალობიე", "dishes": [
-                "სალათა კ/პ", "ლობიო", "ქაბაბი", "წიწაკის მჟავე",
-                "შემწვარი კარტოფილი", "საწებელი", "მწვადი სუკი",
-                "პური", "წყალი",
-            ]},
-            "dinner": AT_HOTEL,  # Gudauri Inn
-        },
-    },
-    "TM": {
-        # TM's other lunches/dinners are seeded as generic "ადგილობრივი"
-        # (local) with no restaurant named, so there's nothing on file to
-        # add there yet — only its Batumi lunch (day 6) matches a restaurant
-        # from the costing sheet, and with its own dish list at that: the
-        # sheet has a separate "ზღაპარი: TM turi" column, distinct from the
-        # one the other series use at the same restaurant.
-        5: {
-            "lunch": {"restaurant": "ზღაპარი", "dishes": [
-                "სუფი", "კიტრი პომიდვრის სალათი", "კარტოფილი ოჯახურად",
-                "ქამა სოკო კეცზე", "შქმერული", "ხბოს მწვადი კეცზე",
-                "პური", "წყალი",
-            ]},
-        },
-    },
+# restaurant name (as it appears in the balance sheets) -> its dishes.
+RESTAURANT_MENUS = {
+    "ბალკონი": [
+        "კიტრი-პომიდვრის სალათი", "ქამა სოკო კეცზე", "ლობიანი",
+        "ოჯახური ღორის", "ხბოს ჩაშუშული", "პური", "წყალი",
+    ],
+    "კტვ": [
+        "ხინკალი", "მწვადი ღორის", "აჯაფსანდალი კეცზე", "შოთის პური",
+        "ქათმის შქმერული", "კიტრი-პომიდვრის სალათი", "ხაჭაპური", "წყალი",
+    ],
+    "ზღაპარი": [
+        "სუფი", "კიტრი პომიდვრის სალათი", "კარტოფილი ფრი",
+        "ღორის მწვადი", "ხაჭაპური იმერული", "ხბოს მწვადი კეცზე",
+        "პური", "წყალი",
+    ],
+    # TM's own dish set at the same restaurant — the office's own sheet
+    # keeps this separate from the list above.
+    "ზღაპარი (ტმ მენიუ)": [
+        "სუფი", "კიტრი პომიდვრის სალათი", "კარტოფილი ოჯახურად",
+        "ქამა სოკო კეცზე", "შქმერული", "ხბოს მწვადი კეცზე",
+        "პური", "წყალი",
+    ],
+    "დიარონი": [
+        "ბოსტნეულის სალათი", "სოკოს სუპი", "საფირმო დიარონი",
+        "ბრინჯი", "ხბოს ნეკნი აჯიკით", "პურის ასორტი", "წყალი",
+    ],
+    "ლუშნუ ქორი": [
+        "ჭარხალი ტყემალში", "ხბოს ჩაშუშული ტომატში",
+        "ტაფაზე შემწვარი კარტოფილი", "ოჯახური სოკ. და ბოსტნეულით",
+        "ხაჭაპური სვანური მწვანე ფეტვით", "ღორის მწვადი ბულგარული",
+        "პური", "წყალი",
+    ],
+    "ენგური": [
+        "კიტრი პომიდორი", "კარტოფილი გლეხურად", "კუბდარი",
+        "ქათმის მწვადი", "ბრინჯი ბოსტნეულით", "ხაჭაპური",
+        "პური", "წყალი",
+    ],
+    "ლუიზასთან": [
+        "მჭადი", "კიტრი პომიდვრის სალათი", "მაკარონი", "ხაშლამა",
+        "ბოსტნეულის პიცა", "ლობიო აზელილი", "ჩახოხბილი",
+        "პური", "წყალი",
+    ],
+    "სალობიე": [
+        "სალათა კ/პ", "ლობიო", "ქაბაბი", "წიწაკის მჟავე",
+        "შემწვარი კარტოფილი", "საწებელი", "მწვადი სუკი",
+        "პური", "წყალი",
+    ],
+    "ვარძია შოთა": [
+        "ლავაში", "სალათის ფოთლები (პომიდვრით)", "კომბოსტოს სალათი",
+        "ხაჭაპური", "ფრი", "თათარბერაგი", "ქათმის მწვადი",
+    ],
+    "ფასანაური": [
+        "ბერძნული სალათი", "ხინკალი ყველის", "ხინკალი ხორცის",
+        "ქათმის მწვადი", "ოჯახური ხბოს ხორცით", "ბრინჯი ბოსტნეულით",
+        "პური", "წყალი",
+    ],
 }
+
+
+def menu_for_restaurant(raw_name):
+    """The dish list for a restaurant name as it appears in a balance sheet.
+
+    Tries an exact match first — this is how a variant like "ზღაპარი (ტმ
+    მენიუ)" gets its own dishes instead of falling through to the plain
+    "ზღაპარი" list. Balance sheets also tack on an extra descriptive word
+    sometimes ("ბალკონი სიღნაღი", "კტვ ცეკვებით") and drop it other times
+    ("ბალკონი", "კტვ") for the same restaurant, so failing that, the
+    longest known name that the raw text starts with wins."""
+    if raw_name in RESTAURANT_MENUS:
+        return RESTAURANT_MENUS[raw_name]
+    for name in sorted(RESTAURANT_MENUS, key=len, reverse=True):
+        if raw_name.startswith(name):
+            return RESTAURANT_MENUS[name]
+    return None

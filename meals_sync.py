@@ -10,17 +10,24 @@ import re
 import requests
 from datetime import datetime
 
+# Same workbooks profit_sync reads (each covers more series than its key
+# suggests — KT_DT also has DT1, ZT also has LT). MT_ST is left out: those
+# tours have no daily_log/tours rows to attach a meal day to.
 SHEET_IDS = {
     "KT_DT": "16NWhGGHR7mXAwRyVH_vmYSrZHx1zxrAR",
     "LN":    "1p5rgt6w_1hGpDr2W3Mug1p7rYWi7L7ZR",
     "ZT":    "1aWUi7GuMFZLuSq1dp2MgP_KV4rmwXGAE",
+    "TM":    "1I_mMGVWcel93pNH72fYVM6sYlxOrPj0HHQiSxq2pS_o",
+    "HM_HT": "1HCg4JqkNgA9f1SX1gXVr_7mp-WRIu0pDz1wlgrtrgRU",
 }
 
-TOUR_SECTION_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2|LT)-?\d{4})\s*/')
+# Same series set the rest of the app recognizes.
+_SERIES_RE = r'ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST'
+TOUR_SECTION_RE = re.compile(rf'((?:{_SERIES_RE})-?\d{{4}})\s*/')
 DATE_MEAL_RE    = re.compile(r'(\d{1,2}/\d{1,2}/\d{4}),((?:ლანჩი|ვახშამი|ვაშამი|დეგუსტაცია)[^,]*),([^,]*),([^,]*),([^,]*)')
 
 def _norm_code(code: str) -> str:
-    return re.sub(r'(ZT|LN|KT|DT1|DT2|LT)(\d{4})', r'\1-\2', code)
+    return re.sub(rf'({_SERIES_RE})(\d{{4}})', r'\1-\2', code)
 
 def _parse_sheet_text(text: str) -> dict:
     results: dict = {}
