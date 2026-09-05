@@ -397,10 +397,10 @@ def get_tours_on_date(check_date: str):
         ).fetchall()
         guides = [dict(g) for g in conn.execute(
             "SELECT name, phone FROM contacts_guides").fetchall()]
-        hotels = {h["name"]: h["phone"] for h in conn.execute(
-            "SELECT name, phone FROM contacts_hotels").fetchall()}
-        restaurants = {r["name"]: r["phone"] for r in conn.execute(
-            "SELECT name, phone FROM contacts_restaurants").fetchall()}
+        hotels = {h["name"]: _combine_phones(h["phone"], h["phone2"]) for h in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_hotels").fetchall()}
+        restaurants = {r["name"]: _combine_phones(r["phone"], r["phone2"]) for r in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_restaurants").fetchall()}
         result = []
         for r in rows:
             bs = date.fromisoformat(r["bus_start"])
@@ -471,6 +471,12 @@ def _pax_for_menu(conn, code: str):
     return _pax_of(prof["pax"]) if prof else None
 
 
+def _combine_phones(phone: str, phone2: str) -> str:
+    """Some hotels/restaurants have two numbers in the informations tab —
+    show both rather than picking one."""
+    return " / ".join(p for p in (phone, phone2) if p)
+
+
 def _match_restaurant_phone(name: str, restaurant_phones: dict) -> str:
     """Exact match first, then the longest known name the raw text starts
     with — same rule menu_for_restaurant uses to line up dish lists."""
@@ -533,8 +539,8 @@ def get_tour_menu(code: str):
         ).fetchall()
         guide_phone = match_guide_phone(guide, [dict(g) for g in conn.execute(
             "SELECT name, phone FROM contacts_guides").fetchall()])
-        restaurant_phones = {r["name"]: r["phone"] for r in conn.execute(
-            "SELECT name, phone FROM contacts_restaurants").fetchall()}
+        restaurant_phones = {r["name"]: _combine_phones(r["phone"], r["phone2"]) for r in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_restaurants").fetchall()}
 
     if tourists is None:
         return {
