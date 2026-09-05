@@ -24,25 +24,25 @@ PORTION_TABLE = [
 ]
 
 # A few dishes are ordered by a straight ratio to the tourist count instead
-# of the lookup table above: (restaurant, dish) -> (numerator, denominator) —
-# portions = ceil(tourists * numerator / denominator). Sourced from the
-# office's own costing sheet (Menu_2026.xlsx), which writes the ratio right
-# next to the dish as "N კაცზე M" (N people : M portions) or, for khinkali,
-# "კაცზე N" (1 person : N portions — a straight multiply, not a divide).
-# Water and the soups/broths are the same ratio at every restaurant that
-# serves them; khinkali's count is restaurant-specific since it differs
-# (1 or 2 per person depending on where it's served).
+# of the lookup table above: (restaurant, dish) -> (numerator, denominator,
+# note) — portions = ceil(tourists * numerator / denominator), shown as
+# "(note) N" when there's a note to show. Sourced from the office's own
+# costing sheet (Menu_2026.xlsx), which writes the ratio right next to the
+# dish as "N კაცზე M" (N people : M portions) or, for khinkali, "კაცზე N"
+# (1 person : N portions — a straight multiply, not a divide). Water and the
+# soups/broths are the same ratio at every restaurant that serves them;
+# khinkali's count is restaurant-specific since it differs (1 or 2 per
+# person depending on where it's served).
 DISH_RATIOS = {
-    (None, "წყალი"): (1.15, 2),
-    (None, "სუფი"): (1, 2),
-    (None, "სოკოს სუპი"): (1, 2),
-    (None, "ბოსტნეულის სუპი"): (1, 2),
-    (None, "მჭადი"): (1, 2),
-    ("სალობიე", "ლობიო"): (1, 2),
-    ("სალობიე", "ქაბაბი"): (1, 2),
-    ("კტვ", "ხინკალი"): (2, 1),
-    ("ფასანაური", "ხინკალი ყველის"): (1, 1),
-    ("ფასანაური", "ხინკალი ხორცის"): (1, 1),
+    (None, "წყალი"): (1.15, 2, None),
+    (None, "სუფი"): (1, 2, "გაყოფილი ორად"),
+    (None, "სოკოს სუპი"): (1, 2, "გაყოფილი ორად"),
+    (None, "ბოსტნეულის სუპი"): (1, 2, "გაყოფილი ორად"),
+    ("სალობიე", "ლობიო"): (1, 2, "2 ადამიანზე 1"),
+    ("სალობიე", "ქაბაბი"): (1, 2, "2 ადამიანზე 1"),
+    ("კტვ", "ხინკალი"): (2, 1, None),
+    ("ფასანაური", "ხინკალი ყველის"): (1, 1, None),
+    ("ფასანაური", "ხინკალი ხორცის"): (1, 1, None),
 }
 
 
@@ -83,14 +83,9 @@ def dish_portion_label(restaurant, dish, tourists):
         return None
     ratio = DISH_RATIOS.get((restaurant, dish)) or DISH_RATIOS.get((None, dish))
     if ratio:
-        num, den = ratio
+        num, den, note = ratio
         total = math.ceil((tourists + 3) * num / den)
-        # Soups and the kebab-style dishes are a straight halving (2 people :
-        # 1 portion) — spell that out next to the number. Water's ratio
-        # isn't a plain half (1.3 : 2), so it's left as just the total.
-        if (num, den) == (1, 2):
-            return f"{total} (გაყოფილი ორად)"
-        return str(total)
+        return f"({note}) {total}" if note else str(total)
     return portion_label(tourists)
 
 
@@ -174,7 +169,7 @@ RESTAURANT_MENUS = {
         "პური", "წყალი",
     ],
     "ლუიზასთან": [
-        "მჭადი", "კიტრი პომიდვრის სალათი", "მაკარონი", "ხაშლამა",
+        "კიტრი პომიდვრის სალათი", "მაკარონი", "ხაშლამა",
         "ბოსტნეულის პიცა", "ლობიო აზელილი", "ჩახოხბილი",
         "პური", "წყალი",
     ],
