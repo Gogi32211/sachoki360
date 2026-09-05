@@ -24,12 +24,25 @@ PORTION_TABLE = [
 ]
 
 # A few dishes are ordered by a straight ratio to the tourist count instead
-# of the lookup table above: (restaurant, dish) -> (numerator, denominator).
-# Water is the same ratio everywhere; the rest are restaurant-specific.
+# of the lookup table above: (restaurant, dish) -> (numerator, denominator) —
+# portions = ceil(tourists * numerator / denominator). Sourced from the
+# office's own costing sheet (Menu_2026.xlsx), which writes the ratio right
+# next to the dish as "N კაცზე M" (N people : M portions) or, for khinkali,
+# "კაცზე N" (1 person : N portions — a straight multiply, not a divide).
+# Water and the soups/broths are the same ratio at every restaurant that
+# serves them; khinkali's count is restaurant-specific since it differs
+# (1 or 2 per person depending on where it's served).
 DISH_RATIOS = {
     (None, "წყალი"): (1.3, 2),
+    (None, "სუფი"): (1, 2),
+    (None, "სოკოს სუპი"): (1, 2),
+    (None, "ბოსტნეულის სუპი"): (1, 2),
+    (None, "მჭადი"): (1, 2),
     ("სალობიე", "ლობიო"): (1, 2),
     ("სალობიე", "ქაბაბი"): (1, 2),
+    ("კტვ", "ხინკალი"): (2, 1),
+    ("ფასანაური", "ხინკალი ყველის"): (1, 1),
+    ("ფასანაური", "ხინკალი ხორცის"): (1, 1),
 }
 
 
