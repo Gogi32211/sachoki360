@@ -75,9 +75,9 @@ RESTAURANT_PHONES = {}
 
 
 def reservation_text(*, meal, restaurant, date_str, tour_code, tourists,
-                      portion_label, guide, guide_phone=None):
+                      portion_label, guide, guide_phone=None, phone=None):
     """The office's copy-paste reservation message for one meal."""
-    phone = RESTAURANT_PHONES.get(restaurant)
+    phone = phone or RESTAURANT_PHONES.get(restaurant)
     phone_part = phone or "___"
     guide_part = guide or "გიდი"
     if guide_phone:

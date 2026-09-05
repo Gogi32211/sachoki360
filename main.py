@@ -17,6 +17,7 @@ from schedule_sync import fetch_active_tours, fetch_all_tour_rooms
 from cancel_sync import fetch_cancelled_tour_codes
 from debts_sync import fetch_tour_debts
 from archive_sync import fetch_archive, fetch_archive_tours
+from contacts_sync import fetch_contacts
 
 app = FastAPI(title="ki.360")
 
@@ -191,6 +192,12 @@ def _background_sync():
             db.sync_archive_tours(archive)
     except Exception as e:
         print(f"Archive sync warning: {e}")
+    try:
+        contacts = fetch_contacts()
+        if contacts:
+            db.sync_contacts(contacts)
+    except Exception as e:
+        print(f"Contacts sync warning: {e}")
     print("[startup] background sync complete")
 
 
@@ -468,6 +475,15 @@ def sync_debts():
     try:
         data = fetch_tour_debts()
         updated = db.sync_tour_debts(data)
+        return {"ok": True, "updated": updated}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.post("/api/sync-contacts")
+def sync_contacts():
+    try:
+        data = fetch_contacts()
+        updated = db.sync_contacts(data)
         return {"ok": True, "updated": updated}
     except Exception as e:
         raise HTTPException(500, str(e))

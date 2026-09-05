@@ -7,6 +7,7 @@ import re as _re
 from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET
 from menu_data import (portion_label, dish_portion_label, reservation_text,
                         menu_for_restaurant)
+from contacts_sync import match_guide_phone
 
 DB_PATH = "gtc360.db"
 
@@ -127,6 +128,23 @@ def init_db():
                 vat_months       TEXT DEFAULT '[]',
                 PRIMARY KEY (year, tour_code)
             );
+            -- Guide / hotel / restaurant phone numbers, from the master
+            -- schedule workbook's "informations" tab. Re-synced wholesale
+            -- each time (small lookup lists), not per-tour.
+            CREATE TABLE IF NOT EXISTS contacts_guides (
+                name  TEXT PRIMARY KEY,
+                phone TEXT DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS contacts_hotels (
+                name   TEXT PRIMARY KEY,
+                phone  TEXT DEFAULT '',
+                phone2 TEXT DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS contacts_restaurants (
+                name   TEXT PRIMARY KEY,
+                phone  TEXT DEFAULT '',
+                phone2 TEXT DEFAULT ''
+            );
             CREATE TABLE IF NOT EXISTS tour_profit (
                 tour_code        TEXT PRIMARY KEY,
                 pax              TEXT,
@@ -155,8 +173,8 @@ def init_db():
             conn.execute("ALTER TABLE tour_debts ADD COLUMN items TEXT DEFAULT '[]'")
         except Exception:
             pass
-        # Migrate: add rooms / guide columns to tours if missing
-        for col in ("rooms", "guide"):
+        # Migrate: add rooms / guide / driver columns to tours if missing
+        for col in ("rooms", "guide", "driver"):
             try:
                 conn.execute(f"ALTER TABLE tours ADD COLUMN {col} TEXT DEFAULT ''")
             except Exception:
@@ -371,12 +389,16 @@ def get_all_tours():
 def get_tours_on_date(check_date: str):
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT t.code, t.series, t.bus_start, t.bus_end, t.notes, t.rooms, t.guide, "
+            "SELECT t.code, t.series, t.bus_start, t.bus_end, t.notes, t.rooms, t.guide, t.driver, "
             "dl.city, dl.hotel, dl.lunch, dl.dinner, dl.border_crossing, dl.notes as day_notes "
             "FROM tours t JOIN daily_log dl ON t.code=dl.tour_code "
             "WHERE dl.date=? ORDER BY dl.city, t.series",
             (check_date,)
         ).fetchall()
+        guides = [dict(g) for g in conn.execute(
+            "SELECT name, phone FROM contacts_guides").fetchall()]
+        hotel_phones = {h["name"]: h["phone"] for h in conn.execute(
+            "SELECT name, phone FROM contacts_hotels").fetchall()}
         result = []
         for r in rows:
             bs = date.fromisoformat(r["bus_start"])
@@ -393,6 +415,9 @@ def get_tours_on_date(check_date: str):
                 "day_num": day_num, "total_days": duration,
                 "rooms": r["rooms"] or "",
                 "guide": r["guide"] or "",
+                "guide_phone": match_guide_phone(r["guide"] or "", guides),
+                "driver": r["driver"] or "",
+                "hotel_phone": hotel_phones.get(r["hotel"] or "", ""),
                 "color": SERIES[r["series"]]["color"],
             })
         return result
@@ -467,6 +492,20 @@ def get_tour_menu(code: str):
             "FROM tour_meals WHERE tour_code=? ORDER BY date, meal_type",
             (code,)
         ).fetchall()
+        guide_phone = match_guide_phone(guide, [dict(g) for g in conn.execute(
+            "SELECT name, phone FROM contacts_guides").fetchall()])
+        restaurant_phones = {r["name"]: r["phone"] for r in conn.execute(
+            "SELECT name, phone FROM contacts_restaurants").fetchall()}
+
+    def _restaurant_phone(name):
+        # Same rule as menu_for_restaurant: exact match first, then the
+        # longest known name the balance-sheet text starts with.
+        if restaurant_phones.get(name):
+            return restaurant_phones[name]
+        for rname in sorted(restaurant_phones, key=len, reverse=True):
+            if name.startswith(rname) and restaurant_phones[rname]:
+                return restaurant_phones[rname]
+        return None
 
     if tourists is None:
         return {
@@ -504,7 +543,8 @@ def get_tour_menu(code: str):
                     meal=meal_key, restaurant=restaurant,
                     date_str=day_date.strftime("%-d.%m.%y"),
                     tour_code=tour["code"], tourists=tourists,
-                    portion_label=label, guide=guide,
+                    portion_label=label, guide=guide, guide_phone=guide_phone,
+                    phone=_restaurant_phone(restaurant),
                 ),
             }
             if dishes:
@@ -1794,9 +1834,46 @@ def set_setting(key: str, value: str):
         )
 
 
+def sync_contacts(data: dict) -> int:
+    """Replace the guide/hotel/restaurant phone lookup tables wholesale —
+    these are small directories, not per-tour records, so there's nothing to
+    diff: whatever the sheet has now is simply the current truth."""
+    if not data:
+        return 0
+    guides = data.get("guides") or []
+    hotels = data.get("hotels") or {}
+    restaurants = data.get("restaurants") or {}
+    with get_db() as conn:
+        conn.execute("DELETE FROM contacts_guides")
+        conn.execute("DELETE FROM contacts_hotels")
+        conn.execute("DELETE FROM contacts_restaurants")
+        conn.executemany(
+            "INSERT OR REPLACE INTO contacts_guides (name, phone) VALUES (?,?)",
+            [(g["name"], g["phone"]) for g in guides])
+        conn.executemany(
+            "INSERT OR REPLACE INTO contacts_hotels (name, phone, phone2) VALUES (?,?,?)",
+            [(n, v.get("phone", ""), v.get("phone2", "")) for n, v in hotels.items()])
+        conn.executemany(
+            "INSERT OR REPLACE INTO contacts_restaurants (name, phone, phone2) VALUES (?,?,?)",
+            [(n, v.get("phone", ""), v.get("phone2", "")) for n, v in restaurants.items()])
+    return len(guides) + len(hotels) + len(restaurants)
+
+
+def get_contacts() -> dict:
+    with get_db() as conn:
+        guides = [dict(r) for r in conn.execute(
+            "SELECT name, phone FROM contacts_guides").fetchall()]
+        hotels = {r["name"]: {"phone": r["phone"], "phone2": r["phone2"]}
+                  for r in conn.execute("SELECT * FROM contacts_hotels").fetchall()}
+        restaurants = {r["name"]: {"phone": r["phone"], "phone2": r["phone2"]}
+                       for r in conn.execute("SELECT * FROM contacts_restaurants").fetchall()}
+    return {"guides": guides, "hotels": hotels, "restaurants": restaurants}
+
+
 def bulk_update_rooms(meta: dict) -> int:
-    """Write rooms and guide from the master schedule sheet — the authoritative
-    source. `meta` is {tour_code: {"rooms": str, "guide": str}}.
+    """Write rooms, guide and driver from the master schedule sheet — the
+    authoritative source. `meta` is {tour_code: {"rooms": str, "guide": str,
+    "driver": str}}.
 
     Overwrites whatever the DB holds whenever the sheet disagrees (e.g. a value
     previously filled in from a balance sheet); rows that already match are left
@@ -1810,7 +1887,7 @@ def bulk_update_rooms(meta: dict) -> int:
         for code, info in meta.items():
             if isinstance(info, str):          # tolerate the old rooms-only shape
                 info = {"rooms": info}
-            for field in ("rooms", "guide"):
+            for field in ("rooms", "guide", "driver"):
                 val = (info.get(field) or "").strip()
                 if not val:
                     continue

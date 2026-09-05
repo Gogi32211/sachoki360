@@ -26,6 +26,9 @@ _ROOM_KEYWORD_RE = re.compile(
     r'\d+\s*(?:twin|single|double|king|suite)\b|\b(?:twin|single|double|king|suite)\b',
     re.IGNORECASE)
 _ROOM_ENTRY_RE = re.compile(r'(\d+)\s*(twin|single|double|king|suite)\s*(?:\(([^)]*)\))?', re.IGNORECASE)
+_DATE_LIKE_RE = re.compile(
+    r'^\d{1,2}/\d{1,2}/\d{2,4}$|^\d{4}-\d{2}-\d{2}(\s+\d{2}:\d{2}:\d{2})?$')
+_DRIVER_RE = re.compile(r'^([\d][\d\s\-]{5,})\s+(\S.*)$')
 
 
 def _norm_code(code: str) -> str:
@@ -184,9 +187,29 @@ def _guide_above(grid, row_i, col_i) -> str:
     return ''
 
 
+def _driver_below(grid, row_i, col_i) -> str:
+    """Bus driver's phone + name, in the row right after the tour's last dated
+    row — e.g. "598 59 19 10  გოგიტა" straight under the last date cell."""
+    ri = row_i + 1
+    n = len(grid)
+    while ri < n:
+        cell = (grid[ri][col_i] if col_i < len(grid[ri]) else '').strip()
+        if not _DATE_LIKE_RE.match(cell):
+            break
+        ri += 1
+    if ri >= n:
+        return ''
+    cell = (grid[ri][col_i] if col_i < len(grid[ri]) else '').strip()
+    m = _DRIVER_RE.match(cell)
+    if m and _LETTER_RE.search(m.group(2)):
+        return cell
+    return ''
+
+
 def fetch_all_tour_rooms() -> dict:
-    """Return {tour_code: {"rooms": str, "guide": str}} for ALL tour codes in the
-    main tab, including completed ones past the 'done 2026' marker."""
+    """Return {tour_code: {"rooms": str, "guide": str, "driver": str}} for ALL
+    tour codes in the main tab, including completed ones past the
+    'done 2026' marker."""
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
     resp = requests.get(url, timeout=60)
     resp.raise_for_status()
@@ -230,10 +253,13 @@ def fetch_all_tour_rooms() -> dict:
                     break
 
             guide = _guide_above(grid, row_i, col_i)
-            if rooms or guide:
-                rooms_map[code] = {"rooms": rooms, "guide": guide}
+            driver = _driver_below(grid, row_i, col_i)
+            if rooms or guide or driver:
+                rooms_map[code] = {"rooms": rooms, "guide": guide, "driver": driver}
 
     n_rooms = sum(1 for v in rooms_map.values() if v["rooms"])
     n_guide = sum(1 for v in rooms_map.values() if v["guide"])
-    print(f"[schedule_sync] full sheet: rooms for {n_rooms}, guides for {n_guide} tours")
+    n_driver = sum(1 for v in rooms_map.values() if v["driver"])
+    print(f"[schedule_sync] full sheet: rooms for {n_rooms}, guides for {n_guide}, "
+          f"drivers for {n_driver} tours")
     return rooms_map

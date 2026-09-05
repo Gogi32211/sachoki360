@@ -342,11 +342,14 @@ function DayView({ onSelectTour }) {
                       <div className="flex-1 text-sm text-gray-700 space-y-0.5">
                         <div>🏨 {t.hotel && t.hotel.startsWith('? ')
                           ? <span className="text-orange-500 font-semibold">{t.hotel} ⚠</span>
-                          : t.hotel}</div>
+                          : t.hotel}{t.hotel_phone && ` — ${t.hotel_phone}`}</div>
                         <div>🍽️ <span className="text-gray-400">L:</span> <span className={t.lunch && t.lunch.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.lunch}</span></div>
                         <div>🌙 <span className="text-gray-400">V:</span> <span className={t.dinner && t.dinner.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.dinner}</span></div>
                         {t.guide && (
-                          <div className="text-gray-500">🧭 <span className="text-gray-400">გიდი:</span> {t.guide}</div>
+                          <div className="text-gray-500">🧭 <span className="text-gray-400">გიდი:</span> {t.guide}{t.guide_phone && ` — ${t.guide_phone}`}</div>
+                        )}
+                        {t.driver && (
+                          <div className="text-gray-500">🚌 <span className="text-gray-400">მძღოლი:</span> {t.driver}</div>
                         )}
                         {t.border_crossing && (
                           <div className="text-orange-600 font-medium">🚧 {t.border_crossing}</div>
@@ -3081,6 +3084,7 @@ function App() {
       fetch(`${API}/sync-hotels`,   {method:'POST'}),
       fetch(`${API}/sync-payment-status`, {method:'POST'}),
       fetch(`${API}/sync-debts`,    {method:'POST'}),
+      fetch(`${API}/sync-contacts`, {method:'POST'}),
     ]).finally(() => window.location.reload());
   };
 
