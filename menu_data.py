@@ -84,7 +84,13 @@ def dish_portion_label(restaurant, dish, tourists):
     ratio = DISH_RATIOS.get((restaurant, dish)) or DISH_RATIOS.get((None, dish))
     if ratio:
         num, den = ratio
-        return str(math.ceil((tourists + 3) * num / den))
+        total = math.ceil((tourists + 3) * num / den)
+        # Soups and the kebab-style dishes are a straight halving (2 people :
+        # 1 portion) — spell that out next to the number. Water's ratio
+        # isn't a plain half (1.3 : 2), so it's left as just the total.
+        if (num, den) == (1, 2):
+            return f"{total} (გაყოფილი ორად)"
+        return str(total)
     return portion_label(tourists)
 
 
