@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from datetime import date, timedelta, datetime, timezone
 import re as _re
 from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET
-from menu_data import (portion_label, dish_portion_label, reservation_text,
+from menu_data import (portion_label, dish_portion_label, dish_note, reservation_text,
                         menu_for_restaurant)
 from contacts_sync import match_guide_phone
 
@@ -629,7 +629,8 @@ def get_tour_menu(code: str):
                 continue
             dish_names = menu_for_restaurant(restaurant)
             dishes = [
-                {"name": d, "portions": dish_portion_label(restaurant, d, tourists)}
+                {"name": d, "note": dish_note(restaurant, d),
+                 "portions": dish_portion_label(restaurant, d, tourists)}
                 for d in dish_names
             ] if dish_names else None
             r_phone = _match_restaurant_phone(restaurant, restaurant_phones)

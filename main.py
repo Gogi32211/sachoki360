@@ -276,7 +276,8 @@ function renderMeal(key, rawText, m) {
     let head = '<div class="hdr">' + MEAL_LABEL[key] + ' — ' + esc(m.restaurant) +
       (m.restaurant_phone ? ' — ' + esc(m.restaurant_phone) : '') + '</div>';
     let dishes = (m.dishes || []).map(d =>
-      '<div class="dish"><span>' + esc(d.name) + '</span><span class="p">' + esc(d.portions) + '</span></div>'
+      '<div class="dish"><span>' + esc(d.name) + (d.note ? ' (' + esc(d.note) + ')' : '') +
+      '</span><span class="p">' + esc(d.portions) + '</span></div>'
     ).join('');
     body = head + (dishes || '<div class="at-hotel">მენიუ ჯერ არ არის დამატებული</div>');
   } else {

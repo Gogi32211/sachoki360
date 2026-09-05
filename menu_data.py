@@ -67,6 +67,13 @@ def portion_label(tourists):
     return f"{p}+1" if p is not None else None
 
 
+def dish_note(restaurant, dish):
+    """The "(2 ადამიანზე 1)" style note for a ratio dish, or None — shown
+    next to the dish's own name rather than mixed into the portion count."""
+    ratio = DISH_RATIOS.get((restaurant, dish)) or DISH_RATIOS.get((None, dish))
+    return ratio[2] if ratio else None
+
+
 def dish_portion_label(restaurant, dish, tourists):
     """Portions for a dish, honouring its own ratio if it has one.
 
@@ -83,9 +90,8 @@ def dish_portion_label(restaurant, dish, tourists):
         return None
     ratio = DISH_RATIOS.get((restaurant, dish)) or DISH_RATIOS.get((None, dish))
     if ratio:
-        num, den, note = ratio
-        total = math.ceil((tourists + 3) * num / den)
-        return f"({note}) {total}" if note else str(total)
+        num, den, _note = ratio
+        return str(math.ceil((tourists + 3) * num / den))
     return portion_label(tourists)
 
 
@@ -121,7 +127,10 @@ def reservation_text(*, meal, restaurant, date_str, tour_code, tourists,
         f"{MEAL_TIME_WINDOW[meal]}-ზე. {guide_part} დაგიკავშირდებათ."
     )
     if dishes:
-        menu_lines = "\n".join(f"- {d['name']}: {d['portions']}" for d in dishes)
+        menu_lines = "\n".join(
+            f"- {d['name']}" + (f" ({d['note']})" if d.get('note') else "") + f": {d['portions']}"
+            for d in dishes
+        )
         text += f"\n\nმენიუ:\n{menu_lines}"
     return text
 
