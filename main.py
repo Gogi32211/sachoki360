@@ -13,7 +13,7 @@ from sheets_sync import fetch_hotel_assignments
 from meals_sync import fetch_all_meals
 from payments_sync import fetch_payment_statuses
 from profit_sync import fetch_tour_profit
-from schedule_sync import fetch_active_tours, fetch_all_tour_rooms
+from schedule_sync import fetch_active_tours, fetch_all_tour_rooms, TOUR_CODE_RE, _norm_code
 from cancel_sync import fetch_cancelled_tour_codes
 from debts_sync import fetch_tour_debts
 from archive_sync import fetch_archive, fetch_archive_tours
@@ -83,6 +83,11 @@ async def auth_gate(request: Request, call_next):
     path = request.url.path
     if path in ("/login", "/logout", "/health"):
         return await call_next(request)
+    # The guide-facing pages/API are a separate, tour-scoped login — they
+    # never accept the office session cookie, and the office login never
+    # grants access to them either.
+    if path == "/guide" or path.startswith("/guide/") or path.startswith("/api/guide/"):
+        return await call_next(request)
     if not _is_authed(request):
         return RedirectResponse("/login", status_code=302)
     return await call_next(request)
@@ -116,6 +121,222 @@ def logout():
     resp = RedirectResponse("/login", status_code=302)
     resp.delete_cookie("ki360_session")
     return resp
+
+
+# ── Guide-facing pages ───────────────────────────────────────────────────
+# A separate, tour-scoped login: a guide signs in with their tour code as
+# both the username and password (dashes optional, case-insensitive), and
+# sees only that one tour's route + menu — never the office app or any
+# other tour. The session cookie carries the tour code plus a signature
+# derived from it, so it can't be hand-edited into a different tour code
+# without going back through login.
+
+def _norm_guide_code(raw: str):
+    raw = (raw or "").strip().upper().replace(" ", "")
+    m = TOUR_CODE_RE.fullmatch(raw)
+    return _norm_code(m.group(1)) if m else None
+
+
+def _guide_token(code: str) -> str:
+    return hashlib.sha256(f"ki360guide:{code}:{APP_PASSWORD}".encode()).hexdigest()[:24]
+
+
+def _guide_code_from_request(request: Request):
+    raw = request.cookies.get("ki360_guide") or ""
+    code, _, token = raw.partition(":")
+    if not code or not token or token != _guide_token(code):
+        return None
+    return code
+
+
+GUIDE_LOGIN_HTML = """<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ki.360 — გიდის შესვლა</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232563eb'/%3E%3Ctext x='50' y='78' font-family='Arial,Helvetica,sans-serif' font-size='82' font-weight='800' letter-spacing='-4' fill='%23ffffff' text-anchor='middle'%3Eki%3C/text%3E%3C/svg%3E"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+* { box-sizing: border-box; font-family: 'Noto Sans Georgian', sans-serif; }
+body { background: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+.card { background: #1e293b; border-radius: 16px; padding: 40px 36px; width: 340px; box-shadow: 0 20px 60px #0005; }
+h1 { color: #f1f5f9; font-size: 28px; margin: 0 0 6px; }
+p { color: #94a3b8; font-size: 13px; margin: 0 0 28px; }
+label { display: block; color: #cbd5e1; font-size: 12px; margin-bottom: 6px; }
+input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #334155;
+        background: #0f172a; color: #f1f5f9; font-size: 15px; outline: none; margin-bottom: 16px;
+        text-transform: uppercase; }
+input:focus { border-color: #fbbf24; }
+button { width: 100%; padding: 12px; background: #fbbf24; color: #0f172a; border: none;
+         border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }
+button:hover { background: #f59e0b; }
+.err { color: #f87171; font-size: 13px; margin-bottom: 14px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>ki.360</h1>
+  <p>გიდის შესვლა — ტურის კოდი (მაგ: ZT0831)</p>
+  {error}
+  <form method="post" action="/guide/login">
+    <label>ტურის კოდი</label>
+    <input type="text" name="username" autocomplete="off" autofocus/>
+    <label>ტურის კოდი (გაიმეორეთ)</label>
+    <input type="text" name="password" autocomplete="off"/>
+    <button type="submit">შესვლა →</button>
+  </form>
+</div>
+</body>
+</html>"""
+
+
+@app.get("/guide/login", response_class=HTMLResponse)
+def guide_login_page():
+    return GUIDE_LOGIN_HTML.replace("{error}", "")
+
+
+@app.post("/guide/login")
+async def guide_login_submit(username: str = Form(...), password: str = Form(...)):
+    code_u = _norm_guide_code(username)
+    code_p = _norm_guide_code(password)
+    if code_u and code_u == code_p and db.get_tour_detail(code_u):
+        resp = RedirectResponse("/guide", status_code=302)
+        resp.set_cookie("ki360_guide", f"{code_u}:{_guide_token(code_u)}",
+                         httponly=True, samesite="lax", max_age=COOKIE_MAX_AGE)
+        return resp
+    html = GUIDE_LOGIN_HTML.replace(
+        "{error}", '<div class="err">ტურის კოდი არასწორია ან ვერ მოიძებნა</div>')
+    return HTMLResponse(html, status_code=401)
+
+
+@app.get("/guide/logout")
+def guide_logout():
+    resp = RedirectResponse("/guide/login", status_code=302)
+    resp.delete_cookie("ki360_guide")
+    return resp
+
+
+GUIDE_PAGE_HTML = """<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ki.360 — ჩემი ტური</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232563eb'/%3E%3Ctext x='50' y='78' font-family='Arial,Helvetica,sans-serif' font-size='82' font-weight='800' letter-spacing='-4' fill='%23ffffff' text-anchor='middle'%3Eki%3C/text%3E%3C/svg%3E"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+* { box-sizing: border-box; font-family: 'Noto Sans Georgian', sans-serif; }
+body { background: #f1f5f9; margin: 0; color: #1e293b; }
+header { background: #0f172a; color: #f1f5f9; padding: 16px 20px; display: flex;
+         align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+header .title { font-weight: 700; font-size: 18px; }
+header a { color: #94a3b8; font-size: 13px; text-decoration: none; }
+main { max-width: 760px; margin: 0 auto; padding: 16px; }
+.card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px #0001; padding: 16px 18px; margin-bottom: 14px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 6px; color: #fff; font-weight: 700; font-size: 12px; margin-right: 8px; }
+.top-info { font-size: 14px; line-height: 1.9; }
+.top-info .muted { color: #94a3b8; }
+.day-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.day-head .num { font-weight: 700; color: #94a3b8; }
+.day-head .city { font-weight: 700; }
+.meals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .meals { grid-template-columns: 1fr; } }
+.meal-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; }
+.meal-box .hdr { font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+.dish { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 1px 0; }
+.dish .p { color: #94a3b8; font-size: 12px; flex-shrink: 0; }
+.own-expense { color: #ef4444; font-weight: 600; font-size: 13px; }
+.at-hotel { color: #64748b; font-size: 13px; }
+.loading, .error { text-align: center; color: #94a3b8; padding: 60px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">ki.360 — ჩემი ტური</div>
+  <a href="/guide/logout">გასვლა</a>
+</header>
+<main id="app"><div class="loading">იტვირთება...</div></main>
+<script>
+const MEAL_LABEL = {lunch: "🍽️ სადილი", dinner: "🌙 ვახშამი"};
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+function renderMeal(key, m) {
+  if (!m) return '';
+  let body;
+  if (m.own_expense) body = '<div class="own-expense">' + MEAL_LABEL[key] + ' საკუთარი ხარჯებით</div>';
+  else if (m.at_hotel) body = '<div class="at-hotel">' + MEAL_LABEL[key] + ' სასტუმროში</div>';
+  else {
+    let head = '<div class="hdr">' + MEAL_LABEL[key] + ' — ' + esc(m.restaurant) +
+      (m.restaurant_phone ? ' — ' + esc(m.restaurant_phone) : '') + '</div>';
+    let dishes = (m.dishes || []).map(d =>
+      '<div class="dish"><span>' + esc(d.name) + '</span><span class="p">' + esc(d.portions) + '</span></div>'
+    ).join('');
+    body = head + (dishes || '<div class="at-hotel">მენიუ ჯერ არ არის დამატებული</div>');
+  }
+  return '<div class="meal-box">' + body + '</div>';
+}
+
+function render(data) {
+  const app = document.getElementById('app');
+  let html = '<div class="card top-info">'
+    + '<span class="badge" style="background:' + esc(data.color) + '">' + esc(data.series) + '</span>'
+    + '<strong>' + esc(data.code) + '</strong> '
+    + (data.pax ? '<span class="muted">(' + esc(data.pax) + ')</span>' : '')
+    + '<br/>🧭 <span class="muted">გიდი:</span> ' + esc(data.guide || '—')
+    + (data.guide_phone ? ' — ' + esc(data.guide_phone) : '')
+    + '<br/>🚌 <span class="muted">მძღოლი:</span> ' + esc(data.driver || '—')
+    + '<br/>🛏️ <span class="muted">ოთახები:</span> ' + esc(data.rooms || '—')
+    + '</div>';
+
+  for (const d of data.days) {
+    html += '<div class="card">'
+      + '<div class="day-head"><span class="num">დღე ' + d.day_num + '</span>'
+      + '<span>' + esc(d.date) + '</span>'
+      + '<span class="city">📍 ' + esc(d.city) + '</span></div>'
+      + '<div class="top-info">🏨 ' + esc(d.hotel)
+      + (d.hotel_phone ? ' — ' + esc(d.hotel_phone) : '') + '</div>';
+    if (d.border_crossing) {
+      html += '<div class="top-info" style="color:#ea580c">🚧 ' + esc(d.border_crossing) + '</div>';
+    }
+    html += '<div class="meals" style="margin-top:8px">'
+      + renderMeal('lunch', d.meals && d.meals.lunch)
+      + renderMeal('dinner', d.meals && d.meals.dinner)
+      + '</div></div>';
+  }
+  app.innerHTML = html;
+}
+
+fetch('/api/guide/data')
+  .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+  .then(render)
+  .catch(() => { window.location.href = '/guide/login'; });
+</script>
+</body>
+</html>"""
+
+
+@app.get("/guide", response_class=HTMLResponse)
+def guide_page(request: Request):
+    if not _guide_code_from_request(request):
+        return RedirectResponse("/guide/login", status_code=302)
+    return GUIDE_PAGE_HTML
+
+
+@app.get("/api/guide/data")
+def guide_data(request: Request):
+    code = _guide_code_from_request(request)
+    if not code:
+        raise HTTPException(401, "Not signed in")
+    view = db.get_guide_view(code)
+    if not view:
+        raise HTTPException(404, "Tour not found")
+    return view
 
 
 @app.get("/ping")

@@ -464,6 +464,53 @@ def get_tour_detail(code: str):
             "days": days,
         }
 
+def get_guide_view(code: str):
+    """Full itinerary + menu for one tour, for the guide-facing read-only
+    page — every day of the tour (not just today), each with its route,
+    hotel and phone numbers, and that day's dish list when the menu is
+    known. Combines get_tour_detail's route with get_tour_menu's dish
+    breakdown, keyed by date."""
+    tour = get_tour_detail(code)
+    if not tour:
+        return None
+    menu = get_tour_menu(code)
+    menu_by_date = {}
+    if menu and not menu.get("pax_unknown"):
+        menu_by_date = {d["date"]: d["meals"] for d in menu["days"]}
+
+    with get_db() as conn:
+        t = conn.execute("SELECT driver FROM tours WHERE code=?", (code,)).fetchone()
+        driver = (t["driver"] or "") if t else ""
+        guides = [dict(g) for g in conn.execute(
+            "SELECT name, phone FROM contacts_guides").fetchall()]
+        hotels = {h["name"]: _combine_phones(h["phone"], h["phone2"]) for h in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_hotels").fetchall()}
+        restaurants = {r["name"]: _combine_phones(r["phone"], r["phone2"]) for r in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_restaurants").fetchall()}
+
+    guide_phone = match_guide_phone(tour["guide"], guides)
+    days = []
+    for d in tour["days"]:
+        lunch_name = _MEAL_PREFIX_RE.sub('', d["lunch"] or '')
+        dinner_name = _MEAL_PREFIX_RE.sub('', d["dinner"] or '')
+        days.append({
+            **d,
+            "hotel_phone": _hotel_phone_for(d["hotel"] or '', hotels),
+            "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
+            "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
+            "meals": menu_by_date.get(d["date"], {}),
+        })
+
+    return {
+        "code": tour["code"], "series": tour["series"], "series_name": tour["series_name"],
+        "bus_start": tour["bus_start"], "bus_end": tour["bus_end"],
+        "color": tour["color"], "rooms": tour["rooms"],
+        "guide": tour["guide"], "guide_phone": guide_phone, "driver": driver,
+        "pax": menu["pax"] if menu else None,
+        "days": days,
+    }
+
+
 def _pax_for_menu(conn, code: str):
     prof = conn.execute(
         "SELECT pax FROM tour_profit WHERE tour_code=?", (code,)
