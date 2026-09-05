@@ -3080,6 +3080,7 @@ function App() {
       fetch(`${API}/sync-profit`,   {method:'POST'}),
       fetch(`${API}/sync-hotels`,   {method:'POST'}),
       fetch(`${API}/sync-payment-status`, {method:'POST'}),
+      fetch(`${API}/sync-debts`,    {method:'POST'}),
     ]).finally(() => window.location.reload());
   };
 
