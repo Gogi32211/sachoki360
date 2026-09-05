@@ -343,8 +343,8 @@ function DayView({ onSelectTour }) {
                         <div>🏨 {t.hotel && t.hotel.startsWith('? ')
                           ? <span className="text-orange-500 font-semibold">{t.hotel} ⚠</span>
                           : t.hotel}{t.hotel_phone && ` — ${t.hotel_phone}`}</div>
-                        <div>🍽️ <span className="text-gray-400">L:</span> <span className={t.lunch && t.lunch.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.lunch}</span></div>
-                        <div>🌙 <span className="text-gray-400">V:</span> <span className={t.dinner && t.dinner.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.dinner}</span></div>
+                        <div>🍽️ <span className="text-gray-400">L:</span> <span className={t.lunch && t.lunch.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.lunch}</span>{t.lunch_phone && ` — ${t.lunch_phone}`}</div>
+                        <div>🌙 <span className="text-gray-400">V:</span> <span className={t.dinner && t.dinner.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.dinner}</span>{t.dinner_phone && ` — ${t.dinner_phone}`}</div>
                         {t.guide && (
                           <div className="text-gray-500">🧭 <span className="text-gray-400">გიდი:</span> {t.guide}{t.guide_phone && ` — ${t.guide_phone}`}</div>
                         )}

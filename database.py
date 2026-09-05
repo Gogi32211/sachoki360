@@ -397,19 +397,29 @@ def get_tours_on_date(check_date: str):
         ).fetchall()
         guides = [dict(g) for g in conn.execute(
             "SELECT name, phone FROM contacts_guides").fetchall()]
-        hotel_phones = {h["name"]: h["phone"] for h in conn.execute(
+        hotels = {h["name"]: h["phone"] for h in conn.execute(
             "SELECT name, phone FROM contacts_hotels").fetchall()}
+        restaurants = {r["name"]: r["phone"] for r in conn.execute(
+            "SELECT name, phone FROM contacts_restaurants").fetchall()}
         result = []
         for r in rows:
             bs = date.fromisoformat(r["bus_start"])
             cd = date.fromisoformat(check_date)
             day_num = (cd - bs).days + 1
             duration = SERIES[r["series"]]["duration"]
+            # Real, synced meal lines are the bare restaurant name; only the
+            # seed/Armenia-day templates still carry the "ლანჩი:" style
+            # prefix, so strip it before matching against the phone list.
+            lunch_name = _MEAL_PREFIX_RE.sub('', r["lunch"] or '')
+            dinner_name = _MEAL_PREFIX_RE.sub('', r["dinner"] or '')
             result.append({
                 "code": r["code"], "series": r["series"],
                 "bus_start": r["bus_start"], "bus_end": r["bus_end"],
                 "city": r["city"], "hotel": r["hotel"],
+                "hotel_phone": _hotel_phone_for(r["hotel"] or '', hotels),
                 "lunch": r["lunch"], "dinner": r["dinner"],
+                "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
+                "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
                 "border_crossing": r["border_crossing"],
                 "day_notes": r["day_notes"],
                 "day_num": day_num, "total_days": duration,
@@ -417,7 +427,6 @@ def get_tours_on_date(check_date: str):
                 "guide": r["guide"] or "",
                 "guide_phone": match_guide_phone(r["guide"] or "", guides),
                 "driver": r["driver"] or "",
-                "hotel_phone": hotel_phones.get(r["hotel"] or "", ""),
                 "color": SERIES[r["series"]]["color"],
             })
         return result
@@ -462,6 +471,36 @@ def _pax_for_menu(conn, code: str):
     return _pax_of(prof["pax"]) if prof else None
 
 
+def _match_restaurant_phone(name: str, restaurant_phones: dict) -> str:
+    """Exact match first, then the longest known name the raw text starts
+    with — same rule menu_for_restaurant uses to line up dish lists."""
+    name = (name or '').strip()
+    if not name:
+        return ''
+    if restaurant_phones.get(name):
+        return restaurant_phones[name]
+    for rname in sorted(restaurant_phones, key=len, reverse=True):
+        if name.startswith(rname) and restaurant_phones[rname]:
+            return restaurant_phones[rname]
+    return ''
+
+
+def _hotel_phone_for(hotel_name: str, hotels: dict) -> str:
+    """Bridge the informations tab's Georgian hotel names to daily_log's
+    English ones through the same Georgian/English alias table _item_dates
+    already uses to date balance-sheet hotel costs — a proven mapping
+    between the two vocabularies, rather than a fresh guess."""
+    name_l = (hotel_name or '').lower()
+    if not name_l:
+        return ''
+    for ka_tokens, en_tokens in _HOTEL_ALIASES:
+        if any(t in name_l for t in en_tokens):
+            for hname, phone in hotels.items():
+                if phone and any(k in hname for k in ka_tokens):
+                    return phone
+    return ''
+
+
 def get_tour_menu(code: str):
     """Per-day lunch/dinner menu + portions for a tour, sized to its own pax.
 
@@ -496,16 +535,6 @@ def get_tour_menu(code: str):
             "SELECT name, phone FROM contacts_guides").fetchall()])
         restaurant_phones = {r["name"]: r["phone"] for r in conn.execute(
             "SELECT name, phone FROM contacts_restaurants").fetchall()}
-
-    def _restaurant_phone(name):
-        # Same rule as menu_for_restaurant: exact match first, then the
-        # longest known name the balance-sheet text starts with.
-        if restaurant_phones.get(name):
-            return restaurant_phones[name]
-        for rname in sorted(restaurant_phones, key=len, reverse=True):
-            if name.startswith(rname) and restaurant_phones[rname]:
-                return restaurant_phones[rname]
-        return None
 
     if tourists is None:
         return {
@@ -544,7 +573,7 @@ def get_tour_menu(code: str):
                     date_str=day_date.strftime("%-d.%m.%y"),
                     tour_code=tour["code"], tourists=tourists,
                     portion_label=label, guide=guide, guide_phone=guide_phone,
-                    phone=_restaurant_phone(restaurant),
+                    phone=_match_restaurant_phone(restaurant, restaurant_phones),
                 ),
             }
             if dishes:

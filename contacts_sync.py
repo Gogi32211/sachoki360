@@ -8,8 +8,10 @@ since the three lists don't share a key with what's already stored:
   - restaurants are already Georgian script, same as menu_data and
     tour_meals — near-exact, with a small alias table for known spelling
     variants between the two sheets.
-  - hotels are Georgian brand names, bridged to the canonical English names
-    already used in daily_log.hotel via a small hand-built table.
+  - hotels are Georgian brand names here, matched against daily_log's
+    English ones by database.py's _hotel_phone_for(), which reuses the
+    Georgian/English alias table _item_dates already relies on to date
+    balance-sheet hotel costs — not something this module handles.
   - guides are Georgian names here, but tours.guide is transliterated to
     Latin by schedule_sync's sheet reader — matched by transliterating the
     Georgian name and comparing normalized words, so this one can
@@ -31,19 +33,6 @@ _GEO_LAT = {
     'პ': 'p', 'ჟ': 'zh', 'რ': 'r', 'ს': 's', 'ტ': 't', 'უ': 'u', 'ფ': 'p',
     'ქ': 'k', 'ღ': 'gh', 'ყ': 'q', 'შ': 'sh', 'ჩ': 'ch', 'ც': 'ts',
     'ძ': 'dz', 'წ': 'ts', 'ჭ': 'ch', 'ხ': 'kh', 'ჯ': 'j', 'ჰ': 'h',
-}
-
-# Georgian brand name (informations tab) -> canonical English name used in
-# daily_log.hotel / sheets_sync.HOTEL_MAP.
-HOTEL_ALIASES = {
-    'ჰუალინგი': 'Hualing Tbilisi',
-    'მარკო პოლო': 'Marco Polo Gudauri',
-    'პულმან თბილისი': 'Pullman Tbilisi',
-    'გრინვუდ ბათუმი': 'Greenwood Batumi',
-    'ლილატ მესტია': 'Lilate Mestia',
-    'უშბა ჰოტელ': 'Ushba Hotel',
-    'გუდაური ინნ': 'Gudauri Inn',
-    'გორი ინნ': 'Gori Inn',
 }
 
 # Known spelling variants between the "informations" tab and
@@ -101,9 +90,8 @@ def fetch_contacts() -> dict:
 
             h_name = str(cells[4] or '').strip()
             if h_name:
-                canon = HOTEL_ALIASES.get(h_name, h_name)
-                hotels[canon] = {"phone": _norm_phone(cells[5]),
-                                  "phone2": _norm_phone(cells[6])}
+                hotels[h_name] = {"phone": _norm_phone(cells[5]),
+                                   "phone2": _norm_phone(cells[6])}
 
             r_name = str(cells[8] or '').strip()
             if r_name:
