@@ -572,14 +572,16 @@ def get_tour_menu(code: str):
                 meals[meal_key] = {"at_hotel": True}
                 continue
             dishes = menu_for_restaurant(restaurant)
+            r_phone = _match_restaurant_phone(restaurant, restaurant_phones)
             entry = {
                 "restaurant": restaurant,
+                "restaurant_phone": r_phone,
                 "reservation_text": reservation_text(
                     meal=meal_key, restaurant=restaurant,
                     date_str=day_date.strftime("%-d.%m.%y"),
                     tour_code=tour["code"], tourists=tourists,
                     portion_label=label, guide=guide, guide_phone=guide_phone,
-                    phone=_match_restaurant_phone(restaurant, restaurant_phones),
+                    phone=r_phone,
                 ),
             }
             if dishes:
@@ -597,6 +599,7 @@ def get_tour_menu(code: str):
     return {
         "code": tour["code"], "series": tour["series"],
         "pax": f"{tourists}+1", "portion_label": label, "pax_unknown": False,
+        "guide": guide, "guide_phone": guide_phone,
         "days": days,
     }
 
@@ -614,6 +617,8 @@ def get_active_menu_tours():
         "tomorrow": (today + timedelta(days=1)).isoformat(),
     }
     with get_db() as conn:
+        guides = [dict(g) for g in conn.execute(
+            "SELECT name, phone FROM contacts_guides").fetchall()]
         result = {}
         for label, d in spans.items():
             rows = conn.execute(
@@ -630,6 +635,7 @@ def get_active_menu_tours():
                 out.append({
                     "code": r["code"], "series": r["series"],
                     "city": r["city"], "guide": r["guide"] or "",
+                    "guide_phone": match_guide_phone(r["guide"] or "", guides),
                     "pax": f"{tourists}+1",
                 })
             result[label] = out
