@@ -151,9 +151,12 @@ function TimelineView({ onSelectTour }) {
     const bs = new Date(tour.bus_start + "T00:00:00");
     const be = new Date(tour.bus_end + "T00:00:00");
     const s = Math.max(0, Math.round((bs - monthStart) / 86400000));
-    const e = Math.min(daysInMonth, Math.round((be - monthStart) / 86400000));
-    if (e <= 0 || s >= daysInMonth) return null;
-    return { left: s * DAY_W, width: Math.max((e - s) * DAY_W - 2, 10) };
+    const e = Math.min(daysInMonth - 1, Math.round((be - monthStart) / 86400000));
+    if (e < 0 || s >= daysInMonth) return null;
+    // bus_end is itself a tour day (often the flight-home day) — the bar
+    // needs to cover through the end of that day's column, not stop at its
+    // start, so the day count is (e - s + 1), not (e - s).
+    return { left: s * DAY_W, width: Math.max((e - s + 1) * DAY_W - 2, 10) };
   };
 
   const handleBarClick = async (tour, e) => {

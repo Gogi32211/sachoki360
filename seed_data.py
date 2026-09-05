@@ -196,8 +196,8 @@ SERIES["TK"] = {
 # TM — 10 დღე: იწყება ურუმჩი→ერევანის ფრენით (CZ5091), სრულდება თბილისი→ბაქოთი.
 # დღე 1 = ტურის პირველი დღე → offset 0.
 SERIES["TM"] = {
-    "name": "TM — 10 დღე (სომხეთი + საქართველო)",
-    "duration": 10,
+    "name": "TM — 11 დღე (სომხეთი + საქართველო)",
+    "duration": 11,
     "color": "#0891B2",
     "nights": {
         0: {"city": "✈ Urumqi→Yerevan", "hotel": "Radisson Blu Yerevan",
@@ -221,17 +221,20 @@ SERIES["TM"] = {
             "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ადგილობრივი", "border": None},
         8: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
             "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: არ შედის", "border": None},
-        9: {"city": "✈ Tbilisi→Baku", "hotel": "—",
+        9: {"city": "Baku", "hotel": "Baku Hotel (TBD)",
             "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: ჩინური",
-            "border": None, "notes": "J28226 21:20 / J28234 16:40"},
+            "border": None},
+        10: {"city": "✈ Baku→Urumqi", "hotel": "—",
+             "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: არ შედის",
+             "border": None, "notes": "J28226 21:20 / J28234 16:40"},
     },
 }
 
 # TV — 7 დღე: იწყება ურუმჩი→ერევანის ფრენით (CZ5091), სრულდება თბილისი→ბაქოთი.
 # დღე 1 = ტურის პირველი დღე → offset 0.
 SERIES["TV"] = {
-    "name": "TV — 7 დღე (სომხეთი + საქართველო)",
-    "duration": 7,
+    "name": "TV — 8 დღე (სომხეთი + საქართველო)",
+    "duration": 8,
     "color": "#65A30D",
     "nights": {
         0: {"city": "✈ Urumqi→Yerevan", "hotel": "Radisson Blu Yerevan",
@@ -250,8 +253,11 @@ SERIES["TV"] = {
         5: {"city": "Tbilisi", "hotel": "Hualing / Pine / Pullman (TBD)",
             "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: მარნის დეგუსტაცია + ცეკვის შოუ",
             "border": None},
-        6: {"city": "✈ Tbilisi→Baku", "hotel": "—",
+        6: {"city": "Baku", "hotel": "Baku Hotel (TBD)",
             "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: საკუთარი ხარჯებით",
+            "border": None},
+        7: {"city": "✈ Baku→Urumqi", "hotel": "—",
+            "lunch": "ლანჩი: ადგილობრივი", "dinner": "ვახშამი: არ შედის",
             "border": None, "notes": "J28234 16:40 / J28226 21:20"},
     },
 }
