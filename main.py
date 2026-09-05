@@ -266,18 +266,25 @@ function esc(s) {
   return d.innerHTML;
 }
 
-function renderMeal(key, m) {
-  if (!m) return '';
+function renderMeal(key, rawText, m) {
   let body;
-  if (m.own_expense) body = '<div class="own-expense">' + MEAL_LABEL[key] + ' საკუთარი ხარჯებით</div>';
-  else if (m.at_hotel) body = '<div class="at-hotel">' + MEAL_LABEL[key] + ' სასტუმროში</div>';
-  else {
+  if (m && m.own_expense) {
+    body = '<div class="own-expense">' + MEAL_LABEL[key] + ' საკუთარი ხარჯებით</div>';
+  } else if (m && m.at_hotel) {
+    body = '<div class="at-hotel">' + MEAL_LABEL[key] + ' სასტუმროში</div>';
+  } else if (m && m.restaurant) {
     let head = '<div class="hdr">' + MEAL_LABEL[key] + ' — ' + esc(m.restaurant) +
       (m.restaurant_phone ? ' — ' + esc(m.restaurant_phone) : '') + '</div>';
     let dishes = (m.dishes || []).map(d =>
       '<div class="dish"><span>' + esc(d.name) + '</span><span class="p">' + esc(d.portions) + '</span></div>'
     ).join('');
     body = head + (dishes || '<div class="at-hotel">მენიუ ჯერ არ არის დამატებული</div>');
+  } else {
+    // No synced meal data for this day yet — show the raw itinerary text,
+    // same as the office's own Day View, so nothing is silently blank.
+    const isOwn = rawText && rawText.indexOf('საკუთარი') !== -1;
+    body = '<div class="' + (isOwn ? 'own-expense' : 'at-hotel') + '">' +
+      MEAL_LABEL[key] + ': ' + esc(rawText || '—') + '</div>';
   }
   return '<div class="meal-box">' + body + '</div>';
 }
@@ -305,8 +312,8 @@ function render(data) {
       html += '<div class="top-info" style="color:#ea580c">🚧 ' + esc(d.border_crossing) + '</div>';
     }
     html += '<div class="meals" style="margin-top:8px">'
-      + renderMeal('lunch', d.meals && d.meals.lunch)
-      + renderMeal('dinner', d.meals && d.meals.dinner)
+      + renderMeal('lunch', d.lunch, d.meals && d.meals.lunch)
+      + renderMeal('dinner', d.dinner, d.meals && d.meals.dinner)
       + '</div></div>';
   }
   app.innerHTML = html;
