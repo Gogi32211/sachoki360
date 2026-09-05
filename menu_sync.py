@@ -36,8 +36,14 @@ MENU_SHEET_ID = "1uDHSD5EAzVhlJw2rF7RV5DlFzME4HHm8"
 
 _DRIVER_ROW_RE = re.compile(r'მძღოლი.*გიდი')
 _NUMERIC_ROW_RE = re.compile(r'^[\d.,%\s]+$')
-_RATIO_DIVIDE_RE = re.compile(r'^(\d+)\s*კაცზე\s*(\d+)$')     # "2 კაცზე 1" -> 2 people : 1 portion
-_RATIO_MULTIPLY_RE = re.compile(r'^კაცზე\s*(\d+)$')            # "კაცზე 2" -> 2 portions per person
+_RATIO_DIVIDE_RE = re.compile(r'^(\d+)\s*კაცზე\s*(\d+)$')      # "2 კაცზე 1" -> 2 people : 1 portion
+_RATIO_MULTIPLY_RE = re.compile(r'^კაცზე\s*(\d+)$')             # "კაცზე 2" -> 2 portions per person
+_RATIO_LITERAL_DIVIDE_RE = re.compile(r'^(\d+)\s*ადამიანზე\s*(\d+)$')  # already-worded "2 ადამიანზე 1"
+
+# The office has started writing the finished note text straight into the
+# ratio cell for some dishes, instead of the raw "N კაცზე M" — recognized
+# as itself rather than re-derived.
+_LITERAL_NOTES = {"გაყოფილი ორად"}
 
 # Business rules not written anywhere on this sheet.
 MANUAL_RATIOS = {
@@ -53,11 +59,20 @@ NOTE_OVERRIDES = {
 
 
 def _parse_ratio(text: str):
-    """Ratio cell text -> (numerator, denominator, note), or None."""
+    """Ratio cell text -> (numerator, denominator, note), or None.
+
+    The 1:2 divide ratio can show up three ways depending on how this
+    particular tab was last edited: the raw "2 კაცზე 1", the same thing
+    already worded as "2 ადამიანზე 1", or the office's own finished phrase
+    for it, "გაყოფილი ორად" — all three mean the same 1-portion-per-2-people
+    ratio, just spelled out to a different degree.
+    """
     text = (text or "").strip()
     if not text:
         return None
-    m = _RATIO_DIVIDE_RE.match(text)
+    if text in _LITERAL_NOTES:
+        return 1, 2, text
+    m = _RATIO_DIVIDE_RE.match(text) or _RATIO_LITERAL_DIVIDE_RE.match(text)
     if m:
         people, portions = int(m.group(1)), int(m.group(2))
         return portions, people, f"{people} ადამიანზე {portions}"
