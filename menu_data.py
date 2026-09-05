@@ -68,13 +68,23 @@ def portion_label(tourists):
 
 
 def dish_portion_label(restaurant, dish, tourists):
-    """Same "N+1" label, but honouring a dish's own ratio if it has one."""
+    """Portions for a dish, honouring its own ratio if it has one.
+
+    A ratio dish (water, soups, khinkali, ...) is ordered for the whole
+    table at once — tourists plus the constant +3 (driver, guide, the
+    extra tourist) — so it's computed over that full headcount and shown
+    as one number, not split into the usual "N+1". An odd headcount
+    rounds up, same as any other fractional result here.
+
+    A dish with no ratio of its own keeps the usual "N+1" table lookup,
+    where the +3 always round to a flat extra portion regardless of size.
+    """
     if tourists is None:
         return None
     ratio = DISH_RATIOS.get((restaurant, dish)) or DISH_RATIOS.get((None, dish))
     if ratio:
         num, den = ratio
-        return f"{math.ceil(tourists * num / den)}+1"
+        return str(math.ceil((tourists + 3) * num / den))
     return portion_label(tourists)
 
 
