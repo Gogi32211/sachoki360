@@ -249,3 +249,32 @@ def menu_for_restaurant(raw_name, prev_city=None, cur_city=None):
         if raw_name.startswith(name):
             return RESTAURANT_MENUS[name]
     return None
+
+
+def sync_menu_data(parsed: dict) -> int:
+    """Update RESTAURANT_MENUS / DISH_RATIOS / _DIARONI_ROUTES in place from
+    a fresh menu_sync.fetch_menu() read of the office's own costing sheet.
+
+    Only ever updates keys the fetch actually found — a failed or partial
+    fetch (menu_sync returns {} on error) leaves everything as it already
+    is rather than wiping dish lists out, the same rule every other sync in
+    this app follows.
+    """
+    if not parsed:
+        return 0
+    updated = 0
+    for key, dishes in (parsed.get("restaurants") or {}).items():
+        if dishes:
+            RESTAURANT_MENUS[key] = dishes
+            updated += 1
+    for key, routes in (parsed.get("routes") or {}).items():
+        if key == "დიარონი":
+            for route, dishes in routes.items():
+                if dishes:
+                    _DIARONI_ROUTES[route] = dishes
+                    updated += 1
+    for k, ratio in (parsed.get("ratios") or {}).items():
+        if ratio:
+            DISH_RATIOS[k] = ratio
+            updated += 1
+    return updated

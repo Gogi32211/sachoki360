@@ -3110,6 +3110,7 @@ function App() {
       fetch(`${API}/sync-payment-status`, {method:'POST'}),
       fetch(`${API}/sync-debts`,    {method:'POST'}),
       fetch(`${API}/sync-contacts`, {method:'POST'}),
+      fetch(`${API}/sync-menu`,     {method:'POST'}),
     ]).finally(() => window.location.reload());
   };
 

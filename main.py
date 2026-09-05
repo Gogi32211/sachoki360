@@ -18,6 +18,8 @@ from cancel_sync import fetch_cancelled_tour_codes
 from debts_sync import fetch_tour_debts
 from archive_sync import fetch_archive, fetch_archive_tours
 from contacts_sync import fetch_contacts
+from menu_sync import fetch_menu
+import menu_data
 
 app = FastAPI(title="ki.360")
 
@@ -460,6 +462,13 @@ def _background_sync():
             db.sync_contacts(contacts)
     except Exception as e:
         print(f"Contacts sync warning: {e}")
+    try:
+        menu = fetch_menu()
+        if menu:
+            n = menu_data.sync_menu_data(menu)
+            print(f"[startup] menu dishes/ratios updated: {n}")
+    except Exception as e:
+        print(f"Menu sync warning: {e}")
     print("[startup] background sync complete")
 
 
@@ -746,6 +755,15 @@ def sync_contacts():
     try:
         data = fetch_contacts()
         updated = db.sync_contacts(data)
+        return {"ok": True, "updated": updated}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.post("/api/sync-menu")
+def sync_menu():
+    try:
+        data = fetch_menu()
+        updated = menu_data.sync_menu_data(data)
         return {"ok": True, "updated": updated}
     except Exception as e:
         raise HTTPException(500, str(e))
