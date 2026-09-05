@@ -198,6 +198,15 @@ def init_db():
                   SELECT code FROM tours WHERE bus_start >= '2026-06-24'
               )
         """)
+        # "ორქოს საწმისი" is a misspelling of "ოქროს საწმისი" that made it into
+        # already-synced rows before the fix in profit_sync._SPELLING_FIXES was
+        # applied to meals_sync too — normalize what's already stored.
+        conn.execute("UPDATE tour_meals SET restaurant = REPLACE(restaurant, 'ორქოს საწმისი', 'ოქროს საწმისი') "
+                      "WHERE restaurant LIKE '%ორქოს საწმისი%'")
+        conn.execute("UPDATE daily_log SET lunch = REPLACE(lunch, 'ორქოს საწმისი', 'ოქროს საწმისი') "
+                      "WHERE lunch LIKE '%ორქოს საწმისი%'")
+        conn.execute("UPDATE daily_log SET dinner = REPLACE(dinner, 'ორქოს საწმისი', 'ოქროს საწმისი') "
+                      "WHERE dinner LIKE '%ორქოს საწმისი%'")
 
 # (vendor_name, vendor_type, timing, days_offset, notes, unit_price, currency, series_prices)
 _DEFAULT_PAYMENT_TERMS = [

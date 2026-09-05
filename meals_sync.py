@@ -17,7 +17,7 @@ from datetime import date as _date, datetime
 
 from openpyxl import load_workbook
 
-from profit_sync import TOUR_CODE_RE, _norm_code, _num, _usd_from_row
+from profit_sync import TOUR_CODE_RE, _norm_code, _num, _usd_from_row, _fix_name
 
 # Same workbooks profit_sync reads (each covers more series than its key
 # suggests — KT_DT also has DT1, ZT also has LT). MT_ST is left out: those
@@ -59,7 +59,7 @@ def _parse_workbook_meals(content: bytes) -> dict:
             if not mm:
                 continue
             mtype = 'lunch' if mm.group(1) == 'ლანჩი' else 'dinner'
-            rest = mm.group(2).strip()
+            rest = _fix_name(mm.group(2).strip())
             if not rest or _NO_VENUE_RE.search(rest):
                 continue
             cells = list(row)
@@ -136,7 +136,7 @@ STATIC_MEALS: dict = {
         {"date":"2026-05-29","meal_type":"lunch","restaurant":"სალობიე","gel_amount":493.00,"usd_amount":183.96},
         {"date":"2026-05-29","meal_type":"dinner","restaurant":"დინ შენი","gel_amount":665.00,"usd_amount":248.13},
         {"date":"2026-05-30","meal_type":"lunch","restaurant":"ფასანაური","gel_amount":512.00,"usd_amount":191.04},
-        {"date":"2026-05-30","meal_type":"dinner","restaurant":"ორქოს საწმისი","gel_amount":532.00,"usd_amount":198.51},
+        {"date":"2026-05-30","meal_type":"dinner","restaurant":"ოქროს საწმისი","gel_amount":532.00,"usd_amount":198.51},
         {"date":"2026-05-31","meal_type":"lunch","restaurant":"ახალი აზია (ისანი)","gel_amount":570.00,"usd_amount":212.69},
     ],
     "DT1-0531": [
@@ -147,7 +147,7 @@ STATIC_MEALS: dict = {
         {"date":"2026-06-05","meal_type":"lunch","restaurant":"სალობიე","gel_amount":459.00,"usd_amount":171.27},
         {"date":"2026-06-05","meal_type":"dinner","restaurant":"დინ შენი","gel_amount":560.00,"usd_amount":208.96},
         {"date":"2026-06-06","meal_type":"lunch","restaurant":"ფასანაური","gel_amount":420.00,"usd_amount":156.72},
-        {"date":"2026-06-06","meal_type":"dinner","restaurant":"ორქოს საწმისი","gel_amount":354.00,"usd_amount":132.09},
+        {"date":"2026-06-06","meal_type":"dinner","restaurant":"ოქროს საწმისი","gel_amount":354.00,"usd_amount":132.09},
         {"date":"2026-06-07","meal_type":"lunch","restaurant":"ახალი აზია (ისანი)","gel_amount":480.00,"usd_amount":179.10},
     ],
     # ── DT2 series ───────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ STATIC_MEALS: dict = {
         {"date":"2026-05-16","meal_type":"lunch","restaurant":"სალობიე","gel_amount":487.00,"usd_amount":181.72},
         {"date":"2026-05-16","meal_type":"dinner","restaurant":"დინ შენი","gel_amount":665.00,"usd_amount":248.13},
         {"date":"2026-05-17","meal_type":"lunch","restaurant":"ფასანაური","gel_amount":550.00,"usd_amount":205.22},
-        {"date":"2026-05-17","meal_type":"dinner","restaurant":"ორქოს საწმისი","gel_amount":532.00,"usd_amount":198.51},
+        {"date":"2026-05-17","meal_type":"dinner","restaurant":"ოქროს საწმისი","gel_amount":532.00,"usd_amount":198.51},
         {"date":"2026-05-18","meal_type":"lunch","restaurant":"ახალი აზია (ისანი)","gel_amount":510.00,"usd_amount":190.30},
     ],
     "DT2-0524": [
@@ -170,7 +170,7 @@ STATIC_MEALS: dict = {
         {"date":"2026-05-29","meal_type":"lunch","restaurant":"გურამიშვილის მარანი","gel_amount":1843.00,"usd_amount":687.69},
         {"date":"2026-05-29","meal_type":"dinner","restaurant":"დინ შენი","gel_amount":665.00,"usd_amount":248.13},
         {"date":"2026-05-30","meal_type":"lunch","restaurant":"ფასანაური","gel_amount":512.00,"usd_amount":191.04},
-        {"date":"2026-05-30","meal_type":"dinner","restaurant":"ორქოს საწმისი","gel_amount":532.00,"usd_amount":198.51},
+        {"date":"2026-05-30","meal_type":"dinner","restaurant":"ოქროს საწმისი","gel_amount":532.00,"usd_amount":198.51},
         {"date":"2026-05-31","meal_type":"dinner","restaurant":"ახალი აზია (ისანი)","gel_amount":570.00,"usd_amount":212.69},
     ],
     "DT2-0601": [
