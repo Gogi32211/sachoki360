@@ -27,11 +27,33 @@ if os.path.isdir(_static_dir):
 
 APP_USER = os.environ.get("APP_USER", "360")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "vai2211")
-# Stable token derived from the credentials so the login cookie survives
-# server restarts / redeploys (otherwise users get logged out every deploy).
 import hashlib
-SESSION_TOKEN = hashlib.sha256(f"ki360:{APP_USER}:{APP_PASSWORD}".encode()).hexdigest()
+
+# Office logins: username -> {password, scope}. "full" sees every tab;
+# "limited" only Timeline / დღის ხედი / ტურის დეტალი / მენიუ — no financial
+# or admin tabs. Add more limited-scope users here the same way.
+USERS = {
+    APP_USER: {"password": APP_PASSWORD, "scope": "full"},
+    "LIZI": {"password": os.environ.get("LIZI_PASSWORD", "360"), "scope": "limited"},
+}
 COOKIE_MAX_AGE = 86400 * 365  # 1 year
+
+
+def _user_token(username: str, password: str) -> str:
+    # Stable per-user token derived from the credentials so the login cookie
+    # survives server restarts / redeploys (otherwise users get logged out
+    # every deploy).
+    return hashlib.sha256(f"ki360:{username}:{password}".encode()).hexdigest()
+
+
+def _session_user(request: Request):
+    """(username, scope) for a valid session cookie, or None."""
+    raw = request.cookies.get("ki360_session") or ""
+    username, _, token = raw.partition(":")
+    info = USERS.get(username)
+    if not info or token != _user_token(username, info["password"]):
+        return None
+    return username, info["scope"]
 
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="ka">
@@ -75,7 +97,7 @@ button:hover { background: #f59e0b; }
 
 
 def _is_authed(request: Request) -> bool:
-    return request.cookies.get("ki360_session") == SESSION_TOKEN
+    return _session_user(request) is not None
 
 
 @app.middleware("http")
@@ -108,12 +130,23 @@ def login_page():
 
 @app.post("/login")
 async def login_submit(username: str = Form(...), password: str = Form(...)):
-    if secrets.compare_digest(username, APP_USER) and secrets.compare_digest(password, APP_PASSWORD):
+    info = USERS.get(username)
+    if info and secrets.compare_digest(password, info["password"]):
         resp = RedirectResponse("/", status_code=302)
-        resp.set_cookie("ki360_session", SESSION_TOKEN, httponly=True, samesite="lax", max_age=COOKIE_MAX_AGE)
+        resp.set_cookie("ki360_session", f"{username}:{_user_token(username, info['password'])}",
+                         httponly=True, samesite="lax", max_age=COOKIE_MAX_AGE)
         return resp
     html = LOGIN_HTML.replace("{error}", '<div class="err">მომხმარებელი ან პაროლი არასწორია</div>')
     return HTMLResponse(html, status_code=401)
+
+
+@app.get("/api/me")
+def me(request: Request):
+    user = _session_user(request)
+    if not user:
+        raise HTTPException(401, "Not signed in")
+    username, scope = user
+    return {"username": username, "scope": scope}
 
 
 @app.get("/logout")

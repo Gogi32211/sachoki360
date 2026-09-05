@@ -3080,10 +3080,24 @@ function SettingsView() {
 }
 
 // ── APP ────────────────────────────────────────────────────────
+const LIMITED_TAB_IDS = ["timeline", "day", "detail", "menu"];
+
 function App() {
   const [tab, setTab] = useState("day");
   const [selectedTour, setSelectedTour] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [scope, setScope] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/me`).then(r => r.json()).then(d => setScope(d.scope)).catch(() => setScope("full"));
+  }, []);
+
+  // A limited-scope user (e.g. a guide-facing office login) never sees or
+  // renders a restricted tab, even briefly — clamp the tab itself rather
+  // than only hiding its button, so stale state can't leave one mounted.
+  useEffect(() => {
+    if (scope === "limited" && !LIMITED_TAB_IDS.includes(tab)) setTab("day");
+  }, [scope, tab]);
 
   const handleSelectTour = code => { setSelectedTour(code); setTab("detail"); };
 
@@ -3099,7 +3113,7 @@ function App() {
     ]).finally(() => window.location.reload());
   };
 
-  const tabs = [
+  const ALL_TABS = [
     {id:"timeline",   label:"📊 Timeline"},
     {id:"day",        label:"📅 დღის ხედი"},
     {id:"detail",     label:"🔍 ტურის დეტალი"},
@@ -3115,6 +3129,9 @@ function App() {
     {id:"stats25",    label:"📊 სტატისტიკა 2025"},
     {id:"settings",   label:"⚙️ პარამეტრები"},
   ];
+  const tabs = scope === "limited"
+    ? ALL_TABS.filter(t => LIMITED_TAB_IDS.includes(t.id))
+    : ALL_TABS;
 
   return (
     <div className="min-h-screen bg-gray-100">
