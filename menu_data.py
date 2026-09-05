@@ -158,9 +158,10 @@ RESTAURANT_MENUS = {
         "პური", "წყალი",
     ],
     # დიარონი serves a different set depending on the route direction — the
-    # office runs it as two separate tabs (Batumi→Mestia, Mestia→Gori) — but
-    # a balance sheet just calls it "დიარონი" either way, so this is the
-    # union of both.
+    # office runs it as two separate tabs. A balance sheet just calls it
+    # "დიარონი" either way, so menu_for_restaurant picks the right one from
+    # the day's actual route (see _DIARONI_ROUTES below); this bare entry is
+    # only the fallback for when that route can't be worked out.
     "დიარონი": [
         "ბოსტნეულის სალათი", "სოკოს სუპი", "საფირმო დიარონი", "ბრინჯი",
         "პურის ასორტი", "წყალი", "ბოსტნეული კორსიკულაად", "ბოსტნეულის სუპი",
@@ -208,8 +209,21 @@ RESTAURANT_MENUS = {
     ],
 }
 
+# დიარონი's two direction-specific dish sets — see the note on the bare
+# "დიარონი" entry above. Keyed by (previous day's city, this day's city).
+_DIARONI_ROUTES = {
+    ("Batumi", "Mestia"): [
+        "ბოსტნეულის სალათი", "სოკოს სუპი", "საფირმო დიარონი",
+        "ბრინჯი", "ხბოს მწვადი", "პურის ასორტი", "წყალი",
+    ],
+    ("Mestia", "Gori"): [
+        "ბოსტნეული კორსიკულაად", "ბოსტნეულის სუპი", "ხბოს ოჯახური",
+        "ბრინჯი", "ქათმის მწვადი", "პურის ასორტი", "წყალი",
+    ],
+}
 
-def menu_for_restaurant(raw_name):
+
+def menu_for_restaurant(raw_name, prev_city=None, cur_city=None):
     """The dish list for a restaurant name as it appears in a balance sheet.
 
     Tries an exact match first — this is how a variant like "ზღაპარი (ტმ
@@ -217,7 +231,18 @@ def menu_for_restaurant(raw_name):
     "ზღაპარი" list. Balance sheets also tack on an extra descriptive word
     sometimes ("ბალკონი სიღნაღი", "კტვ ცეკვებით") and drop it other times
     ("ბალკონი", "კტვ") for the same restaurant, so failing that, the
-    longest known name that the raw text starts with wins."""
+    longest known name that the raw text starts with wins.
+
+    დიარონი is a special case: the office runs it as two separate tabs
+    depending on which leg of the route it's served on, but a balance sheet
+    just calls it "დიარონი" either way — prev_city/cur_city (the day's own
+    route) pick the right one when given; otherwise it falls through to the
+    bare "დიარონი" union like any other restaurant.
+    """
+    if raw_name == "დიარონი" and prev_city and cur_city:
+        route_dishes = _DIARONI_ROUTES.get((prev_city, cur_city))
+        if route_dishes:
+            return route_dishes
     if raw_name in RESTAURANT_MENUS:
         return RESTAURANT_MENUS[raw_name]
     for name in sorted(RESTAURANT_MENUS, key=len, reverse=True):

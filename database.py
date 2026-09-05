@@ -627,7 +627,8 @@ def get_tour_menu(code: str):
             if not (r["gel_amount"] or r["usd_amount"]):
                 meals[meal_key] = {"at_hotel": True}
                 continue
-            dish_names = menu_for_restaurant(restaurant)
+            prev_city = SERIES[tour["series"]]["nights"].get(offset - 1, {}).get("city")
+            dish_names = menu_for_restaurant(restaurant, prev_city, info.get("city"))
             dishes = [
                 {"name": d, "note": dish_note(restaurant, d),
                  "portions": dish_portion_label(restaurant, d, tourists)}
