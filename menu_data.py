@@ -33,7 +33,7 @@ PORTION_TABLE = [
 # serves them; khinkali's count is restaurant-specific since it differs
 # (1 or 2 per person depending on where it's served).
 DISH_RATIOS = {
-    (None, "წყალი"): (1.3, 2),
+    (None, "წყალი"): (1.15, 1),
     (None, "სუფი"): (1, 2),
     (None, "სოკოს სუპი"): (1, 2),
     (None, "ბოსტნეულის სუპი"): (1, 2),
