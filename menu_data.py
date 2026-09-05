@@ -98,20 +98,31 @@ RESTAURANT_PHONES = {}
 
 
 def reservation_text(*, meal, restaurant, date_str, tour_code, tourists,
-                      portion_label, guide, guide_phone=None, phone=None):
-    """The office's copy-paste reservation message for one meal."""
+                      portion_label, guide, guide_phone=None, phone=None,
+                      dishes=None):
+    """The office's copy-paste reservation message for one meal.
+
+    Includes the dish list with each dish's own portion count, when the
+    restaurant's menu is on file, so the whole reservation — not just the
+    headcount — goes out in one message. A restaurant without a menu on
+    file yet just gets the reservation lines, same as before.
+    """
     phone = phone or RESTAURANT_PHONES.get(restaurant)
     phone_part = phone or "___"
     guide_part = guide or "გიდი"
     if guide_phone:
         guide_part += f", {guide_phone}"
-    return (
+    text = (
         f"{restaurant} (ტელ: {phone_part})\n"
         f"ჯავშნის გაკეთება გვინდა, {date_str}, ტურის კოდი: {tour_code} "
         f"({tourists}+3 სტუმარი) პორციების რაოდენობა {portion_label}. "
         f"{MEAL_LABEL_GEO[meal]}. ადგილზე იქნებიან დაახლოებით "
         f"{MEAL_TIME_WINDOW[meal]}-ზე. {guide_part} დაგიკავშირდებათ."
     )
+    if dishes:
+        menu_lines = "\n".join(f"- {d['name']}: {d['portions']}" for d in dishes)
+        text += f"\n\nმენიუ:\n{menu_lines}"
+    return text
 
 
 # restaurant name (as it appears in the balance sheets) -> its dishes.

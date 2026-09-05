@@ -571,7 +571,11 @@ def get_tour_menu(code: str):
             if not (r["gel_amount"] or r["usd_amount"]):
                 meals[meal_key] = {"at_hotel": True}
                 continue
-            dishes = menu_for_restaurant(restaurant)
+            dish_names = menu_for_restaurant(restaurant)
+            dishes = [
+                {"name": d, "portions": dish_portion_label(restaurant, d, tourists)}
+                for d in dish_names
+            ] if dish_names else None
             r_phone = _match_restaurant_phone(restaurant, restaurant_phones)
             entry = {
                 "restaurant": restaurant,
@@ -581,14 +585,11 @@ def get_tour_menu(code: str):
                     date_str=day_date.strftime("%-d.%m.%y"),
                     tour_code=tour["code"], tourists=tourists,
                     portion_label=label, guide=guide, guide_phone=guide_phone,
-                    phone=r_phone,
+                    phone=r_phone, dishes=dishes,
                 ),
             }
             if dishes:
-                entry["dishes"] = [
-                    {"name": d, "portions": dish_portion_label(restaurant, d, tourists)}
-                    for d in dishes
-                ]
+                entry["dishes"] = dishes
             meals[meal_key] = entry
         days.append({
             "day_num": offset + 1,
