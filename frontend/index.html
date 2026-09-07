@@ -30,7 +30,7 @@ const { useState, useEffect, useCallback, useRef } = React;
 const API = window.location.origin + "/api";
 
 const SERIES_COLORS = {
-  ZT: "#42A5F5", LN: "#66BB6A", KT: "#FF7043", DT1: "#AB47BC", DT2: "#EC407A", LT: "#26A69A",
+  ZT: "#42A5F5", ZT1: "#0EA5E9", LN: "#66BB6A", KT: "#FF7043", DT1: "#AB47BC", DT2: "#EC407A", LT: "#26A69A",
   HM: "#F59E0B", HM1: "#F59E0B", HM2: "#D97706", HT: "#6366F1",
   TH: "#E11D48", TK: "#7C3AED", TM: "#0891B2", TV: "#65A30D",
   MT: "#0F766E", ST: "#B45309",
@@ -48,7 +48,7 @@ const ARCHIVE_SERIES_COLORS = {
 const seriesColor = s => SERIES_COLORS[s] || ARCHIVE_SERIES_COLORS[s] || '#888';
 
 // Approx tour price (USD) for a 19+1 group — revenue from clients.
-const TOUR_PRICE = { ZT: 20300, LN: 17350, KT: 13600, DT1: 13300, DT2: 13300, LT: 20300,
+const TOUR_PRICE = { ZT: 20300, ZT1: 20300, LN: 17350, KT: 13600, DT1: 13300, DT2: 13300, LT: 20300,
                      HM: 0, HM1: 0, HM2: 0, HT: 0,
                      TH: 0, TK: 0, TM: 0, TV: 0, MT: 0, ST: 0 };
 
