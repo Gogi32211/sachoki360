@@ -34,7 +34,7 @@ SHEET_IDS = {
 # desk runs them, so they must not turn up in the day view or the timeline.
 FINANCE_ONLY = ("MT_ST",)
 
-TOUR_CODE_RE = re.compile(r'((?:ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-?\d{4})')
+TOUR_CODE_RE = re.compile(r'((?:ZT1|ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-?\d{4})')
 # Group size, e.g. "19+1" = 19 tourists + 1 leader.
 PAX_RE = re.compile(r'(?<!\d)(\d{1,2})\s*\+\s*(\d{1,2})')
 _ROOM_KEYWORD_RE = re.compile(
@@ -204,7 +204,7 @@ def _run_of_dates(dates: list) -> list:
 
 
 def _norm_code(code: str) -> str:
-    return re.sub(r'(ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)(\d{4})', r'\1-\2', code)
+    return re.sub(r'(ZT1|ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)(\d{4})', r'\1-\2', code)
 
 
 def _num(v):

@@ -73,6 +73,17 @@ SERIES = {
     },
 }
 
+# ZT1 — იგივე ZT ტური, უბრალოდ იმავე დღეებში მიმავალი მეორე (პარალელური)
+# ჯგუფი — ისევე, როგორც DT1/DT2 ორივე ერთი და იგივე პროგრამის პარალელური
+# ჯგუფებია. პროგრამა სრულად იდენტურია; ცალკე კოდი მხოლოდ ორი ჯგუფის
+# გასარჩევადაა.
+SERIES["ZT1"] = {
+    "name": "ZT1 — ZT-ის იდენტური (პარალელური ჯგუფი)",
+    "duration": SERIES["ZT"]["duration"],
+    "color": "#0EA5E9",
+    "nights": {offset: dict(info) for offset, info in SERIES["ZT"]["nights"].items()},
+}
+
 # LT — ახალი სერია, ZT ტურის იდენტური პროგრამით (მცირე განსხვავებებით).
 # განსხვავება ZT-სგან: მესტიის ორივე ღამე Lilati Mestia-ში — master განრიგის
 # ფურცელში LT ჯგუფები Lilati-შია განთავსებული, არა Gistola-ში.
@@ -265,7 +276,7 @@ SERIES["TV"] = {
 # Day offset from the schedule-map's first (Baku/Almaty) date to the
 # app's bus_start (the Georgia / Khareba day). Used by schedule_sync.
 SERIES_START_OFFSET = {
-    "ZT": 3, "LN": 3, "KT": 3, "DT1": 2, "DT2": 2, "LT": 2,
+    "ZT": 3, "ZT1": 3, "LN": 3, "KT": 3, "DT1": 2, "DT2": 2, "LT": 2,
     # HM: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 3 → offset +2
     "HM": 2, "HM1": 2, "HM2": 2,
     # HT: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 4 → offset +3

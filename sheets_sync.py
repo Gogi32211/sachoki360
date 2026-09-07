@@ -18,7 +18,7 @@ CSV_URL = (
 # Same series set the rest of the app recognizes — this used to omit
 # HM1/HM2/HT/TH/TK/TM/TV, so those tours' columns were never even seen and
 # their nights stayed on the seed template's placeholder hotel.
-TOUR_RE = re.compile(r'^(ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-\d{4}$')
+TOUR_RE = re.compile(r'^(ZT1|ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-\d{4}$')
 
 # Hotels outside GEO/ARM — skip updating daily_log for these
 SKIP_HOTELS = {

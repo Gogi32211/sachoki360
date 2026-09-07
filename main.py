@@ -410,12 +410,12 @@ def _background_sync():
             print(f"[startup] rooms updated for {updated} tours")
     except Exception as e:
         print(f"Rooms sync warning: {e}")
-    for series in ("ZT", "LN", "KT", "DT1", "DT2", "LT", "TH", "TK", "TM", "TV"):
+    for series in ("ZT", "ZT1", "LN", "KT", "DT1", "DT2", "LT", "TH", "TK", "TM", "TV"):
         try:
             db.sync_series_hotels(series)
         except Exception as e:
             print(f"Hotel sync warning ({series}): {e}")
-    for series in ("ZT", "LN", "KT", "DT1", "DT2", "LT", "TH", "TK", "TM", "TV"):
+    for series in ("ZT", "ZT1", "LN", "KT", "DT1", "DT2", "LT", "TH", "TK", "TM", "TV"):
         try:
             db.sync_series_meals(series)
         except Exception as e:

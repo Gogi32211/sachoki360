@@ -11,11 +11,11 @@ from openpyxl import load_workbook
 
 MASTER_SHEET_ID = "13FoSFZqpi4QAm2CDc1qT3uB7AKHOFEJv"
 
-TOUR_CODE_RE = re.compile(r'\b((?:ZT|LN|KT|DT1|DT2|LT|ST|MT|HM)-?\d{4})\b')
+TOUR_CODE_RE = re.compile(r'\b((?:ZT1|ZT|LN|KT|DT1|DT2|LT|ST|MT|HM)-?\d{4})\b')
 
 
 def _norm_code(code: str) -> str:
-    return re.sub(r'(ZT|LN|KT|DT1|DT2|LT|ST|MT|HM)(\d{4})', r'\1-\2', code)
+    return re.sub(r'(ZT1|ZT|LN|KT|DT1|DT2|LT|ST|MT|HM)(\d{4})', r'\1-\2', code)
 
 
 def fetch_cancelled_tour_codes() -> set:
