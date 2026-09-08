@@ -20,12 +20,18 @@ from openpyxl import load_workbook
 from profit_sync import TOUR_CODE_RE, _norm_code, _num, _usd_from_row, _fix_name
 
 # Same workbooks profit_sync reads (each covers more series than its key
-# suggests — KT_DT also has DT1, ZT also has LT). MT_ST is left out: those
-# tours have no daily_log/tours rows to attach a meal day to.
+# suggests — KT_DT also has DT1, ZT also has LT). MT_ST is nominally the
+# finance-only MT/ST workbook (see profit_sync.FINANCE_ONLY — those two
+# series run under another desk and stay out of the schedule/timeline), but
+# the office also drops other series' tours in there sometimes (e.g.
+# LN-0906) — those still need a menu, so every tab here is scanned the same
+# way as the rest; a genuine MT/ST tab just never matches a scheduled tour
+# to attach its meals to, so it's a harmless no-op.
 SHEET_IDS = {
     "KT_DT": "16NWhGGHR7mXAwRyVH_vmYSrZHx1zxrAR",
     "LN":    "1p5rgt6w_1hGpDr2W3Mug1p7rYWi7L7ZR",
     "ZT":    "1aWUi7GuMFZLuSq1dp2MgP_KV4rmwXGAE",
+    "MT_ST": "1bzsKKc6lHIDuoeuK1WCbK_lG1mbPlkYN",
     "TM":    "1I_mMGVWcel93pNH72fYVM6sYlxOrPj0HHQiSxq2pS_o",
     "HM_HT": "1HCg4JqkNgA9f1SX1gXVr_7mp-WRIu0pDz1wlgrtrgRU",
 }
