@@ -112,6 +112,18 @@ def fetch_contacts() -> dict:
                             extra[key] = {"name": text, "phone": phone}
                         break
 
+        # GTC 360's own staff contacts sit under a literal "GTC 360" header
+        # cell on row 1 — found dynamically rather than by a fixed column
+        # index, since the office has already inserted a whole extra column
+        # group ("G&D დარჩენა") in front of it once, which would silently
+        # break a hardcoded position.
+        gtc_col = None
+        header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), ())
+        for i, cell in enumerate(header_row):
+            if str(cell or '').strip().upper().startswith('GTC'):
+                gtc_col = i
+                break
+
         for row in ws.iter_rows(min_row=3, values_only=True):
             cells = list(row) + [None] * 20
 
@@ -134,10 +146,11 @@ def fetch_contacts() -> dict:
 
             # GTC 360's own staff contacts (tour operator / accountant /
             # emergency), shown to guides rather than tied to any one day —
-            # two columns further right than the one-off extras above.
-            c_name = str(cells[15] or '').strip()
+            # column position found dynamically above via the "GTC 360"
+            # header cell, not hardcoded.
+            c_name = str(cells[gtc_col] or '').strip() if gtc_col is not None else ''
             if c_name:
-                phone = _norm_phone(cells[16])
+                phone = _norm_phone(cells[gtc_col + 1])
                 if phone:
                     company.append({"name": c_name, "phone": phone})
         wb.close()
