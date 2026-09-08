@@ -28,7 +28,10 @@ _ROOM_KEYWORD_RE = re.compile(
 _ROOM_ENTRY_RE = re.compile(r'(\d+)\s*(twin|single|double|king|suite)\s*(?:\(([^)]*)\))?', re.IGNORECASE)
 _DATE_LIKE_RE = re.compile(
     r'^\d{1,2}/\d{1,2}/\d{2,4}$|^\d{4}-\d{2}-\d{2}(\s+\d{2}:\d{2}:\d{2})?$')
-_DRIVER_RE = re.compile(r'^([\d][\d\s\-]{5,})\s+(\S.*)$')
+# The office writes this either "phone name" or "name phone" depending on
+# who typed it — both are accepted, whichever half isn't the phone run is
+# checked for an actual letter so stray numeric junk doesn't false-match.
+_DRIVER_RE = re.compile(r'^(?:[\d][\d\s\-]{5,}\s+(\S.*)|(\S.*?)\s+[\d][\d\s\-]{5,})$')
 
 
 def _norm_code(code: str) -> str:
@@ -201,8 +204,10 @@ def _driver_below(grid, row_i, col_i) -> str:
         return ''
     cell = (grid[ri][col_i] if col_i < len(grid[ri]) else '').strip()
     m = _DRIVER_RE.match(cell)
-    if m and _LETTER_RE.search(m.group(2)):
-        return cell
+    if m:
+        name_part = m.group(1) or m.group(2)
+        if name_part and _LETTER_RE.search(name_part):
+            return cell
     return ''
 
 

@@ -709,7 +709,7 @@ def get_tour_menu(code: str):
     return {
         "code": tour["code"], "series": tour["series"],
         "pax": f"{tourists}+1", "portion_label": label, "pax_unknown": False,
-        "guide": guide, "guide_phone": guide_phone,
+        "guide": guide, "guide_phone": guide_phone, "driver": tour["driver"] or "",
         "days": days,
     }
 
