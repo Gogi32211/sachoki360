@@ -630,7 +630,7 @@ def get_tour_menu(code: str):
             prev_city = SERIES[tour["series"]]["nights"].get(offset - 1, {}).get("city")
             dish_names = menu_for_restaurant(restaurant, prev_city, info.get("city"))
             dishes = [
-                {"name": d, "note": dish_note(restaurant, d),
+                {"name": d, "note": dish_note(restaurant, d, tourists),
                  "portions": dish_portion_label(restaurant, d, tourists)}
                 for d in dish_names
             ] if dish_names else None
