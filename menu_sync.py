@@ -12,6 +12,12 @@ of that tab's small side-table costing, and everything from there down is
 skipped — it repeats some of the same dishes at a smaller reference
 quantity, not new items.
 
+Column A holds one more optional marker: the letter "D" next to a dish
+means that dish is prone to running short, so on group sizes where the
+office's own headcount brackets land right at their thin edge (see
+menu_data._extra_dish_trigger), that one dish gets an extra portion on
+top of its usual count — everything else on the table stays as computed.
+
 A route-based or variant-based restaurant is folded into the same
 app-facing key menu_data already uses: დიარონი's two tabs key by
 (previous day's city, this day's city), exactly matching
@@ -139,7 +145,9 @@ def _parse_tab(ws):
             num, den, note = ratio
             note = NOTE_OVERRIDES.get(cell_b, note)
             ratio = (num, den, note)
-        dishes.append({"name": cell_b, "ratio": ratio})
+        cell_a = str(row[0] or '').strip() if len(row) > 0 else ''
+        extra = cell_a.upper() == "D"
+        dishes.append({"name": cell_b, "ratio": ratio, "extra": extra})
     return {"key": key, "route": route, "dishes": dishes}
 
 
@@ -147,6 +155,7 @@ def _parse_workbook(content: bytes) -> dict:
     restaurants: dict = {}
     routes: dict = {}
     ratios: dict = dict(MANUAL_RATIOS)
+    extras: dict = {}
     wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
     for ws in wb.worksheets:
         parsed = _parse_tab(ws)
@@ -167,13 +176,15 @@ def _parse_workbook(content: bytes) -> dict:
         for d in parsed["dishes"]:
             if d["ratio"]:
                 ratios[(key, d["name"])] = d["ratio"]
+            extras[(key, d["name"])] = d["extra"]
     wb.close()
-    return {"restaurants": restaurants, "routes": routes, "ratios": ratios}
+    return {"restaurants": restaurants, "routes": routes, "ratios": ratios, "extras": extras}
 
 
 def fetch_menu() -> dict:
     """Return {"restaurants": {key: [dish,...]}, "routes": {key: {(prev,cur): [dish,...]}},
-    "ratios": {(restaurant_or_None, dish): (num,den,note)}}, or {} on failure."""
+    "ratios": {(restaurant_or_None, dish): (num,den,note)},
+    "extras": {(restaurant, dish): bool}}, or {} on failure."""
     try:
         url = f"https://docs.google.com/spreadsheets/d/{MENU_SHEET_ID}/export?format=xlsx"
         resp = requests.get(url, timeout=60)
@@ -181,7 +192,8 @@ def fetch_menu() -> dict:
         result = _parse_workbook(resp.content)
         print(f"[menu_sync] parsed {len(result['restaurants'])} restaurants, "
               f"{sum(len(v) for v in result['routes'].values())} route variants, "
-              f"{len(result['ratios'])} ratios")
+              f"{len(result['ratios'])} ratios, "
+              f"{sum(1 for v in result['extras'].values() if v)} extra-eligible dishes")
         return result
     except Exception as e:
         print(f"[menu_sync] Could not fetch/parse Menu_2026.xlsx: {e}")

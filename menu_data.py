@@ -45,6 +45,27 @@ DISH_RATIOS = {
     ("ფასანაური", "ხინკალი ხორცის"): (1, 1, None),
 }
 
+# (restaurant, dish) pairs marked with "D" in column A of the office's own
+# Menu_2026.xlsx — those dishes run short right at the thin edge of each
+# headcount bracket (see _extra_dish_trigger), so they get one portion on
+# top of their usual count on exactly those group sizes. Populated by
+# sync_menu_data from the sheet; empty until the first successful sync.
+EXTRA_ELIGIBLE = set()
+
+
+def _extra_dish_trigger(tourists):
+    """Group sizes that sit at the thin edge of a headcount bracket — the
+    office's confirmed list is 6, 10-11, 15-16, 20-21, 25(-26), continuing
+    the same every-5 spacing beyond that. 5 itself is the one exception:
+    it's the bracket's own floor, not a thin edge, so it's excluded."""
+    if tourists is None or tourists < 6:
+        return False
+    return tourists % 5 in (0, 1)
+
+
+def _dish_extra_eligible(restaurant, dish):
+    return (restaurant, dish) in EXTRA_ELIGIBLE or (None, dish) in EXTRA_ELIGIBLE
+
 
 def portions_for(tourists):
     """Portions for the tourists' table, given the tourist headcount
@@ -89,10 +110,12 @@ def dish_portion_label(restaurant, dish, tourists):
     if tourists is None:
         return None
     ratio = DISH_RATIOS.get((restaurant, dish)) or DISH_RATIOS.get((None, dish))
+    extra = 1 if (_dish_extra_eligible(restaurant, dish) and _extra_dish_trigger(tourists)) else 0
     if ratio:
         num, den, _note = ratio
-        return str(math.ceil((tourists + 3) * num / den))
-    return portion_label(tourists)
+        return str(math.ceil((tourists + 3) * num / den) + extra)
+    p = portions_for(tourists)
+    return f"{p + extra}+1" if p is not None else None
 
 
 # Default arrival window, for the reservation text.
@@ -276,5 +299,13 @@ def sync_menu_data(parsed: dict) -> int:
     for k, ratio in (parsed.get("ratios") or {}).items():
         if ratio:
             DISH_RATIOS[k] = ratio
+            updated += 1
+    for k, is_extra in (parsed.get("extras") or {}).items():
+        if is_extra:
+            if k not in EXTRA_ELIGIBLE:
+                EXTRA_ELIGIBLE.add(k)
+                updated += 1
+        elif k in EXTRA_ELIGIBLE:
+            EXTRA_ELIGIBLE.discard(k)
             updated += 1
     return updated
