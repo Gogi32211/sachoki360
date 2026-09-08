@@ -267,7 +267,10 @@ header { background: #0f172a; color: #f1f5f9; padding: 16px 20px; display: flex;
          align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 header .title { font-weight: 700; font-size: 18px; }
 header a { color: #94a3b8; font-size: 13px; text-decoration: none; }
-main { max-width: 760px; margin: 0 auto; padding: 16px; }
+.layout { max-width: 1040px; margin: 0 auto; padding: 16px; display: flex; gap: 16px; align-items: flex-start; }
+.main-col { flex: 1; min-width: 0; }
+.sidebar { width: 240px; flex-shrink: 0; position: sticky; top: 16px; }
+@media (max-width: 860px) { .layout { flex-direction: column; } .sidebar { width: 100%; position: static; } }
 .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px #0001; padding: 16px 18px; margin-bottom: 14px; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; color: #fff; font-weight: 700; font-size: 12px; margin-right: 8px; }
 .top-info { font-size: 14px; line-height: 1.9; }
@@ -291,7 +294,10 @@ main { max-width: 760px; margin: 0 auto; padding: 16px; }
   <div class="title">ki.360 — ჩემი ტური</div>
   <a href="/guide/logout">გასვლა</a>
 </header>
-<main id="app"><div class="loading">იტვირთება...</div></main>
+<div class="layout">
+  <main class="main-col" id="app"><div class="loading">იტვირთება...</div></main>
+  <aside class="sidebar" id="sidebar"></aside>
+</div>
 <script>
 const MEAL_LABEL = {lunch: "🍽️ სადილი", dinner: "🌙 ვახშამი"};
 
@@ -337,12 +343,14 @@ function render(data) {
     + '<br/>🛏️ <span class="muted">ოთახები:</span> ' + esc(data.rooms || '—')
     + '</div>';
 
+  const sidebar = document.getElementById('sidebar');
   if (data.company_contacts && data.company_contacts.length) {
-    html += '<div class="card top-info"><strong>GTC 360</strong>';
+    let side = '<div class="card top-info"><strong>GTC 360</strong>';
     for (const c of data.company_contacts) {
-      html += '<br/>☎️ ' + esc(c.name) + ' — ' + esc(c.phone);
+      side += '<br/>☎️ ' + esc(c.name) + ' — ' + esc(c.phone);
     }
-    html += '</div>';
+    side += '</div>';
+    sidebar.innerHTML = side;
   }
 
   for (const d of data.days) {
