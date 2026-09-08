@@ -93,7 +93,7 @@ def fetch_contacts() -> dict:
         if ws is None:
             print(f"[contacts_sync] no '{INFO_TAB}' tab found")
             wb.close()
-            return {"guides": [], "hotels": {}, "restaurants": {}, "extra": {}, "company": [], "stay": []}
+            return {}
 
         # The three one-off contacts can be on any row/column, so scan the
         # whole tab for them before the regular min_row=3 column-position
@@ -170,10 +170,15 @@ def fetch_contacts() -> dict:
         wb.close()
         print(f"[contacts_sync] guides={len(guides)} hotels={len(hotels)} "
               f"restaurants={len(restaurants)} extra={len(extra)} company={len(company)} stay={len(stay)}")
+        return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra,
+                "company": company, "stay": stay}
     except Exception as e:
+        # Never return an all-empty-but-truthy dict here — main.py's
+        # `if contacts:` check relies on a genuine failure coming back
+        # falsy, so a bad fetch leaves existing contacts alone instead of
+        # wiping every table out via sync_contacts().
         print(f"[contacts_sync] Could not fetch/parse informations tab: {e}")
-    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra,
-            "company": company, "stay": stay}
+        return {}
 
 
 def match_guide_phone(guide_field: str, guides: list) -> str:
