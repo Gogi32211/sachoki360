@@ -716,6 +716,13 @@ def get_tour_menu(code: str):
             if "საკუთარი ხარჯებით" in restaurant:
                 meals[meal_key] = {"own_expense": True}
                 continue
+            if "სომხეთ" in restaurant:
+                # Armenia days never name a real venue -- the balance
+                # sheet's own line just says "სომხეთში", so shown the
+                # same way rather than treated as an unmatched restaurant
+                # or (worse) guessed as the night's hotel.
+                meals[meal_key] = {"armenia": True}
+                continue
             prev_city = nights.get(offset - 1, {}).get("city")
             dish_names = menu_for_restaurant(restaurant, prev_city, info.get("city"))
             r_phone = _match_restaurant_phone(restaurant, restaurant_phones)

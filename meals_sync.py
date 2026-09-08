@@ -38,10 +38,6 @@ SHEET_IDS = {
 
 MEAL_LINE_RE = re.compile(r'^(ლანჩი|ვახშამი|ვაშამი)\s*-\s*(.+)$')
 
-# Armenia days never name a restaurant at all — nothing to attach a menu to,
-# unlike an own-expense or hotel meal, which at least names a place.
-_NO_VENUE_RE = re.compile(r'სომხეთი')
-
 
 def _parse_workbook_meals(content: bytes) -> dict:
     wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
@@ -66,7 +62,7 @@ def _parse_workbook_meals(content: bytes) -> dict:
                 continue
             mtype = 'lunch' if mm.group(1) == 'ლანჩი' else 'dinner'
             rest = _fix_name(mm.group(2).strip())
-            if not rest or _NO_VENUE_RE.search(rest):
+            if not rest:
                 continue
             cells = list(row)
             gel = _num(cells[3]) if len(cells) > 3 else None
