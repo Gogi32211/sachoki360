@@ -158,7 +158,14 @@ def _parse_workbook(content: bytes) -> dict:
     extras: dict = {}
     wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
     for ws in wb.worksheets:
-        parsed = _parse_tab(ws)
+        # One tab's own quirks (a stray #REF! cell, an oddly-shaped row)
+        # must never take the rest of the workbook down with it — every
+        # other restaurant is unrelated and should still sync.
+        try:
+            parsed = _parse_tab(ws)
+        except Exception as e:
+            print(f"[menu_sync] Skipping tab '{ws.title}': {e}")
+            continue
         if not parsed or not parsed["dishes"]:
             continue
         key, route = parsed["key"], parsed["route"]
