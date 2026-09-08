@@ -42,6 +42,21 @@ RESTAURANT_ALIASES = {
     'კტვ პატარძეული': 'კტვ',
 }
 
+# Three one-off contacts the office typed into their own stray cells rather
+# than a proper repeating column (each is just a name + the very next cell
+# as its phone, sitting on its own row) — matched by prefix since neither
+# their exact cell nor their full label text is stable. Shown on daily_log
+# days that meet each one's own condition (see database.get_tours_on_date /
+# get_guide_view): border_transport on any day with a border crossing,
+# kazbegi_delika on a Kazbegi/Gudauri day, mestia_delika on a Mestia day
+# (covers both the Ushguli excursion and any night at Lilati Mestia, since
+# the bus can't reach either and this transport carries guests + luggage).
+_EXTRA_CONTACT_PREFIXES = [
+    ('სატრანსპორტო', 'border_transport'),
+    ('ყაზბეგის დელიკები', 'kazbegi_delika'),
+    ('მესტიის დელიკები', 'mestia_delika'),
+]
+
 
 def _translit(s: str) -> str:
     return ''.join(_GEO_LAT.get(ch, ch) for ch in (s or '').lower())
@@ -62,9 +77,9 @@ def _norm_phone(v) -> str:
 
 def fetch_contacts() -> dict:
     """Return {"guides": [{"name","phone"}], "hotels": {name: {phone,phone2}},
-    "restaurants": {name: {phone,phone2}}}."""
+    "restaurants": {name: {phone,phone2}}, "extra": {key: {"name","phone"}}}."""
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
-    guides, hotels, restaurants = [], {}, {}
+    guides, hotels, restaurants, extra = [], {}, {}, {}
     try:
         resp = requests.get(url, timeout=60)
         resp.raise_for_status()
@@ -77,7 +92,24 @@ def fetch_contacts() -> dict:
         if ws is None:
             print(f"[contacts_sync] no '{INFO_TAB}' tab found")
             wb.close()
-            return {"guides": [], "hotels": {}, "restaurants": {}}
+            return {"guides": [], "hotels": {}, "restaurants": {}, "extra": {}}
+
+        # The three one-off contacts can be on any row/column, so scan the
+        # whole tab for them before the regular min_row=3 column-position
+        # loop below (which only covers the repeating guide/hotel/restaurant
+        # lists starting at row 3).
+        for row in ws.iter_rows(values_only=True):
+            cells = list(row)
+            for i, cell in enumerate(cells):
+                text = str(cell or '').strip()
+                if not text:
+                    continue
+                for prefix, key in _EXTRA_CONTACT_PREFIXES:
+                    if text.startswith(prefix) and key not in extra:
+                        phone = _norm_phone(cells[i + 1]) if i + 1 < len(cells) else ''
+                        if phone:
+                            extra[key] = {"name": text, "phone": phone}
+                        break
 
         for row in ws.iter_rows(min_row=3, values_only=True):
             cells = list(row) + [None] * 11
@@ -100,10 +132,10 @@ def fetch_contacts() -> dict:
                                        "phone2": _norm_phone(cells[10])}
         wb.close()
         print(f"[contacts_sync] guides={len(guides)} hotels={len(hotels)} "
-              f"restaurants={len(restaurants)}")
+              f"restaurants={len(restaurants)} extra={len(extra)}")
     except Exception as e:
         print(f"[contacts_sync] Could not fetch/parse informations tab: {e}")
-    return {"guides": guides, "hotels": hotels, "restaurants": restaurants}
+    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra}
 
 
 def match_guide_phone(guide_field: str, guides: list) -> str:

@@ -347,6 +347,11 @@ function render(data) {
     if (d.border_crossing) {
       html += '<div class="top-info" style="color:#ea580c">🚧 ' + esc(d.border_crossing) + '</div>';
     }
+    if (d.extra_contacts) {
+      for (const c of Object.values(d.extra_contacts)) {
+        html += '<div class="top-info">🚐 ' + esc(c.name) + ' — ' + esc(c.phone) + '</div>';
+      }
+    }
     html += '<div class="meals" style="margin-top:8px">'
       + renderMeal('lunch', d.lunch, d.meals && d.meals.lunch)
       + renderMeal('dinner', d.dinner, d.meals && d.meals.dinner)

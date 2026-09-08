@@ -354,6 +354,9 @@ function DayView({ onSelectTour }) {
                         {t.border_crossing && (
                           <div className="text-orange-600 font-medium">🚧 {t.border_crossing}</div>
                         )}
+                        {t.extra_contacts && Object.values(t.extra_contacts).map((c, i) => (
+                          <div key={i} className="text-gray-500">🚐 {c.name} — {c.phone}</div>
+                        ))}
                       </div>
                       <span className="text-sm text-gray-400 flex-shrink-0">Day {t.day_num}/{t.total_days}</span>
                     </div>

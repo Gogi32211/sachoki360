@@ -145,6 +145,14 @@ def init_db():
                 phone  TEXT DEFAULT '',
                 phone2 TEXT DEFAULT ''
             );
+            -- Three one-off contacts (border transport, Kazbegi delika,
+            -- Mestia delika) keyed by a fixed internal key rather than
+            -- name, since name/phone come straight from the sheet.
+            CREATE TABLE IF NOT EXISTS contacts_extra (
+                key   TEXT PRIMARY KEY,
+                name  TEXT DEFAULT '',
+                phone TEXT DEFAULT ''
+            );
             CREATE TABLE IF NOT EXISTS tour_profit (
                 tour_code        TEXT PRIMARY KEY,
                 pax              TEXT,
@@ -446,6 +454,8 @@ def get_tours_on_date(check_date: str):
             "SELECT name, phone, phone2 FROM contacts_hotels").fetchall()}
         restaurants = {r["name"]: _combine_phones(r["phone"], r["phone2"]) for r in conn.execute(
             "SELECT name, phone, phone2 FROM contacts_restaurants").fetchall()}
+        extra = {r["key"]: {"name": r["name"], "phone": r["phone"]} for r in conn.execute(
+            "SELECT * FROM contacts_extra").fetchall()}
         result = []
         for r in rows:
             bs = date.fromisoformat(r["bus_start"])
@@ -466,6 +476,7 @@ def get_tours_on_date(check_date: str):
                 "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
                 "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
                 "border_crossing": r["border_crossing"],
+                "extra_contacts": _extra_contacts_for_day(extra, r["city"], r["border_crossing"]),
                 "day_notes": r["day_notes"],
                 "day_num": day_num, "total_days": duration,
                 "rooms": r["rooms"] or "",
@@ -532,6 +543,8 @@ def get_guide_view(code: str):
             "SELECT name, phone, phone2 FROM contacts_hotels").fetchall()}
         restaurants = {r["name"]: _combine_phones(r["phone"], r["phone2"]) for r in conn.execute(
             "SELECT name, phone, phone2 FROM contacts_restaurants").fetchall()}
+        extra = {r["key"]: {"name": r["name"], "phone": r["phone"]} for r in conn.execute(
+            "SELECT * FROM contacts_extra").fetchall()}
 
     guide_phone = match_guide_phone(tour["guide"], guides)
     days = []
@@ -543,6 +556,7 @@ def get_guide_view(code: str):
             "hotel_phone": _hotel_phone_for(d["hotel"] or '', hotels),
             "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
             "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
+            "extra_contacts": _extra_contacts_for_day(extra, d["city"], d["border_crossing"]),
             "meals": menu_by_date.get(d["date"], {}),
         })
 
@@ -1980,10 +1994,12 @@ def sync_contacts(data: dict) -> int:
     guides = data.get("guides") or []
     hotels = data.get("hotels") or {}
     restaurants = data.get("restaurants") or {}
+    extra = data.get("extra") or {}
     with get_db() as conn:
         conn.execute("DELETE FROM contacts_guides")
         conn.execute("DELETE FROM contacts_hotels")
         conn.execute("DELETE FROM contacts_restaurants")
+        conn.execute("DELETE FROM contacts_extra")
         conn.executemany(
             "INSERT OR REPLACE INTO contacts_guides (name, phone) VALUES (?,?)",
             [(g["name"], g["phone"]) for g in guides])
@@ -1993,7 +2009,10 @@ def sync_contacts(data: dict) -> int:
         conn.executemany(
             "INSERT OR REPLACE INTO contacts_restaurants (name, phone, phone2) VALUES (?,?,?)",
             [(n, v.get("phone", ""), v.get("phone2", "")) for n, v in restaurants.items()])
-    return len(guides) + len(hotels) + len(restaurants)
+        conn.executemany(
+            "INSERT OR REPLACE INTO contacts_extra (key, name, phone) VALUES (?,?,?)",
+            [(k, v.get("name", ""), v.get("phone", "")) for k, v in extra.items()])
+    return len(guides) + len(hotels) + len(restaurants) + len(extra)
 
 
 def get_contacts() -> dict:
@@ -2004,7 +2023,25 @@ def get_contacts() -> dict:
                   for r in conn.execute("SELECT * FROM contacts_hotels").fetchall()}
         restaurants = {r["name"]: {"phone": r["phone"], "phone2": r["phone2"]}
                        for r in conn.execute("SELECT * FROM contacts_restaurants").fetchall()}
-    return {"guides": guides, "hotels": hotels, "restaurants": restaurants}
+        extra = {r["key"]: {"name": r["name"], "phone": r["phone"]}
+                 for r in conn.execute("SELECT * FROM contacts_extra").fetchall()}
+    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra}
+
+
+_KAZBEGI_CITIES = ("Kazbegi", "Gudauri")
+
+
+def _extra_contacts_for_day(extra: dict, city: str, border_crossing: str) -> dict:
+    """The subset of the three one-off contacts (see contacts_sync) that
+    apply to one daily_log day, keyed the same as contacts_extra."""
+    out = {}
+    if border_crossing and extra.get("border_transport"):
+        out["border_transport"] = extra["border_transport"]
+    if city in _KAZBEGI_CITIES and extra.get("kazbegi_delika"):
+        out["kazbegi_delika"] = extra["kazbegi_delika"]
+    if city == "Mestia" and extra.get("mestia_delika"):
+        out["mestia_delika"] = extra["mestia_delika"]
+    return out
 
 
 def bulk_update_rooms(meta: dict) -> int:
