@@ -216,6 +216,17 @@ def init_db():
                       "WHERE lunch LIKE '%ცენტრალ პაბ%' AND lunch NOT LIKE '%ცენტრალ პაბი%'")
         conn.execute("UPDATE daily_log SET dinner = REPLACE(dinner, 'ცენტრალ პაბ', 'ცენტრალ პაბი') "
                       "WHERE dinner LIKE '%ცენტრალ პაბ%' AND dinner NOT LIKE '%ცენტრალ პაბი%'")
+        # Same normalization for two more balance-sheet typos: "გურამიშილის"
+        # (missing "ვ") vs. "გურამიშვილის", and "ცანტრალ" vs. "ცენტრალ" — both
+        # safe as a plain replace since neither wrong spelling is a substring
+        # of its own correct form.
+        for _wrong, _right in (("გურამიშილის", "გურამიშვილის"), ("ცანტრალ", "ცენტრალ")):
+            conn.execute("UPDATE tour_meals SET restaurant = REPLACE(restaurant, ?, ?) WHERE restaurant LIKE ?",
+                          (_wrong, _right, f"%{_wrong}%"))
+            conn.execute("UPDATE daily_log SET lunch = REPLACE(lunch, ?, ?) WHERE lunch LIKE ?",
+                          (_wrong, _right, f"%{_wrong}%"))
+            conn.execute("UPDATE daily_log SET dinner = REPLACE(dinner, ?, ?) WHERE dinner LIKE ?",
+                          (_wrong, _right, f"%{_wrong}%"))
         # LN-0906 was already auto-added (from the master schedule) using the
         # regular LN template before TOUR_NIGHTS_OVERRIDE existed, so its
         # daily_log rows need a one-time correction to the tour's own real

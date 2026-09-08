@@ -107,6 +107,8 @@ def _usd_from_row(cells) -> float:
 # Known spelling corrections in balance sheets: wrong → correct.
 _SPELLING_FIXES = {
     'ორქოს': 'ოქროს',
+    'გურამიშილის': 'გურამიშვილის',
+    'ცანტრალ': 'ცენტრალ',
 }
 
 # "ცენტრალ პაბ" (missing the trailing "ი") is the same restaurant as
