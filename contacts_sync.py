@@ -205,13 +205,22 @@ def match_guide_phone(guide_field: str, guides: list) -> str:
     naming several guides for different date ranges within the same tour
     ("11-mde Nina Peiqrishvili, 12-13 Elza") is matched segment by
     segment, so every guide's own phone shows — not just whichever one
-    scores best across the whole field — joined in the same order as the
-    names themselves. Returns '' when nothing plausible matches."""
-    if not guide_field or not guides:
+    scores best across the whole field. Each phone is appended right
+    after the name/date-range it belongs to ("11-mde Nina Peiqrishvili —
+    579088982, 12-13 Elza — 579319449") rather than all names first and
+    all phones bunched at the end, so it's never ambiguous which phone
+    goes with which guide. This is meant as the full, ready-to-display
+    line — callers show it in place of the raw guide field, not
+    alongside it. Segments with no plausible match are kept, name-only.
+    Returns '' only when guide_field itself is empty."""
+    if not guide_field:
         return ''
     segments = [s.strip() for s in guide_field.split(',') if s.strip()]
-    phones = [p for p in (_best_guide_phone(seg, guides) for seg in segments) if p]
-    return ', '.join(phones)
+    parts = [
+        (f"{seg} — {phone}" if (phone := _best_guide_phone(seg, guides or [])) else seg)
+        for seg in segments
+    ]
+    return ', '.join(parts)
 
 
 # _translit renders ყ as 'q' (its standard scientific transliteration),

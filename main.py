@@ -331,8 +331,7 @@ function render(data) {
     + '<span class="badge" style="background:' + esc(data.color) + '">' + esc(data.series) + '</span>'
     + '<strong>' + esc(data.code) + '</strong> '
     + (data.pax ? '<span class="muted">(' + esc(data.pax) + ')</span>' : '')
-    + '<br/>🧭 <span class="muted">გიდი:</span> ' + esc(data.guide || '—')
-    + (data.guide_phone ? ' — ' + esc(data.guide_phone) : '')
+    + '<br/>🧭 <span class="muted">გიდი:</span> ' + esc(data.guide_phone || data.guide || '—')
     + '<br/>🚌 <span class="muted">მძღოლი:</span> ' + esc(data.driver || '—')
     + '<br/>🛏️ <span class="muted">ოთახები:</span> ' + esc(data.rooms || '—')
     + '</div>';

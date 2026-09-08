@@ -346,7 +346,7 @@ function DayView({ onSelectTour }) {
                         <div>🍽️ <span className="text-gray-400">L:</span> <span className={t.lunch && t.lunch.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.lunch}</span>{t.lunch_phone && ` — ${t.lunch_phone}`}</div>
                         <div>🌙 <span className="text-gray-400">V:</span> <span className={t.dinner && t.dinner.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.dinner}</span>{t.dinner_phone && ` — ${t.dinner_phone}`}</div>
                         {t.guide && (
-                          <div className="text-gray-500">🧭 <span className="text-gray-400">გიდი:</span> {t.guide}{t.guide_phone && ` — ${t.guide_phone}`}</div>
+                          <div className="text-gray-500">🧭 <span className="text-gray-400">გიდი:</span> {t.guide_phone || t.guide}</div>
                         )}
                         {t.driver && (
                           <div className="text-gray-500">🚌 <span className="text-gray-400">მძღოლი:</span> {t.driver}</div>
@@ -584,7 +584,7 @@ function MenuView() {
                           <span className="text-xs text-gray-400 truncate">{t.city}</span>
                         </div>
                         {t.guide && (
-                          <div className="text-xs text-gray-400 pl-1">🧭 {t.guide}{t.guide_phone && ` — ${t.guide_phone}`}</div>
+                          <div className="text-xs text-gray-400 pl-1">🧭 {t.guide_phone || t.guide}</div>
                         )}
                       </button>
                     ))}
@@ -615,7 +615,7 @@ function MenuView() {
               {menu.pax && <span className="font-mono text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 text-xs">{menu.pax}</span>}
               {menu.portion_label && <span className="text-xs text-gray-400">პორცია: {menu.portion_label}</span>}
               {menu.guide && (
-                <span className="text-sm text-gray-500">🧭 {menu.guide}{menu.guide_phone && ` — ${menu.guide_phone}`}</span>
+                <span className="text-sm text-gray-500">🧭 {menu.guide_phone || menu.guide}</span>
               )}
               {menu.driver && (
                 <span className="text-sm text-gray-500">🚌 {menu.driver}</span>
