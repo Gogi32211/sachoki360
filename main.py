@@ -267,10 +267,7 @@ header { background: #0f172a; color: #f1f5f9; padding: 16px 20px; display: flex;
          align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 header .title { font-weight: 700; font-size: 18px; }
 header a { color: #94a3b8; font-size: 13px; text-decoration: none; }
-.layout { max-width: 1040px; margin: 0 auto; padding: 16px; display: flex; gap: 16px; align-items: flex-start; }
-.main-col { flex: 1; min-width: 0; }
-.sidebar { width: 240px; flex-shrink: 0; position: sticky; top: 16px; }
-@media (max-width: 860px) { .layout { flex-direction: column; } .sidebar { width: 100%; position: static; } }
+main { max-width: 760px; margin: 0 auto; padding: 16px; }
 .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px #0001; padding: 16px 18px; margin-bottom: 14px; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; color: #fff; font-weight: 700; font-size: 12px; margin-right: 8px; }
 .top-info { font-size: 14px; line-height: 1.9; }
@@ -294,10 +291,7 @@ header a { color: #94a3b8; font-size: 13px; text-decoration: none; }
   <div class="title">ki.360 — ჩემი ტური</div>
   <a href="/guide/logout">გასვლა</a>
 </header>
-<div class="layout">
-  <main class="main-col" id="app"><div class="loading">იტვირთება...</div></main>
-  <aside class="sidebar" id="sidebar"></aside>
-</div>
+<main id="app"><div class="loading">იტვირთება...</div></main>
 <script>
 const MEAL_LABEL = {lunch: "🍽️ სადილი", dinner: "🌙 ვახშამი"};
 
@@ -333,7 +327,7 @@ function renderMeal(key, rawText, m) {
 
 function render(data) {
   const app = document.getElementById('app');
-  let html = '<div class="card top-info">'
+  let headerCard = '<div class="card top-info">'
     + '<span class="badge" style="background:' + esc(data.color) + '">' + esc(data.series) + '</span>'
     + '<strong>' + esc(data.code) + '</strong> '
     + (data.pax ? '<span class="muted">(' + esc(data.pax) + ')</span>' : '')
@@ -343,14 +337,16 @@ function render(data) {
     + '<br/>🛏️ <span class="muted">ოთახები:</span> ' + esc(data.rooms || '—')
     + '</div>';
 
-  const sidebar = document.getElementById('sidebar');
+  let html;
   if (data.company_contacts && data.company_contacts.length) {
-    let side = '<div class="card top-info"><strong>GTC 360</strong>';
+    let gtcCard = '<div class="card top-info"><strong>GTC 360</strong>';
     for (const c of data.company_contacts) {
-      side += '<br/>☎️ ' + esc(c.name) + ' — ' + esc(c.phone);
+      gtcCard += '<br/>☎️ ' + esc(c.name) + ' — ' + esc(c.phone);
     }
-    side += '</div>';
-    sidebar.innerHTML = side;
+    gtcCard += '</div>';
+    html = '<div class="meals">' + headerCard + gtcCard + '</div>';
+  } else {
+    html = headerCard;
   }
 
   for (const d of data.days) {
@@ -369,7 +365,7 @@ function render(data) {
       }
     }
     if (d.stay_contact && d.stay_contact.name) {
-      html += '<div class="top-info">🏠 ' + esc(d.stay_contact.name) + ' — ' + esc(d.stay_contact.phone) + '</div>';
+      html += '<div class="top-info">🏠 <span class="muted">პერსონალის ღამისთევა:</span> ' + esc(d.stay_contact.name) + ' — ' + esc(d.stay_contact.phone) + '</div>';
     }
     html += '<div class="meals" style="margin-top:8px">'
       + renderMeal('lunch', d.lunch, d.meals && d.meals.lunch)

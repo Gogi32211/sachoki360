@@ -215,8 +215,10 @@ def match_stay_contact(city_en: str, stay_entries: list) -> dict:
     transliterates to an exact match against daily_log's own English city
     name (ქუთაისი -> kutaisi, მესტია -> mestia, ...), so no separate
     alias table is needed beyond the one Kazbegi spelling mismatch above.
-    Returns {} for a city with no such entry (Tbilisi, say — the
-    guide/driver don't need one there)."""
+    Returns {"name": hotel_only, "phone": ...} — just the hotel half, since
+    the city is always shown as the day's own heading already — or {} for
+    a city with no such entry (Tbilisi, say — the guide/driver don't need
+    one there)."""
     if not city_en or not stay_entries:
         return {}
     city_l = city_en.strip().lower()
@@ -227,5 +229,9 @@ def match_stay_contact(city_en: str, stay_entries: list) -> dict:
         translit = _CITY_TRANSLIT_FIXES.get(translit, translit)
         if translit == city_l:
             phone = " / ".join(p for p in (entry.get("phone", ""), entry.get("phone2", "")) if p)
-            return {"name": name, "phone": phone}
+            # Just the hotel half — the city is already the day's own
+            # heading wherever this gets shown, so repeating it here (the
+            # "/ ქალაქი" part of the sheet's own text) would be redundant.
+            hotel = name.split('/', 1)[0].strip() if '/' in name else name
+            return {"name": hotel, "phone": phone}
     return {}

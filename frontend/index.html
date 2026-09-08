@@ -358,7 +358,7 @@ function DayView({ onSelectTour }) {
                           <div key={i} className="text-gray-500">🚐 {c.name} — {c.phone}</div>
                         ))}
                         {t.stay_contact && t.stay_contact.name && (
-                          <div className="text-gray-500">🏠 {t.stay_contact.name} — {t.stay_contact.phone}</div>
+                          <div className="text-gray-500">🏠 <span className="text-gray-400">პერსონალის ღამისთევა:</span> {t.stay_contact.name} — {t.stay_contact.phone}</div>
                         )}
                       </div>
                       <span className="text-sm text-gray-400 flex-shrink-0">Day {t.day_num}/{t.total_days}</span>
