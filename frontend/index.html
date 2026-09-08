@@ -644,7 +644,11 @@ function MenuView() {
                     {["lunch","dinner"].map(mk => day.meals[mk] && (
                       <div key={mk} className="border rounded-lg p-3">
                         {day.meals[mk].at_hotel ? (
-                          <div className="text-sm text-gray-500">{MEAL_LABEL[mk]} სასტუმროში</div>
+                          <div className="text-sm text-gray-500">
+                            {MEAL_LABEL[mk]} სასტუმროში
+                            {day.meals[mk].hotel && ` — ${day.meals[mk].hotel}`}
+                            {day.meals[mk].hotel_phone && ` — ${day.meals[mk].hotel_phone}`}
+                          </div>
                         ) : day.meals[mk].own_expense ? (
                           <div className="text-sm text-gray-500">{MEAL_LABEL[mk]} საკუთარი ხარჯებით</div>
                         ) : (

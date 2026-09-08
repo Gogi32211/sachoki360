@@ -306,7 +306,9 @@ function renderMeal(key, rawText, m) {
   if (m && m.own_expense) {
     body = '<div class="own-expense">' + MEAL_LABEL[key] + ' საკუთარი ხარჯებით</div>';
   } else if (m && m.at_hotel) {
-    body = '<div class="at-hotel">' + MEAL_LABEL[key] + ' სასტუმროში</div>';
+    body = '<div class="at-hotel">' + MEAL_LABEL[key] + ' სასტუმროში' +
+      (m.hotel ? ' — ' + esc(m.hotel) : '') +
+      (m.hotel_phone ? ' — ' + esc(m.hotel_phone) : '') + '</div>';
   } else if (m && m.restaurant) {
     let head = '<div class="hdr">' + MEAL_LABEL[key] + ' — ' + esc(m.restaurant) +
       (m.restaurant_phone ? ' — ' + esc(m.restaurant_phone) : '') + '</div>';

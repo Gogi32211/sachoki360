@@ -684,6 +684,10 @@ def get_tour_menu(code: str):
             "SELECT name, phone FROM contacts_guides").fetchall()])
         restaurant_phones = {r["name"]: _combine_phones(r["phone"], r["phone2"]) for r in conn.execute(
             "SELECT name, phone, phone2 FROM contacts_restaurants").fetchall()}
+        hotel_phones = {h["name"]: _combine_phones(h["phone"], h["phone2"]) for h in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_hotels").fetchall()}
+        hotel_by_date = {row["date"]: row["hotel"] for row in conn.execute(
+            "SELECT date, hotel FROM daily_log WHERE tour_code=?", (code,)).fetchall()}
 
     if tourists is None:
         return {
@@ -713,7 +717,12 @@ def get_tour_menu(code: str):
                 meals[meal_key] = {"own_expense": True}
                 continue
             if not (r["gel_amount"] or r["usd_amount"]):
-                meals[meal_key] = {"at_hotel": True}
+                hotel_name = hotel_by_date.get(day_iso, "") or ""
+                meals[meal_key] = {
+                    "at_hotel": True,
+                    "hotel": hotel_name,
+                    "hotel_phone": _hotel_phone_for(hotel_name, hotel_phones),
+                }
                 continue
             prev_city = nights.get(offset - 1, {}).get("city")
             dish_names = menu_for_restaurant(restaurant, prev_city, info.get("city"))
