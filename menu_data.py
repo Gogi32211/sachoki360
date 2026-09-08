@@ -275,12 +275,24 @@ def menu_for_restaurant(raw_name, prev_city=None, cur_city=None):
         route_dishes = _DIARONI_ROUTES.get((prev_city, cur_city))
         if route_dishes:
             return route_dishes
+    return RESTAURANT_MENUS.get(restaurant_key(raw_name))
+
+
+def restaurant_key(raw_name):
+    """The canonical RESTAURANT_MENUS/DISH_RATIOS/EXTRA_ELIGIBLE key a
+    balance sheet's raw restaurant text resolves to — same matching as
+    menu_for_restaurant, but returning the key itself. Ratio and D-marked
+    extra-portion lookups are keyed by this exact canonical name (set by
+    menu_sync from the tab title), so passing the raw balance-sheet text
+    straight through — "ბერიძეები ( აჭარული)" instead of "ბერიძეები" —
+    would miss a real ratio/extra entry even though the dish list itself
+    still resolves fine through the prefix match below."""
     if raw_name in RESTAURANT_MENUS:
-        return RESTAURANT_MENUS[raw_name]
+        return raw_name
     for name in sorted(RESTAURANT_MENUS, key=len, reverse=True):
         if raw_name.startswith(name):
-            return RESTAURANT_MENUS[name]
-    return None
+            return name
+    return raw_name
 
 
 def sync_menu_data(parsed: dict) -> int:

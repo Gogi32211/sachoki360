@@ -77,9 +77,10 @@ def _norm_phone(v) -> str:
 
 def fetch_contacts() -> dict:
     """Return {"guides": [{"name","phone"}], "hotels": {name: {phone,phone2}},
-    "restaurants": {name: {phone,phone2}}, "extra": {key: {"name","phone"}}}."""
+    "restaurants": {name: {phone,phone2}}, "extra": {key: {"name","phone"}},
+    "company": [{"name","phone"}]}."""
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
-    guides, hotels, restaurants, extra = [], {}, {}, {}
+    guides, hotels, restaurants, extra, company = [], {}, {}, {}, []
     try:
         resp = requests.get(url, timeout=60)
         resp.raise_for_status()
@@ -92,7 +93,7 @@ def fetch_contacts() -> dict:
         if ws is None:
             print(f"[contacts_sync] no '{INFO_TAB}' tab found")
             wb.close()
-            return {"guides": [], "hotels": {}, "restaurants": {}, "extra": {}}
+            return {"guides": [], "hotels": {}, "restaurants": {}, "extra": {}, "company": []}
 
         # The three one-off contacts can be on any row/column, so scan the
         # whole tab for them before the regular min_row=3 column-position
@@ -112,7 +113,7 @@ def fetch_contacts() -> dict:
                         break
 
         for row in ws.iter_rows(min_row=3, values_only=True):
-            cells = list(row) + [None] * 11
+            cells = list(row) + [None] * 20
 
             g_name = str(cells[1] or '').strip()
             if g_name and g_name not in _PLACEHOLDER_NAMES:
@@ -130,12 +131,21 @@ def fetch_contacts() -> dict:
                 canon = RESTAURANT_ALIASES.get(r_name, r_name)
                 restaurants[canon] = {"phone": _norm_phone(cells[9]),
                                        "phone2": _norm_phone(cells[10])}
+
+            # GTC 360's own staff contacts (tour operator / accountant /
+            # emergency), shown to guides rather than tied to any one day —
+            # two columns further right than the one-off extras above.
+            c_name = str(cells[15] or '').strip()
+            if c_name:
+                phone = _norm_phone(cells[16])
+                if phone:
+                    company.append({"name": c_name, "phone": phone})
         wb.close()
         print(f"[contacts_sync] guides={len(guides)} hotels={len(hotels)} "
-              f"restaurants={len(restaurants)} extra={len(extra)}")
+              f"restaurants={len(restaurants)} extra={len(extra)} company={len(company)}")
     except Exception as e:
         print(f"[contacts_sync] Could not fetch/parse informations tab: {e}")
-    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra}
+    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra, "company": company}
 
 
 def match_guide_phone(guide_field: str, guides: list) -> str:

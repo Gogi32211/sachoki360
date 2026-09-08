@@ -337,6 +337,14 @@ function render(data) {
     + '<br/>🛏️ <span class="muted">ოთახები:</span> ' + esc(data.rooms || '—')
     + '</div>';
 
+  if (data.company_contacts && data.company_contacts.length) {
+    html += '<div class="card top-info"><strong>GTC 360</strong>';
+    for (const c of data.company_contacts) {
+      html += '<br/>☎️ ' + esc(c.name) + ' — ' + esc(c.phone);
+    }
+    html += '</div>';
+  }
+
   for (const d of data.days) {
     html += '<div class="card">'
       + '<div class="day-head"><span class="num">დღე ' + d.day_num + '</span>'
