@@ -287,6 +287,34 @@ SERIES_START_OFFSET = {
     "TM": 0, "TV": 0,
 }
 
+# A specific tour code that runs a genuinely different route from the rest
+# of its series — not a template change, since every other tour of that
+# series still follows the shared SERIES[...]["nights"] plan unchanged.
+# LN-0906 goes Tbilisi → Gudauri/Kazbegi → Kutaisi → Batumi → Borjomi →
+# Yerevan (flying out of Yerevan, not Tbilisi), per the office's own
+# itinerary document for this tour — a completely different order from
+# the regular LN template (Tbilisi → Yerevan → Akhaltsikhe → Batumi →
+# Gori → Gudauri → Tbilisi → flight).
+TOUR_NIGHTS_OVERRIDE = {
+    "LN-0906": {
+        0: {"city": "Tbilisi", "hotel": "Pullman Tbilisi", "lunch": "ლანჩი: ბალკონი", "dinner": "ვახშამი: კტვ (შოთის პური)", "border": None},
+        1: {"city": "Tbilisi", "hotel": "Pullman Tbilisi", "lunch": "ლანჩი: გურამიშვილის მარანი", "dinner": "ვახშამი: ახალი აზია (ისანი)", "border": None},
+        2: {"city": "Gudauri", "hotel": "Marco Polo Gudauri", "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: მარკო პოლო", "border": None},
+        3: {"city": "Kutaisi", "hotel": "Kutaisi Inn", "lunch": "ლანჩი: ცენტრალ პაბი", "dinner": "ვახშამი: ქუთაისი ინნ", "border": None},
+        4: {"city": "Batumi", "hotel": "Greenwood Batumi", "lunch": "ლანჩი: ბერიძეები", "dinner": "ვახშამი: საკუთარი ხარჯებით", "border": None},
+        5: {"city": "Borjomi", "hotel": "Borjomi Likani", "lunch": "ლანჩი: ზღაპარი", "dinner": "ვახშამი: ფესვები", "border": None},
+        6: {"city": "Yerevan", "hotel": "Radisson Blu Yerevan", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: ბავრა"},
+        7: {"city": "✈ Yerevan→Urumqi", "hotel": "—", "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": None, "notes": "CZ5092 23:50"},
+    },
+}
+
+
+def nights_for_tour(code: str, series: str) -> dict:
+    """A tour's own night-by-night plan — the shared SERIES template unless
+    this exact tour code has a one-off override (see TOUR_NIGHTS_OVERRIDE);
+    every other tour of the same series is unaffected either way."""
+    return TOUR_NIGHTS_OVERRIDE.get(code) or SERIES[series]["nights"]
+
 TOURS_2026 = [
     {"code": "ZT-0427", "series": "ZT", "bus_start": "2026-04-30"},
     {"code": "ZT-0504", "series": "ZT", "bus_start": "2026-05-07"},

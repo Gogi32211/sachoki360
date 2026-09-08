@@ -109,10 +109,17 @@ _SPELLING_FIXES = {
     'ორქოს': 'ოქროს',
 }
 
+# "ცენტრალ პაბ" (missing the trailing "ი") is the same restaurant as
+# "ცენტრალ პაბი" — a plain dict replace would double the "ი" on names that
+# already have it (e.g. "ცენტრალ პაბი (ხინკალი)"), so this one needs the
+# negative lookahead instead of joining _SPELLING_FIXES above.
+_CENTRAL_PUB_RE = re.compile(r'ცენტრალ პაბ(?!ი)')
+
 
 def _fix_name(name: str) -> str:
     for wrong, right in _SPELLING_FIXES.items():
         name = name.replace(wrong, right)
+    name = _CENTRAL_PUB_RE.sub('ცენტრალ პაბი', name)
     return name
 
 

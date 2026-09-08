@@ -4,7 +4,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from datetime import date, timedelta, datetime, timezone
 import re as _re
-from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET
+from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET, nights_for_tour, TOUR_NIGHTS_OVERRIDE
 from menu_data import (portion_label, dish_portion_label, dish_note, reservation_text,
                         menu_for_restaurant)
 from contacts_sync import match_guide_phone
@@ -207,6 +207,33 @@ def init_db():
                       "WHERE lunch LIKE '%ორქოს საწმისი%'")
         conn.execute("UPDATE daily_log SET dinner = REPLACE(dinner, 'ორქოს საწმისი', 'ოქროს საწმისი') "
                       "WHERE dinner LIKE '%ორქოს საწმისი%'")
+        # Same normalization for "ცენტრალ პაბ" (missing the trailing "ი") vs.
+        # "ცენტრალ პაბი" — the NOT LIKE guard keeps this from double-adding
+        # the "ი" on rows that already have it correctly.
+        conn.execute("UPDATE tour_meals SET restaurant = REPLACE(restaurant, 'ცენტრალ პაბ', 'ცენტრალ პაბი') "
+                      "WHERE restaurant LIKE '%ცენტრალ პაბ%' AND restaurant NOT LIKE '%ცენტრალ პაბი%'")
+        conn.execute("UPDATE daily_log SET lunch = REPLACE(lunch, 'ცენტრალ პაბ', 'ცენტრალ პაბი') "
+                      "WHERE lunch LIKE '%ცენტრალ პაბ%' AND lunch NOT LIKE '%ცენტრალ პაბი%'")
+        conn.execute("UPDATE daily_log SET dinner = REPLACE(dinner, 'ცენტრალ პაბ', 'ცენტრალ პაბი') "
+                      "WHERE dinner LIKE '%ცენტრალ პაბ%' AND dinner NOT LIKE '%ცენტრალ პაბი%'")
+        # LN-0906 was already auto-added (from the master schedule) using the
+        # regular LN template before TOUR_NIGHTS_OVERRIDE existed, so its
+        # daily_log rows need a one-time correction to the tour's own real
+        # route — new tours pick up the override directly through
+        # nights_for_tour, but this one's rows are already sitting in the DB.
+        for _code, _nights in TOUR_NIGHTS_OVERRIDE.items():
+            _row = conn.execute("SELECT bus_start FROM tours WHERE code=?", (_code,)).fetchone()
+            if not _row:
+                continue
+            _bs = date.fromisoformat(_row["bus_start"])
+            for _offset, _info in _nights.items():
+                _day = (_bs + timedelta(days=_offset)).isoformat()
+                conn.execute(
+                    "UPDATE daily_log SET city=?, hotel=?, lunch=?, dinner=?, border_crossing=? "
+                    "WHERE tour_code=? AND date=?",
+                    (_info.get("city", ""), _info.get("hotel", ""), _info.get("lunch", ""),
+                     _info.get("dinner", ""), _info.get("border") or "", _code, _day)
+                )
 
 # (vendor_name, vendor_type, timing, days_offset, notes, unit_price, currency, series_prices)
 _DEFAULT_PAYMENT_TERMS = [
@@ -287,7 +314,7 @@ def _insert_tour(conn, code: str, series: str, bus_start: date, rooms: str = '',
         "INSERT INTO tours (code, series, bus_start, bus_end, rooms, guide) VALUES (?,?,?,?,?,?)",
         (code, series, bus_start.isoformat(), bus_end.isoformat(), rooms, guide)
     )
-    for offset, info in SERIES[series]["nights"].items():
+    for offset, info in nights_for_tour(code, series).items():
         day_date = bus_start + timedelta(days=offset)
         conn.execute(
             "INSERT INTO daily_log (tour_code, date, city, hotel, lunch, dinner, border_crossing) VALUES (?,?,?,?,?,?,?)",
@@ -297,7 +324,6 @@ def _insert_tour(conn, code: str, series: str, bus_start: date, rooms: str = '',
 
 def sync_series_meals(series_key: str):
     """Update lunch/dinner in daily_log for all tours of a given series from SERIES definition."""
-    nights = SERIES[series_key]["nights"]
     with get_db() as conn:
         tours = conn.execute(
             "SELECT code, bus_start FROM tours WHERE series=?", (series_key,)
@@ -305,7 +331,7 @@ def sync_series_meals(series_key: str):
         updated = 0
         for t in tours:
             bs = date.fromisoformat(t["bus_start"])
-            for offset, info in nights.items():
+            for offset, info in nights_for_tour(t["code"], series_key).items():
                 day_date = (bs + timedelta(days=offset)).isoformat()
                 cur = conn.execute(
                     "UPDATE daily_log SET lunch=?, dinner=? WHERE tour_code=? AND date=?",
@@ -318,7 +344,6 @@ def sync_series_meals(series_key: str):
 
 def sync_series_hotels(series_key: str):
     """Reset hotel/city in daily_log for all tours of a series to seed_data defaults."""
-    nights = SERIES[series_key]["nights"]
     with get_db() as conn:
         tours = conn.execute(
             "SELECT code, bus_start FROM tours WHERE series=?", (series_key,)
@@ -326,7 +351,7 @@ def sync_series_hotels(series_key: str):
         updated = 0
         for t in tours:
             bs = date.fromisoformat(t["bus_start"])
-            for offset, info in nights.items():
+            for offset, info in nights_for_tour(t["code"], series_key).items():
                 day_date = (bs + timedelta(days=offset)).isoformat()
                 hotel = info.get("hotel", "")
                 city = info.get("city", "")
@@ -613,11 +638,12 @@ def get_tour_menu(code: str):
             continue
         by_date.setdefault(r["date"], {})[r["meal_type"]] = r
 
+    nights = nights_for_tour(code, tour["series"])
     days = []
     for day_iso in sorted(by_date):
         day_date = date.fromisoformat(day_iso)
         offset = (day_date - bs).days
-        info = SERIES[tour["series"]]["nights"].get(offset, {})
+        info = nights.get(offset, {})
         meals = {}
         for meal_key, r in by_date[day_iso].items():
             restaurant = r["restaurant"]
@@ -627,7 +653,7 @@ def get_tour_menu(code: str):
             if not (r["gel_amount"] or r["usd_amount"]):
                 meals[meal_key] = {"at_hotel": True}
                 continue
-            prev_city = SERIES[tour["series"]]["nights"].get(offset - 1, {}).get("city")
+            prev_city = nights.get(offset - 1, {}).get("city")
             dish_names = menu_for_restaurant(restaurant, prev_city, info.get("city"))
             dishes = [
                 {"name": d, "note": dish_note(restaurant, d, tourists),
