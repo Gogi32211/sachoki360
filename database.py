@@ -716,7 +716,16 @@ def get_tour_menu(code: str):
             if "საკუთარი ხარჯებით" in restaurant:
                 meals[meal_key] = {"own_expense": True}
                 continue
-            if not (r["gel_amount"] or r["usd_amount"]):
+            prev_city = nights.get(offset - 1, {}).get("city")
+            dish_names = menu_for_restaurant(restaurant, prev_city, info.get("city"))
+            r_phone = _match_restaurant_phone(restaurant, restaurant_phones)
+            if not (r["gel_amount"] or r["usd_amount"]) and not dish_names and not r_phone:
+                # A zero recorded cost alone doesn't mean the hotel served
+                # this meal for free -- a real restaurant's own cost is
+                # sometimes just missing from this particular row (e.g.
+                # billed elsewhere). Only treat it as the hotel's own meal
+                # when the name doesn't resolve to any restaurant we
+                # actually know (no menu, no phone) either.
                 hotel_name = hotel_by_date.get(day_iso, "") or ""
                 meals[meal_key] = {
                     "at_hotel": True,
@@ -724,8 +733,6 @@ def get_tour_menu(code: str):
                     "hotel_phone": _hotel_phone_for(hotel_name, hotel_phones),
                 }
                 continue
-            prev_city = nights.get(offset - 1, {}).get("city")
-            dish_names = menu_for_restaurant(restaurant, prev_city, info.get("city"))
             # Ratio/D-marked-extra lookups are keyed by the canonical
             # Menu_2026.xlsx tab name, not the raw balance-sheet text — a
             # descriptive suffix like "ბერიძეები ( აჭარული)" would
@@ -736,7 +743,6 @@ def get_tour_menu(code: str):
                  "portions": dish_portion_label(canon, d, tourists)}
                 for d in dish_names
             ] if dish_names else None
-            r_phone = _match_restaurant_phone(restaurant, restaurant_phones)
             entry = {
                 "restaurant": restaurant,
                 "restaurant_phone": r_phone,
