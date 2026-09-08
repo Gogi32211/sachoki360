@@ -270,6 +270,17 @@ def init_db():
                     (_info.get("city", ""), _info.get("hotel", ""), _info.get("lunch", ""),
                      _info.get("dinner", ""), _info.get("border") or "", _code, _day)
                 )
+        # TM/TV used to run one extra day (the onward Baku→Urumqi flight),
+        # which isn't part of this company's own tour — it now ends the day
+        # they fly Tbilisi→Baku instead. Drop that trailing day from any
+        # TM/TV tours already inserted with the old, longer duration.
+        for _series, _new_duration in (("TM", 10), ("TV", 7)):
+            for _t in conn.execute("SELECT code, bus_start FROM tours WHERE series=?", (_series,)).fetchall():
+                _bs = date.fromisoformat(_t["bus_start"])
+                _dropped_day = (_bs + timedelta(days=_new_duration)).isoformat()
+                conn.execute("DELETE FROM daily_log WHERE tour_code=? AND date=?", (_t["code"], _dropped_day))
+                _new_end = (_bs + timedelta(days=_new_duration - 1)).isoformat()
+                conn.execute("UPDATE tours SET bus_end=? WHERE code=?", (_new_end, _t["code"]))
 
 # (vendor_name, vendor_type, timing, days_offset, notes, unit_price, currency, series_prices)
 _DEFAULT_PAYMENT_TERMS = [

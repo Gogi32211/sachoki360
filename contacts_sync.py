@@ -185,13 +185,10 @@ def fetch_contacts() -> dict:
         return {}
 
 
-def match_guide_phone(guide_field: str, guides: list) -> str:
-    """Best-effort: tours.guide is Latin-transliterated, the sheet's names
-    are Georgian — compare transliterated, normalized word sets and take
-    the best overlap. Returns '' when nothing plausible matches."""
-    if not guide_field or not guides:
-        return ''
-    field_words = set(_words(guide_field))
+def _best_guide_phone(text: str, guides: list) -> str:
+    """Best-effort: transliterated, normalized word sets, best overlap
+    wins. Returns '' when nothing plausible matches."""
+    field_words = set(_words(text))
     if not field_words:
         return ''
     best_phone, best_score = '', 0
@@ -200,6 +197,21 @@ def match_guide_phone(guide_field: str, guides: list) -> str:
         if len(overlap) > best_score:
             best_score, best_phone = len(overlap), g['phone']
     return best_phone
+
+
+def match_guide_phone(guide_field: str, guides: list) -> str:
+    """tours.guide is Latin-transliterated, the sheet's names are Georgian
+    — matched by comparing transliterated, normalized word sets. A field
+    naming several guides for different date ranges within the same tour
+    ("11-mde Nina Peiqrishvili, 12-13 Elza") is matched segment by
+    segment, so every guide's own phone shows — not just whichever one
+    scores best across the whole field — joined in the same order as the
+    names themselves. Returns '' when nothing plausible matches."""
+    if not guide_field or not guides:
+        return ''
+    segments = [s.strip() for s in guide_field.split(',') if s.strip()]
+    phones = [p for p in (_best_guide_phone(seg, guides) for seg in segments) if p]
+    return ', '.join(phones)
 
 
 # _translit renders ყ as 'q' (its standard scientific transliteration),
