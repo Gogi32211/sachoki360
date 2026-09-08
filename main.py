@@ -368,6 +368,9 @@ function render(data) {
         html += '<div class="top-info">🚐 ' + esc(c.name) + ' — ' + esc(c.phone) + '</div>';
       }
     }
+    if (d.stay_contact && d.stay_contact.name) {
+      html += '<div class="top-info">🏠 ' + esc(d.stay_contact.name) + ' — ' + esc(d.stay_contact.phone) + '</div>';
+    }
     html += '<div class="meals" style="margin-top:8px">'
       + renderMeal('lunch', d.lunch, d.meals && d.meals.lunch)
       + renderMeal('dinner', d.dinner, d.meals && d.meals.dinner)

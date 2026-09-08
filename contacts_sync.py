@@ -78,9 +78,9 @@ def _norm_phone(v) -> str:
 def fetch_contacts() -> dict:
     """Return {"guides": [{"name","phone"}], "hotels": {name: {phone,phone2}},
     "restaurants": {name: {phone,phone2}}, "extra": {key: {"name","phone"}},
-    "company": [{"name","phone"}]}."""
+    "company": [{"name","phone"}], "stay": [{"name","phone","phone2"}]}."""
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
-    guides, hotels, restaurants, extra, company = [], {}, {}, {}, []
+    guides, hotels, restaurants, extra, company, stay = [], {}, {}, {}, [], []
     try:
         resp = requests.get(url, timeout=60)
         resp.raise_for_status()
@@ -93,7 +93,7 @@ def fetch_contacts() -> dict:
         if ws is None:
             print(f"[contacts_sync] no '{INFO_TAB}' tab found")
             wb.close()
-            return {"guides": [], "hotels": {}, "restaurants": {}, "extra": {}, "company": []}
+            return {"guides": [], "hotels": {}, "restaurants": {}, "extra": {}, "company": [], "stay": []}
 
         # The three one-off contacts can be on any row/column, so scan the
         # whole tab for them before the regular min_row=3 column-position
@@ -118,11 +118,14 @@ def fetch_contacts() -> dict:
         # group ("G&D დარჩენა") in front of it once, which would silently
         # break a hardcoded position.
         gtc_col = None
+        stay_col = None
         header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), ())
         for i, cell in enumerate(header_row):
-            if str(cell or '').strip().upper().startswith('GTC'):
+            text = str(cell or '').strip()
+            if text.upper().startswith('GTC'):
                 gtc_col = i
-                break
+            elif 'დარჩენა' in text:
+                stay_col = i
 
         for row in ws.iter_rows(min_row=3, values_only=True):
             cells = list(row) + [None] * 20
@@ -153,12 +156,24 @@ def fetch_contacts() -> dict:
                 phone = _norm_phone(cells[gtc_col + 1])
                 if phone:
                     company.append({"name": c_name, "phone": phone})
+
+            # The guide/driver's own overnight-stay contact for a city
+            # they can't drive out of the same day (written "hotel /
+            # ქალაქი") — column position found dynamically too, same
+            # reasoning as the GTC block above.
+            s_name = str(cells[stay_col] or '').strip() if stay_col is not None else ''
+            if s_name:
+                phone = _norm_phone(cells[stay_col + 1])
+                if phone:
+                    stay.append({"name": s_name, "phone": phone,
+                                 "phone2": _norm_phone(cells[stay_col + 2])})
         wb.close()
         print(f"[contacts_sync] guides={len(guides)} hotels={len(hotels)} "
-              f"restaurants={len(restaurants)} extra={len(extra)} company={len(company)}")
+              f"restaurants={len(restaurants)} extra={len(extra)} company={len(company)} stay={len(stay)}")
     except Exception as e:
         print(f"[contacts_sync] Could not fetch/parse informations tab: {e}")
-    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra, "company": company}
+    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra,
+            "company": company, "stay": stay}
 
 
 def match_guide_phone(guide_field: str, guides: list) -> str:
@@ -176,3 +191,22 @@ def match_guide_phone(guide_field: str, guides: list) -> str:
         if len(overlap) > best_score:
             best_score, best_phone = len(overlap), g['phone']
     return best_phone
+
+
+def match_stay_contact(city_en: str, stay_entries: list) -> dict:
+    """The guide/driver's own overnight-stay contact for a daily_log day's
+    city, from entries written "hotel / ქალაქი" — the city half
+    transliterates to an exact match against daily_log's own English city
+    name (ქუთაისი -> kutaisi, მესტია -> mestia, ...), so no separate
+    alias table is needed. Returns {} for a city with no such entry
+    (Tbilisi, say — the guide/driver don't need one there)."""
+    if not city_en or not stay_entries:
+        return {}
+    city_l = city_en.strip().lower()
+    for entry in stay_entries:
+        name = entry.get("name", "")
+        city_part = name.rsplit('/', 1)[-1].strip() if '/' in name else name.strip()
+        if _translit(city_part) == city_l:
+            phone = " / ".join(p for p in (entry.get("phone", ""), entry.get("phone2", "")) if p)
+            return {"name": name, "phone": phone}
+    return {}

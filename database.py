@@ -7,7 +7,7 @@ import re as _re
 from seed_data import SERIES, TOURS_2026, SERIES_START_OFFSET, nights_for_tour, TOUR_NIGHTS_OVERRIDE
 from menu_data import (portion_label, dish_portion_label, dish_note, reservation_text,
                         menu_for_restaurant, restaurant_key)
-from contacts_sync import match_guide_phone
+from contacts_sync import match_guide_phone, match_stay_contact
 
 DB_PATH = "gtc360.db"
 
@@ -160,6 +160,15 @@ def init_db():
                 id    INTEGER PRIMARY KEY AUTOINCREMENT,
                 name  TEXT DEFAULT '',
                 phone TEXT DEFAULT ''
+            );
+            -- Guide/driver's own overnight-stay contact, one per city
+            -- ("hotel / ქალაქი") — matched against a day's own city, not
+            -- keyed by name.
+            CREATE TABLE IF NOT EXISTS contacts_stay (
+                id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                name   TEXT DEFAULT '',
+                phone  TEXT DEFAULT '',
+                phone2 TEXT DEFAULT ''
             );
             CREATE TABLE IF NOT EXISTS tour_profit (
                 tour_code        TEXT PRIMARY KEY,
@@ -464,6 +473,8 @@ def get_tours_on_date(check_date: str):
             "SELECT name, phone, phone2 FROM contacts_restaurants").fetchall()}
         extra = {r["key"]: {"name": r["name"], "phone": r["phone"]} for r in conn.execute(
             "SELECT * FROM contacts_extra").fetchall()}
+        stay_entries = [dict(s) for s in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_stay").fetchall()]
         result = []
         for r in rows:
             bs = date.fromisoformat(r["bus_start"])
@@ -485,6 +496,7 @@ def get_tours_on_date(check_date: str):
                 "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
                 "border_crossing": r["border_crossing"],
                 "extra_contacts": _extra_contacts_for_day(extra, r["city"], r["border_crossing"]),
+                "stay_contact": match_stay_contact(r["city"], stay_entries),
                 "day_notes": r["day_notes"],
                 "day_num": day_num, "total_days": duration,
                 "rooms": r["rooms"] or "",
@@ -555,6 +567,8 @@ def get_guide_view(code: str):
             "SELECT * FROM contacts_extra").fetchall()}
         company_contacts = [{"name": r["name"], "phone": r["phone"]} for r in conn.execute(
             "SELECT name, phone FROM contacts_company ORDER BY id").fetchall()]
+        stay_entries = [dict(s) for s in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_stay").fetchall()]
 
     guide_phone = match_guide_phone(tour["guide"], guides)
     days = []
@@ -567,6 +581,7 @@ def get_guide_view(code: str):
             "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
             "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
             "extra_contacts": _extra_contacts_for_day(extra, d["city"], d["border_crossing"]),
+            "stay_contact": match_stay_contact(d["city"], stay_entries),
             "meals": menu_by_date.get(d["date"], {}),
         })
 
@@ -2013,12 +2028,14 @@ def sync_contacts(data: dict) -> int:
     restaurants = data.get("restaurants") or {}
     extra = data.get("extra") or {}
     company = data.get("company") or []
+    stay = data.get("stay") or []
     with get_db() as conn:
         conn.execute("DELETE FROM contacts_guides")
         conn.execute("DELETE FROM contacts_hotels")
         conn.execute("DELETE FROM contacts_restaurants")
         conn.execute("DELETE FROM contacts_extra")
         conn.execute("DELETE FROM contacts_company")
+        conn.execute("DELETE FROM contacts_stay")
         conn.executemany(
             "INSERT OR REPLACE INTO contacts_guides (name, phone) VALUES (?,?)",
             [(g["name"], g["phone"]) for g in guides])
@@ -2034,7 +2051,10 @@ def sync_contacts(data: dict) -> int:
         conn.executemany(
             "INSERT INTO contacts_company (name, phone) VALUES (?,?)",
             [(c["name"], c["phone"]) for c in company])
-    return len(guides) + len(hotels) + len(restaurants) + len(extra) + len(company)
+        conn.executemany(
+            "INSERT INTO contacts_stay (name, phone, phone2) VALUES (?,?,?)",
+            [(s["name"], s["phone"], s.get("phone2", "")) for s in stay])
+    return len(guides) + len(hotels) + len(restaurants) + len(extra) + len(company) + len(stay)
 
 
 def get_contacts() -> dict:
@@ -2049,7 +2069,10 @@ def get_contacts() -> dict:
                  for r in conn.execute("SELECT * FROM contacts_extra").fetchall()}
         company = [{"name": r["name"], "phone": r["phone"]} for r in conn.execute(
             "SELECT name, phone FROM contacts_company ORDER BY id").fetchall()]
-    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra, "company": company}
+        stay = [{"name": r["name"], "phone": r["phone"], "phone2": r["phone2"]} for r in conn.execute(
+            "SELECT name, phone, phone2 FROM contacts_stay ORDER BY id").fetchall()]
+    return {"guides": guides, "hotels": hotels, "restaurants": restaurants, "extra": extra,
+            "company": company, "stay": stay}
 
 
 def get_company_contacts() -> list:
