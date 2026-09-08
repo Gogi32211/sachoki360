@@ -113,19 +113,23 @@ def fetch_contacts() -> dict:
                         break
 
         # GTC 360's own staff contacts sit under a literal "GTC 360" header
-        # cell on row 1 — found dynamically rather than by a fixed column
-        # index, since the office has already inserted a whole extra column
-        # group ("G&D დარჩენა") in front of it once, which would silently
-        # break a hardcoded position.
+        # cell, and the guide/driver stay contacts under one containing
+        # "დარჩენა" — found dynamically rather than by a fixed column
+        # index, since the office has already inserted a whole extra
+        # column group in front of the GTC block once already, which
+        # would silently break a hardcoded position. The header itself
+        # isn't reliably row 1 either (it's sometimes preceded by a blank
+        # row), so the first several rows are scanned rather than assuming
+        # a fixed row number too.
         gtc_col = None
         stay_col = None
-        header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), ())
-        for i, cell in enumerate(header_row):
-            text = str(cell or '').strip()
-            if text.upper().startswith('GTC'):
-                gtc_col = i
-            elif 'დარჩენა' in text:
-                stay_col = i
+        for header_row in ws.iter_rows(min_row=1, max_row=5, values_only=True):
+            for i, cell in enumerate(header_row):
+                text = str(cell or '').strip()
+                if text.upper().startswith('GTC'):
+                    gtc_col = i
+                elif 'დარჩენა' in text:
+                    stay_col = i
 
         for row in ws.iter_rows(min_row=3, values_only=True):
             cells = list(row) + [None] * 20
@@ -198,20 +202,30 @@ def match_guide_phone(guide_field: str, guides: list) -> str:
     return best_phone
 
 
+# _translit renders ყ as 'q' (its standard scientific transliteration),
+# but "ყაზბეგი" is conventionally spelled "Kazbegi" in English — the one
+# city name in daily_log that doesn't just fall out of the letter-by-letter
+# mapping used everywhere else here.
+_CITY_TRANSLIT_FIXES = {'qazbegi': 'kazbegi'}
+
+
 def match_stay_contact(city_en: str, stay_entries: list) -> dict:
     """The guide/driver's own overnight-stay contact for a daily_log day's
     city, from entries written "hotel / ქალაქი" — the city half
     transliterates to an exact match against daily_log's own English city
     name (ქუთაისი -> kutaisi, მესტია -> mestia, ...), so no separate
-    alias table is needed. Returns {} for a city with no such entry
-    (Tbilisi, say — the guide/driver don't need one there)."""
+    alias table is needed beyond the one Kazbegi spelling mismatch above.
+    Returns {} for a city with no such entry (Tbilisi, say — the
+    guide/driver don't need one there)."""
     if not city_en or not stay_entries:
         return {}
     city_l = city_en.strip().lower()
     for entry in stay_entries:
         name = entry.get("name", "")
         city_part = name.rsplit('/', 1)[-1].strip() if '/' in name else name.strip()
-        if _translit(city_part) == city_l:
+        translit = _translit(city_part)
+        translit = _CITY_TRANSLIT_FIXES.get(translit, translit)
+        if translit == city_l:
             phone = " / ".join(p for p in (entry.get("phone", ""), entry.get("phone2", "")) if p)
             return {"name": name, "phone": phone}
     return {}
