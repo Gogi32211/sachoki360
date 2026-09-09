@@ -651,7 +651,7 @@ function MenuView() {
                             {day.meals[mk].hotel_phone && ` — ${day.meals[mk].hotel_phone}`}
                           </div>
                         ) : day.meals[mk].own_expense ? (
-                          <div className="text-sm text-gray-500">{MEAL_LABEL[mk]} საკუთარი ხარჯებით</div>
+                          <div className="text-sm text-red-500 font-medium">{MEAL_LABEL[mk]} საკუთარი ხარჯებით</div>
                         ) : day.meals[mk].armenia ? (
                           <div className="text-sm text-gray-500">{MEAL_LABEL[mk]} სომხეთში</div>
                         ) : (
