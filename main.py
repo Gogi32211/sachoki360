@@ -277,7 +277,8 @@ main { max-width: 760px; margin: 0 auto; padding: 16px; }
 .day-head .city { font-weight: 700; }
 .meals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 520px) { .meals { grid-template-columns: 1fr; } }
-.meal-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; }
+.card.today { background: #f0fdf4; }
+.meal-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; background: #fff; }
 .meal-box .hdr { font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; }
 .dish { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 1px 0; }
 .dish .p { color: #94a3b8; font-size: 12px; flex-shrink: 0; }
@@ -352,8 +353,9 @@ function render(data) {
     html = headerCard;
   }
 
+  const todayIso = new Date().toISOString().slice(0, 10);
   for (const d of data.days) {
-    html += '<div class="card">'
+    html += '<div class="card' + (d.date === todayIso ? ' today' : '') + '">'
       + '<div class="day-head"><span class="num">დღე ' + d.day_num + '</span>'
       + '<span>' + esc(d.date) + '</span>'
       + '<span class="city">📍 ' + esc(d.city) + '</span></div>'
