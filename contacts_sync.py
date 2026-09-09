@@ -96,9 +96,8 @@ def fetch_contacts() -> dict:
             return {}
 
         # The three one-off contacts can be on any row/column, so scan the
-        # whole tab for them before the regular min_row=3 column-position
-        # loop below (which only covers the repeating guide/hotel/restaurant
-        # lists starting at row 3).
+        # whole tab for them before the regular column-position loop below
+        # (which only covers the repeating guide/hotel/restaurant lists).
         for row in ws.iter_rows(values_only=True):
             cells = list(row)
             for i, cell in enumerate(cells):
@@ -112,44 +111,50 @@ def fetch_contacts() -> dict:
                             extra[key] = {"name": text, "phone": phone}
                         break
 
-        # GTC 360's own staff contacts sit under a literal "GTC 360" header
-        # cell, and the guide/driver stay contacts under one containing
-        # "დარჩენა" — found dynamically rather than by a fixed column
-        # index, since the office has already inserted a whole extra
-        # column group in front of the GTC block once already, which
-        # would silently break a hardcoded position. The header itself
-        # isn't reliably row 1 either (it's sometimes preceded by a blank
-        # row), so the first several rows are scanned rather than assuming
-        # a fixed row number too.
-        gtc_col = None
-        stay_col = None
-        for header_row in ws.iter_rows(min_row=1, max_row=5, values_only=True):
+        # Every repeating block's own column position is found dynamically
+        # from its header text, rather than a fixed index — the office has
+        # repeatedly inserted or dropped gap columns between blocks (it
+        # already broke a hardcoded GTC/stay position once), and the same
+        # kind of shift has since silently moved the hotel/restaurant
+        # blocks over by one column too, without any header rename to
+        # signal it. The header itself isn't reliably row 1 either (it's
+        # sometimes preceded by a blank row), so the first several rows
+        # are scanned rather than assuming a fixed row number.
+        guide_col = hotel_col = restaurant_col = gtc_col = stay_col = None
+        header_row_num = 2  # data starts right after, same fallback as before
+        for row_num, header_row in enumerate(ws.iter_rows(min_row=1, max_row=5, values_only=True), start=1):
             for i, cell in enumerate(header_row):
                 text = str(cell or '').strip()
-                if text.upper().startswith('GTC'):
+                if text == 'გიდი':
+                    guide_col, header_row_num = i, row_num
+                elif text == 'სასტუმრო':
+                    hotel_col = i
+                elif text == 'რესტორანი':
+                    restaurant_col = i
+                elif text.upper().startswith('GTC'):
                     gtc_col = i
                 elif 'დარჩენა' in text:
                     stay_col = i
 
-        for row in ws.iter_rows(min_row=3, values_only=True):
+        for row in ws.iter_rows(min_row=header_row_num + 1, values_only=True):
             cells = list(row) + [None] * 20
 
-            g_name = str(cells[1] or '').strip()
+            g_name = str(cells[guide_col] or '').strip() if guide_col is not None else ''
             if g_name and g_name not in _PLACEHOLDER_NAMES:
-                phone = _norm_phone(cells[2])
+                phone = _norm_phone(cells[guide_col + 1])
                 if phone:
                     guides.append({"name": g_name, "phone": phone})
 
-            h_name = str(cells[4] or '').strip()
+            h_name = str(cells[hotel_col] or '').strip() if hotel_col is not None else ''
             if h_name:
-                hotels[h_name] = {"phone": _norm_phone(cells[5]),
-                                   "phone2": _norm_phone(cells[6])}
+                hotels[h_name] = {"phone": _norm_phone(cells[hotel_col + 1]),
+                                   "phone2": _norm_phone(cells[hotel_col + 2])}
 
-            r_name = str(cells[8] or '').strip()
+            r_name = str(cells[restaurant_col] or '').strip() if restaurant_col is not None else ''
             if r_name:
                 canon = RESTAURANT_ALIASES.get(r_name, r_name)
-                restaurants[canon] = {"phone": _norm_phone(cells[9]),
-                                       "phone2": _norm_phone(cells[10])}
+                restaurants[canon] = {"phone": _norm_phone(cells[restaurant_col + 1]),
+                                       "phone2": _norm_phone(cells[restaurant_col + 2])}
 
             # GTC 360's own staff contacts (tour operator / accountant /
             # emergency), shown to guides rather than tied to any one day —
