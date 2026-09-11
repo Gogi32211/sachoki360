@@ -524,9 +524,15 @@ const ROLE_EN = {
   'ტურ ოპერატორი': 'Tour Operator', 'ბუღალტერი': 'Accountant', 'ემერჯენსი': 'Emergency',
 };
 
+// Same prefixes contacts_sync._EXTRA_CONTACT_PREFIXES scans for -- the
+// captured name is this prefix plus whatever the office adds after it
+// (often a person's name in parentheses, e.g. "მესტიის დელიკები
+// (გიორგი)"), so only the known prefix part is replaced with English;
+// anything past it is transliterated rather than dropped.
 const EXTRA_LABEL_EN = {
-  border_transport: 'Border transport', kazbegi_delika: 'Kazbegi delivery service',
-  mestia_delika: 'Mestia delivery service',
+  border_transport: ['სატრანსპორტო', 'Border transport'],
+  kazbegi_delika: ['ყაზბეგის დელიკები', 'Kazbegi delivery'],
+  mestia_delika: ['მესტიის დელიკები', 'Mestia delivery'],
 };
 
 const BORDER_PLACE_EN = { 'სადახლო': 'Sadakhlo', 'ბავრა': 'Bavra', 'ლაგოდეხი': 'Lagodekhi' };
@@ -561,7 +567,12 @@ function trHotelOnly(name) { return lang === 'en' ? trOr(name, HOTEL_ONLY_EN) : 
 
 function trExtraLabel(key, fallbackName) {
   if (lang !== 'en') return fallbackName;
-  return EXTRA_LABEL_EN[key] || (hasGeorgian(fallbackName) ? translit(fallbackName) : fallbackName);
+  const entry = EXTRA_LABEL_EN[key];
+  if (entry && fallbackName && fallbackName.startsWith(entry[0])) {
+    const rest = fallbackName.slice(entry[0].length);
+    return entry[1] + (hasGeorgian(rest) ? translit(rest) : rest);
+  }
+  return hasGeorgian(fallbackName) ? translit(fallbackName) : fallbackName;
 }
 
 // "ლიზი (ტურ ოპერატორი)" -> "Lizi (Tour Operator)"

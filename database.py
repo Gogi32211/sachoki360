@@ -506,7 +506,9 @@ def get_tours_on_date(check_date: str):
                 "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
                 "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
                 "border_crossing": r["border_crossing"],
-                "extra_contacts": _extra_contacts_for_day(extra, r["city"], r["border_crossing"]),
+                "extra_contacts": _extra_contacts_for_day(
+                    extra, r["city"], r["border_crossing"], r["hotel"],
+                    _mestia_is_second_day(conn, r["code"], check_date) if r["city"] == "Mestia" else False),
                 "stay_contact": match_stay_contact(r["city"], stay_entries),
                 "day_notes": r["day_notes"],
                 "day_num": day_num, "total_days": duration,
@@ -582,6 +584,7 @@ def get_guide_view(code: str):
             "SELECT name, phone, phone2 FROM contacts_stay").fetchall()]
 
     guide_phone = match_guide_phone(tour["guide"], guides)
+    mestia_dates = sorted(d["date"] for d in tour["days"] if d["city"] == "Mestia")
     days = []
     for d in tour["days"]:
         lunch_name = _MEAL_PREFIX_RE.sub('', d["lunch"] or '')
@@ -591,7 +594,9 @@ def get_guide_view(code: str):
             "hotel_phone": _hotel_phone_for(d["hotel"] or '', hotels),
             "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
             "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
-            "extra_contacts": _extra_contacts_for_day(extra, d["city"], d["border_crossing"]),
+            "extra_contacts": _extra_contacts_for_day(
+                extra, d["city"], d["border_crossing"], d["hotel"],
+                len(mestia_dates) > 1 and mestia_dates[1] == d["date"]),
             "stay_contact": match_stay_contact(d["city"], stay_entries),
             "meals": menu_by_date.get(d["date"], {}),
         })
@@ -2117,16 +2122,36 @@ def get_company_contacts() -> list:
 _KAZBEGI_CITIES = ("Kazbegi", "Gudauri")
 
 
-def _extra_contacts_for_day(extra: dict, city: str, border_crossing: str) -> dict:
+def _mestia_is_second_day(conn, tour_code: str, this_date: str) -> bool:
+    """Whether this_date is the second day of the tour's Mestia stretch —
+    the office's fixed Ushguli-excursion day regardless of which hotel or
+    how many nights, so mestia_delika is needed then even at a hotel the
+    bus can otherwise reach fine."""
+    dates = [row["date"] for row in conn.execute(
+        "SELECT date FROM daily_log WHERE tour_code=? AND city='Mestia' ORDER BY date",
+        (tour_code,)
+    ).fetchall()]
+    return len(dates) > 1 and dates[1] == this_date
+
+
+def _extra_contacts_for_day(extra: dict, city: str, border_crossing: str,
+                             hotel: str = "", mestia_is_second_day: bool = False) -> dict:
     """The subset of the three one-off contacts (see contacts_sync) that
-    apply to one daily_log day, keyed the same as contacts_extra."""
+    apply to one daily_log day, keyed the same as contacts_extra.
+
+    mestia_delika (the bus can't reach Ushguli, or the Lilati resort)
+    applies on the fixed Ushguli-excursion day regardless of hotel, and
+    on any other Mestia day only when that day's own hotel is Lilati —
+    the one Mestia hotel the bus can't reach at all.
+    """
     out = {}
     if border_crossing and extra.get("border_transport"):
         out["border_transport"] = extra["border_transport"]
     if city in _KAZBEGI_CITIES and extra.get("kazbegi_delika"):
         out["kazbegi_delika"] = extra["kazbegi_delika"]
     if city == "Mestia" and extra.get("mestia_delika"):
-        out["mestia_delika"] = extra["mestia_delika"]
+        if mestia_is_second_day or 'lilat' in (hotel or '').lower():
+            out["mestia_delika"] = extra["mestia_delika"]
     return out
 
 
