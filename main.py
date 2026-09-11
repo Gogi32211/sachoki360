@@ -267,6 +267,11 @@ header { background: #0f172a; color: #f1f5f9; padding: 16px 20px; display: flex;
          align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 header .title { font-weight: 700; font-size: 18px; }
 header a { color: #94a3b8; font-size: 13px; text-decoration: none; }
+header .right { display: flex; align-items: center; gap: 12px; }
+.lang-toggle { display: flex; gap: 4px; }
+.lang-toggle button { background: transparent; border: 1px solid #334155; color: #94a3b8;
+  font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 6px; cursor: pointer; }
+.lang-toggle button.active { background: #2563eb; border-color: #2563eb; color: #fff; }
 main { max-width: 760px; margin: 0 auto; padding: 16px; }
 .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px #0001; padding: 16px 18px; margin-bottom: 14px; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; color: #fff; font-weight: 700; font-size: 12px; margin-right: 8px; }
@@ -289,12 +294,41 @@ main { max-width: 760px; margin: 0 auto; padding: 16px; }
 </head>
 <body>
 <header>
-  <div class="title">ki.360 — ჩემი ტური</div>
-  <a href="/guide/logout">გასვლა</a>
+  <div class="title" id="pageTitle">ki.360 — ჩემი ტური</div>
+  <div class="right">
+    <div class="lang-toggle" id="langToggle">
+      <button data-lang="ka">GE</button>
+      <button data-lang="en">EN</button>
+    </div>
+    <a href="/guide/logout" id="logoutLink">გასვლა</a>
+  </div>
 </header>
-<main id="app"><div class="loading">იტვირთება...</div></main>
+<main id="app"><div class="loading" id="loadingMsg">იტვირთება...</div></main>
 <script>
-const MEAL_LABEL = {lunch: "🍽️ სადილი", dinner: "🌙 ვახშამი"};
+// Only this guide-facing page is translated -- the restaurant/hotel/dish
+// names themselves stay exactly as the office types them in Georgian
+// (there's no translation table for those), only the surrounding labels
+// switch between the two.
+const T = {
+  ka: {
+    pageTitle: "ki.360 — ჩემი ტური", logout: "გასვლა", loading: "იტვირთება...",
+    lunch: "🍽️ სადილი", dinner: "🌙 ვახშამი", ownExpense: "საკუთარი ხარჯებით",
+    atHotel: "სასტუმროში", armenia: "სომხეთში", noMenu: "მენიუ ჯერ არ არის დამატებული",
+    day: "დღე", guide: "გიდი:", driver: "მძღოლი:", rooms: "ოთახები:",
+    staffStay: "პერსონალის ღამისთევა:",
+  },
+  en: {
+    pageTitle: "ki.360 — My Tour", logout: "Log out", loading: "Loading...",
+    lunch: "🍽️ Lunch", dinner: "🌙 Dinner", ownExpense: "own expense",
+    atHotel: "at the hotel", armenia: "in Armenia", noMenu: "Menu not added yet",
+    day: "Day", guide: "Guide:", driver: "Driver:", rooms: "Rooms:",
+    staffStay: "Staff overnight stay:",
+  },
+};
+
+let lang = 'ka';
+try { lang = localStorage.getItem('ki360_guide_lang') || 'ka'; } catch (e) {}
+let lastData = null;
 
 function esc(s) {
   const d = document.createElement('div');
@@ -302,43 +336,75 @@ function esc(s) {
   return d.innerHTML;
 }
 
+function applyStaticText() {
+  const t = T[lang];
+  document.title = t.pageTitle;
+  document.getElementById('pageTitle').textContent = t.pageTitle;
+  document.getElementById('logoutLink').textContent = t.logout;
+  document.documentElement.lang = lang;
+  document.querySelectorAll('#langToggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  if (!lastData) document.getElementById('loadingMsg').textContent = t.loading;
+}
+
+function setLang(newLang) {
+  if (newLang === lang) return;
+  lang = newLang;
+  try { localStorage.setItem('ki360_guide_lang', lang); } catch (e) {}
+  applyStaticText();
+  if (lastData) render(lastData);
+}
+
+document.getElementById('langToggle').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-lang]');
+  if (btn) setLang(btn.dataset.lang);
+});
+applyStaticText();
+
 function renderMeal(key, rawText, m) {
+  const t = T[lang];
+  const mealLabel = key === 'lunch' ? t.lunch : t.dinner;
   let body;
   if (m && m.own_expense) {
-    body = '<div class="own-expense">' + MEAL_LABEL[key] + ' საკუთარი ხარჯებით</div>';
+    body = '<div class="own-expense">' + mealLabel + ' ' + t.ownExpense + '</div>';
   } else if (m && m.at_hotel) {
-    body = '<div class="at-hotel">' + MEAL_LABEL[key] + ' სასტუმროში' +
+    body = '<div class="at-hotel">' + mealLabel + ' ' + t.atHotel +
       (m.hotel ? ' — ' + esc(m.hotel) : '') +
       (m.hotel_phone ? ' — ' + esc(m.hotel_phone) : '') + '</div>';
   } else if (m && m.armenia) {
-    body = '<div class="at-hotel">' + MEAL_LABEL[key] + ' სომხეთში</div>';
+    body = '<div class="at-hotel">' + mealLabel + ' ' + t.armenia + '</div>';
   } else if (m && m.restaurant) {
-    let head = '<div class="hdr">' + MEAL_LABEL[key] + ' — ' + esc(m.restaurant) +
+    let head = '<div class="hdr">' + mealLabel + ' — ' + esc(m.restaurant) +
       (m.restaurant_phone ? ' — ' + esc(m.restaurant_phone) : '') + '</div>';
     let dishes = (m.dishes || []).map(d =>
       '<div class="dish"><span>' + esc(d.name) + (d.note ? ' (' + esc(d.note) + ')' : '') +
       '</span><span class="p">' + esc(d.portions) + '</span></div>'
     ).join('');
-    body = head + (dishes || '<div class="at-hotel">მენიუ ჯერ არ არის დამატებული</div>');
+    body = head + (dishes || '<div class="at-hotel">' + t.noMenu + '</div>');
   } else {
     // No synced meal data for this day yet — show the raw itinerary text,
     // same as the office's own Day View, so nothing is silently blank.
+    // That raw text is only ever written in Georgian, so it stays as-is
+    // regardless of the selected language — only the label before it switches.
     const isOwn = rawText && rawText.indexOf('საკუთარი') !== -1;
     body = '<div class="' + (isOwn ? 'own-expense' : 'at-hotel') + '">' +
-      MEAL_LABEL[key] + ': ' + esc(rawText || '—') + '</div>';
+      mealLabel + ': ' + esc(rawText || '—') + '</div>';
   }
   return '<div class="meal-box">' + body + '</div>';
 }
 
 function render(data) {
+  lastData = data;
+  const t = T[lang];
   const app = document.getElementById('app');
   let headerCard = '<div class="card top-info">'
     + '<span class="badge" style="background:' + esc(data.color) + '">' + esc(data.series) + '</span>'
     + '<strong>' + esc(data.code) + '</strong> '
     + (data.pax ? '<span class="muted">(' + esc(data.pax) + ')</span>' : '')
-    + '<br/>🧭 <span class="muted">გიდი:</span> ' + esc(data.guide_phone || data.guide || '—')
-    + '<br/>🚌 <span class="muted">მძღოლი:</span> ' + esc(data.driver || '—')
-    + '<br/>🛏️ <span class="muted">ოთახები:</span> ' + esc(data.rooms || '—')
+    + '<br/>🧭 <span class="muted">' + t.guide + '</span> ' + esc(data.guide_phone || data.guide || '—')
+    + '<br/>🚌 <span class="muted">' + t.driver + '</span> ' + esc(data.driver || '—')
+    + '<br/>🛏️ <span class="muted">' + t.rooms + '</span> ' + esc(data.rooms || '—')
     + '</div>';
 
   let html;
@@ -356,7 +422,7 @@ function render(data) {
   const todayIso = new Date().toISOString().slice(0, 10);
   for (const d of data.days) {
     html += '<div class="card' + (d.date === todayIso ? ' today' : '') + '">'
-      + '<div class="day-head"><span class="num">დღე ' + d.day_num + '</span>'
+      + '<div class="day-head"><span class="num">' + t.day + ' ' + d.day_num + '</span>'
       + '<span>' + esc(d.date) + '</span>'
       + '<span class="city">📍 ' + esc(d.city) + '</span></div>'
       + '<div class="top-info">🏨 ' + esc(d.hotel)
@@ -370,7 +436,7 @@ function render(data) {
       }
     }
     if (d.stay_contact && d.stay_contact.name) {
-      html += '<div class="top-info">🏠 <span class="muted">პერსონალის ღამისთევა:</span> ' + esc(d.stay_contact.name) + ' — ' + esc(d.stay_contact.phone) + '</div>';
+      html += '<div class="top-info">🏠 <span class="muted">' + t.staffStay + '</span> ' + esc(d.stay_contact.name) + ' — ' + esc(d.stay_contact.phone) + '</div>';
     }
     html += '<div class="meals" style="margin-top:8px">'
       + renderMeal('lunch', d.lunch, d.meals && d.meals.lunch)
