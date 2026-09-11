@@ -305,10 +305,14 @@ main { max-width: 760px; margin: 0 auto; padding: 16px; }
 </header>
 <main id="app"><div class="loading" id="loadingMsg">იტვირთება...</div></main>
 <script>
-// Only this guide-facing page is translated -- the restaurant/hotel/dish
-// names themselves stay exactly as the office types them in Georgian
-// (there's no translation table for those), only the surrounding labels
-// switch between the two.
+// Only this guide-facing page is translated. UI labels below switch via
+// the T table; the real data (restaurant/dish/hotel/person names) is
+// translated too, via the dictionaries further down -- built from the
+// office's own known, finite lists (there's no live translation service
+// to call), so anything already in one of them gets a real English word
+// and anything not yet added (a brand-new restaurant, say) falls back to
+// a plain Georgian->Latin transliteration, so it's at least readable
+// rather than silently staying in Georgian script.
 const T = {
   ka: {
     pageTitle: "ki.360 — ჩემი ტური", logout: "გასვლა", loading: "იტვირთება...",
@@ -362,6 +366,230 @@ document.getElementById('langToggle').addEventListener('click', e => {
 });
 applyStaticText();
 
+// ---- Data translation (restaurant/dish/hotel/person names) ----
+const GEO_LAT = {
+  'ა':'a','ბ':'b','გ':'g','დ':'d','ე':'e','ვ':'v','ზ':'z','თ':'t','ი':'i',
+  'კ':'k','ლ':'l','მ':'m','ნ':'n','ო':'o','პ':'p','ჟ':'zh','რ':'r','ს':'s',
+  'ტ':'t','უ':'u','ფ':'p','ქ':'k','ღ':'gh','ყ':'q','შ':'sh','ჩ':'ch',
+  'ც':'ts','ძ':'dz','წ':'ts','ჭ':'ch','ხ':'kh','ჯ':'j','ჰ':'h',
+};
+function hasGeorgian(s) { return /[Ⴀ-ჿ]/.test(s || ''); }
+// Georgian->Latin, word by word, each word capitalized -- not a real
+// translation (a Georgian case ending like "-ში" just becomes "-shi"),
+// but the fallback for anything outside the dictionaries below still
+// reads as Latin text instead of staying in Georgian script.
+function translit(s) {
+  return (s || '').split(/(\s+)/).map(chunk =>
+    /\s/.test(chunk) ? chunk : chunk.split('').map(ch => GEO_LAT[ch] || ch).join('')
+  ).join('').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Every dish name currently on file across all 17 restaurants in
+// Menu_2026.xlsx (see menu_data.RESTAURANT_MENUS / menu_sync.py) --
+// checked against the live sheet when this table was built. A dish added
+// to the sheet later without a matching entry here just falls back to
+// translit() above rather than breaking anything.
+const DISH_EN = {
+  'აჯაფსანდალი კეცზე': 'Ajapsandali (clay pot)',
+  'ბერძნული სალათი': 'Greek salad',
+  'ბოსტნეული კორსიკულაად': 'Vegetables Corsican-style',
+  'ბოსტნეული შამფურზე': 'Grilled vegetable skewer',
+  'ბოსტნეულის პიცა': 'Vegetable pizza',
+  'ბოსტნეულის სალათი': 'Vegetable salad',
+  'ბოსტნეულის სუპი': 'Vegetable soup',
+  'ბრინჯი': 'Rice',
+  'ბრინჯი ბოსტნეულით': 'Rice with vegetables',
+  'თათარბერაგი': 'Tatarberagi',
+  'თონის პური': 'Clay-oven bread',
+  'იმერული': 'Imeretian cheese',
+  'კარტოფილი გლეხურად': 'Peasant-style potatoes',
+  'კარტოფილი ოჯახურად': 'Homestyle potatoes',
+  'კარტოფილი ფრი': 'French fries',
+  'კიტი პომიდვრის სალათა ნიგვზით': 'Cucumber-tomato salad with walnuts',
+  'კიტრი პომიდვრის სალათი': 'Cucumber-tomato salad',
+  'კიტრი პომიდორი': 'Cucumber and tomato',
+  'კიტრი- პომიდვრის სალათი': 'Cucumber-tomato salad',
+  'კიტრი-პომიდვრის სალათი': 'Cucumber-tomato salad',
+  'კომბოსტოს სალათი': 'Cabbage salad',
+  'კპ სალათი': 'Cucumber-tomato salad',
+  'კუბდარი': 'Kubdari',
+  'ლავაში': 'Lavash',
+  'ლობიანი': 'Lobiani',
+  'ლობიო': 'Lobio',
+  'ლობიო აზელილი': 'Mashed lobio',
+  'ლობიო კვაწარახით და რაჭული ლორით': 'Lobio with kvatsarakhi and Racha bacon',
+  'მაკარონი': 'Pasta',
+  'მეგრული ხაჭაპური': 'Megrelian khachapuri',
+  'მექსიკური კარტოფილი': 'Mexican-style potatoes',
+  'მოხარშული კარტოფილი': 'Boiled potatoes',
+  'მწვადი სუკი': 'Pork skewer',
+  'მწვადი ღორის': 'Pork skewer',
+  'მწვადი ხბოსი': 'Veal skewer',
+  'მწვანე სალათი': 'Green salad',
+  'ოჯახური სოკ. და ბოსტნეულით': 'Homestyle mushrooms and vegetables',
+  'ოჯახური ღორის': 'Homestyle pork',
+  'ოჯახური ხბოს ხორცით': 'Homestyle veal',
+  'პატარა აჭარული ხაჭაპური': 'Small Adjaruli khachapuri',
+  'პიცა ვეგეტარიანული': 'Vegetarian pizza',
+  'პიცა პეპერონი': 'Pepperoni pizza',
+  'პომიდვრით': 'with tomato',
+  'პური': 'Bread',
+  'პურის ასორტი': 'Bread basket',
+  'სალათა კ/პ': 'Cucumber-tomato salad',
+  'სალათის ფოთლები': 'Lettuce leaves',
+  'საფირმო დიარონი': "Diaroni's signature dish",
+  'საქონლის ოსტრი': 'Beef ostri',
+  'საწებელი': 'Satsebeli sauce',
+  'სოკო კეცზე': 'Mushrooms (clay pot)',
+  'სოკოს სუპი': 'Mushroom soup',
+  'სუფი': 'Soup',
+  'ტაფაზე შემწვარი კარტოფილი': 'Pan-fried potatoes',
+  'ფრი': 'Fries',
+  'ქაბაბი': 'Kebab',
+  'ქათამის მწვადი': 'Chicken skewer',
+  'ქათმის მწვადი': 'Chicken skewer',
+  'ქათმის შქმერული': 'Chicken shkmeruli',
+  'ქამა სოკო კეცზე': 'Forest mushrooms (clay pot)',
+  'ღორის მწვადი': 'Pork skewer',
+  'ღორის მწვადი ბულგარული': 'Bulgarian-style pork skewer',
+  'ღორის ოჯახური კეცზე': 'Homestyle pork (clay pot)',
+  'შემწვარი კარტოფილი': 'Fried potatoes',
+  'შემწვარი კარტოფილი ოჯახურად': 'Homestyle fried potatoes',
+  'შოთის პური': 'Shoti bread',
+  'შქმერული': 'Shkmeruli',
+  'ჩაშუშლი ხის სოკო მწვანილით და პიტნით': 'Sautéed wild mushrooms with herbs and mint',
+  'ჩაშუშული საქნლის ხორცით': 'Sautéed beef',
+  'ჩახოხბილი': 'Chakhokhbili',
+  'წიწაკის მჟავე': 'Pickled peppers',
+  'წყალი': 'Water',
+  'ჭარხალი ტყემალში': 'Beetroot in tkemali sauce',
+  'ხაშლამა': 'Khashlama',
+  'ხაჭაპური': 'Khachapuri',
+  'ხაჭაპური იმერული': 'Imeretian khachapuri',
+  'ხაჭაპური სვანური მწვანე ფეტვით': 'Svan khachapuri with green millet',
+  'ხბოს მწვადი': 'Veal skewer',
+  'ხბოს მწვადი კეცზე': 'Veal (clay pot)',
+  'ხბოს ოჯახური': 'Homestyle veal',
+  'ხბოს ჩაქაფული': 'Veal chakapuli',
+  'ხბოს ჩაშუშული': 'Sautéed veal',
+  'ხბოს ჩაშუშული ტომატში': 'Sautéed veal in tomato sauce',
+  'ხინკალი': 'Khinkali',
+  'ხინკალი ყველის': 'Cheese khinkali',
+  'ხინკალი ხორცის': 'Meat khinkali',
+  'ხის სოკო იმერულად': 'Wild mushrooms Imeretian-style',
+};
+
+const DISH_NOTE_EN = {
+  'გაყოფილი ორად': 'split in half',
+  '2 ადამიანზე 1': '1 per 2 people',
+  'პორცია ემატება': 'extra portion added',
+};
+
+// Every restaurant name currently in Menu_2026.xlsx, plus "ახალი აზია"
+// (no dishes on file for it, but it's a common balance-sheet entry).
+const RESTAURANT_EN = {
+  'ვარძია შოთა': 'Vardzia Shota',
+  'დიარონი': 'Diaroni',
+  'ლუშნუ ქორი': 'Lushnu Qori',
+  'ენგური': 'Enguri',
+  'ლუიზასთან': "Luiza's",
+  'ლუზიასთან': "Luiza's",
+  'ფასანაური': 'Pasanauri',
+  'ოქროს საწმისი': 'Golden Fleece',
+  'ცენტრალ პაბი': 'Central Pub',
+  'ცენტრალ პაბ': 'Central Pub',
+  'ბერიძეები': 'The Beridzes',
+  'სალობიე': 'Salobie',
+  'ბალკონი': 'Balkoni',
+  'ფესვები': 'Roots',
+  'დარანი': 'Darani',
+  'დარანი (ახალციხე)': 'Darani (Akhaltsikhe)',
+  'გურამიშვილის მარანი': "Guramishvili's Wine Cellar",
+  'კტვ': 'KTV',
+  'კტვ პატარძეული': 'KTV',
+  'ზღაპარი (ტმ მენიუ)': 'Zgapari (TM menu)',
+  'ზღაპარი': 'Zgapari',
+  'ახალი აზია': 'New Asia',
+};
+
+// The guide/driver overnight-stay hotels (contacts_stay), by their
+// Georgian-only name -- unlike the tour's own daily_log.hotel, these
+// never come with an English form already attached.
+const HOTEL_ONLY_EN = {
+  'სანი': 'Sani', 'ლილეო': 'Lileo', 'სასტუმრო': 'Hotel',
+  'ასტანა პალასი': 'Astana Palace', 'ყაზბეგი ინნ': 'Kazbegi Inn', 'ალპინა': 'Alpina',
+};
+
+const ROLE_EN = {
+  'ტურ ოპერატორი': 'Tour Operator', 'ბუღალტერი': 'Accountant', 'ემერჯენსი': 'Emergency',
+};
+
+const EXTRA_LABEL_EN = {
+  border_transport: 'Border transport', kazbegi_delika: 'Kazbegi delivery service',
+  mestia_delika: 'Mestia delivery service',
+};
+
+const BORDER_PLACE_EN = { 'სადახლო': 'Sadakhlo', 'ბავრა': 'Bavra', 'ლაგოდეხი': 'Lagodekhi' };
+
+function trOr(s, dict) {
+  if (!s) return s;
+  if (dict[s] != null) return dict[s];
+  return hasGeorgian(s) ? translit(s) : s;
+}
+
+function trDish(name) { return lang === 'en' ? trOr(name, DISH_EN) : name; }
+
+function trDishNote(note) {
+  if (lang !== 'en' || !note) return note;
+  return note.split(', ').map(p => DISH_NOTE_EN[p] || (hasGeorgian(p) ? translit(p) : p)).join(', ');
+}
+
+function trRestaurant(name) {
+  if (lang !== 'en' || !name) return name;
+  if (RESTAURANT_EN[name] != null) return RESTAURANT_EN[name];
+  // A balance sheet sometimes tacks an extra descriptive word onto a
+  // known restaurant's bare name -- same prefix match menu_for_restaurant
+  // uses server-side -- so the longest known name it starts with wins.
+  const keys = Object.keys(RESTAURANT_EN).sort((a, b) => b.length - a.length);
+  for (const k of keys) {
+    if (name.startsWith(k)) return RESTAURANT_EN[k];
+  }
+  return hasGeorgian(name) ? translit(name) : name;
+}
+
+function trHotelOnly(name) { return lang === 'en' ? trOr(name, HOTEL_ONLY_EN) : name; }
+
+function trExtraLabel(key, fallbackName) {
+  if (lang !== 'en') return fallbackName;
+  return EXTRA_LABEL_EN[key] || (hasGeorgian(fallbackName) ? translit(fallbackName) : fallbackName);
+}
+
+// "ლიზი (ტურ ოპერატორი)" -> "Lizi (Tour Operator)"
+function trGtcName(name) {
+  if (lang !== 'en' || !name) return name;
+  const m = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(name);
+  if (m) {
+    const person = hasGeorgian(m[1]) ? translit(m[1]) : m[1];
+    const role = ROLE_EN[m[2]] || (hasGeorgian(m[2]) ? translit(m[2]) : m[2]);
+    return person + ' (' + role + ')';
+  }
+  return hasGeorgian(name) ? translit(name) : name;
+}
+
+// Guide/driver names, and the composed "name — phone, name2 — phone2"
+// guide line -- translit() only touches Georgian runs and leaves
+// numbers/dashes/already-Latin names exactly as they are.
+function trPerson(text) {
+  return lang === 'en' && hasGeorgian(text) ? translit(text) : text;
+}
+
+function trBorder(text) {
+  if (lang !== 'en' || !text) return text;
+  let out = text;
+  for (const geo in BORDER_PLACE_EN) out = out.split(geo).join(BORDER_PLACE_EN[geo]);
+  return out;
+}
+
 function renderMeal(key, rawText, m) {
   const t = T[lang];
   const mealLabel = key === 'lunch' ? t.lunch : t.dinner;
@@ -375,21 +603,24 @@ function renderMeal(key, rawText, m) {
   } else if (m && m.armenia) {
     body = '<div class="at-hotel">' + mealLabel + ' ' + t.armenia + '</div>';
   } else if (m && m.restaurant) {
-    let head = '<div class="hdr">' + mealLabel + ' — ' + esc(m.restaurant) +
+    let head = '<div class="hdr">' + mealLabel + ' — ' + esc(trRestaurant(m.restaurant)) +
       (m.restaurant_phone ? ' — ' + esc(m.restaurant_phone) : '') + '</div>';
     let dishes = (m.dishes || []).map(d =>
-      '<div class="dish"><span>' + esc(d.name) + (d.note ? ' (' + esc(d.note) + ')' : '') +
+      '<div class="dish"><span>' + esc(trDish(d.name)) + (d.note ? ' (' + esc(trDishNote(d.note)) + ')' : '') +
       '</span><span class="p">' + esc(d.portions) + '</span></div>'
     ).join('');
     body = head + (dishes || '<div class="at-hotel">' + t.noMenu + '</div>');
   } else {
     // No synced meal data for this day yet — show the raw itinerary text,
     // same as the office's own Day View, so nothing is silently blank.
-    // That raw text is only ever written in Georgian, so it stays as-is
-    // regardless of the selected language — only the label before it switches.
+    // That raw text is only ever written in Georgian, so in English mode
+    // it goes through the same transliteration fallback as everything
+    // else not in a known dictionary (there's no dedicated translation
+    // for this free-form seed text).
     const isOwn = rawText && rawText.indexOf('საკუთარი') !== -1;
+    const shown = lang === 'en' && rawText && hasGeorgian(rawText) ? translit(rawText) : rawText;
     body = '<div class="' + (isOwn ? 'own-expense' : 'at-hotel') + '">' +
-      mealLabel + ': ' + esc(rawText || '—') + '</div>';
+      mealLabel + ': ' + esc(shown || '—') + '</div>';
   }
   return '<div class="meal-box">' + body + '</div>';
 }
@@ -402,8 +633,8 @@ function render(data) {
     + '<span class="badge" style="background:' + esc(data.color) + '">' + esc(data.series) + '</span>'
     + '<strong>' + esc(data.code) + '</strong> '
     + (data.pax ? '<span class="muted">(' + esc(data.pax) + ')</span>' : '')
-    + '<br/>🧭 <span class="muted">' + t.guide + '</span> ' + esc(data.guide_phone || data.guide || '—')
-    + '<br/>🚌 <span class="muted">' + t.driver + '</span> ' + esc(data.driver || '—')
+    + '<br/>🧭 <span class="muted">' + t.guide + '</span> ' + esc(trPerson(data.guide_phone || data.guide || '—'))
+    + '<br/>🚌 <span class="muted">' + t.driver + '</span> ' + esc(trPerson(data.driver || '—'))
     + '<br/>🛏️ <span class="muted">' + t.rooms + '</span> ' + esc(data.rooms || '—')
     + '</div>';
 
@@ -411,7 +642,7 @@ function render(data) {
   if (data.company_contacts && data.company_contacts.length) {
     let gtcCard = '<div class="card top-info"><strong>GTC 360</strong>';
     for (const c of data.company_contacts) {
-      gtcCard += '<br/>☎️ ' + esc(c.name) + ' — ' + esc(c.phone);
+      gtcCard += '<br/>☎️ ' + esc(trGtcName(c.name)) + ' — ' + esc(c.phone);
     }
     gtcCard += '</div>';
     html = '<div class="meals">' + headerCard + gtcCard + '</div>';
@@ -428,15 +659,15 @@ function render(data) {
       + '<div class="top-info">🏨 ' + esc(d.hotel)
       + (d.hotel_phone ? ' — ' + esc(d.hotel_phone) : '') + '</div>';
     if (d.border_crossing) {
-      html += '<div class="top-info" style="color:#ea580c">🚧 ' + esc(d.border_crossing) + '</div>';
+      html += '<div class="top-info" style="color:#ea580c">🚧 ' + esc(trBorder(d.border_crossing)) + '</div>';
     }
     if (d.extra_contacts) {
-      for (const c of Object.values(d.extra_contacts)) {
-        html += '<div class="top-info">🚐 ' + esc(c.name) + ' — ' + esc(c.phone) + '</div>';
+      for (const [key, c] of Object.entries(d.extra_contacts)) {
+        html += '<div class="top-info">🚐 ' + esc(trExtraLabel(key, c.name)) + ' — ' + esc(c.phone) + '</div>';
       }
     }
     if (d.stay_contact && d.stay_contact.name) {
-      html += '<div class="top-info">🏠 <span class="muted">' + t.staffStay + '</span> ' + esc(d.stay_contact.name) + ' — ' + esc(d.stay_contact.phone) + '</div>';
+      html += '<div class="top-info">🏠 <span class="muted">' + t.staffStay + '</span> ' + esc(trHotelOnly(d.stay_contact.name)) + ' — ' + esc(d.stay_contact.phone) + '</div>';
     }
     html += '<div class="meals" style="margin-top:8px">'
       + renderMeal('lunch', d.lunch, d.meals && d.meals.lunch)
