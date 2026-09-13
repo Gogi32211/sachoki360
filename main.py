@@ -533,6 +533,10 @@ const EXTRA_LABEL_EN = {
   border_transport: ['სატრანსპორტო', 'Border transport'],
   kazbegi_delika: ['ყაზბეგის დელიკები', 'Kazbegi delivery'],
   mestia_delika: ['მესტიის დელიკები', 'Mestia delivery'],
+  // Sliced longer than contacts_sync's own capture prefix, purely so the
+  // city name doesn't get redundantly repeated here too -- it's already
+  // the day's own heading, same reasoning as the stay-contact line.
+  batumi_boat: ['გემით გასეირნება ბათუმში', 'Boat cruise'],
 };
 
 const BORDER_PLACE_EN = { 'სადახლო': 'Sadakhlo', 'ბავრა': 'Bavra', 'ლაგოდეხი': 'Lagodekhi' };

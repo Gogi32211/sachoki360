@@ -42,7 +42,7 @@ RESTAURANT_ALIASES = {
     'კტვ პატარძეული': 'კტვ',
 }
 
-# Three one-off contacts the office typed into their own stray cells rather
+# One-off contacts the office typed into their own stray cells rather
 # than a proper repeating column (each is just a name + the very next cell
 # as its phone, sitting on its own row) — matched by prefix since neither
 # their exact cell nor their full label text is stable. Shown on daily_log
@@ -50,11 +50,13 @@ RESTAURANT_ALIASES = {
 # get_guide_view): border_transport on any day with a border crossing,
 # kazbegi_delika on a Kazbegi/Gudauri day, mestia_delika on a Mestia day
 # (covers both the Ushguli excursion and any night at Lilati Mestia, since
-# the bus can't reach either and this transport carries guests + luggage).
+# the bus can't reach either and this transport carries guests + luggage),
+# batumi_boat on any Batumi day.
 _EXTRA_CONTACT_PREFIXES = [
     ('სატრანსპორტო', 'border_transport'),
     ('ყაზბეგის დელიკები', 'kazbegi_delika'),
     ('მესტიის დელიკები', 'mestia_delika'),
+    ('გემით გასეირნება', 'batumi_boat'),
 ]
 
 

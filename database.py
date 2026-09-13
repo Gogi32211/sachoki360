@@ -2136,8 +2136,8 @@ def _mestia_is_second_day(conn, tour_code: str, this_date: str) -> bool:
 
 def _extra_contacts_for_day(extra: dict, city: str, border_crossing: str,
                              hotel: str = "", mestia_is_second_day: bool = False) -> dict:
-    """The subset of the three one-off contacts (see contacts_sync) that
-    apply to one daily_log day, keyed the same as contacts_extra.
+    """The subset of the one-off contacts (see contacts_sync) that apply
+    to one daily_log day, keyed the same as contacts_extra.
 
     mestia_delika (the bus can't reach Ushguli, or the Lilati resort)
     applies on the fixed Ushguli-excursion day regardless of hotel, and
@@ -2152,6 +2152,8 @@ def _extra_contacts_for_day(extra: dict, city: str, border_crossing: str,
     if city == "Mestia" and extra.get("mestia_delika"):
         if mestia_is_second_day or 'lilat' in (hotel or '').lower():
             out["mestia_delika"] = extra["mestia_delika"]
+    if city == "Batumi" and extra.get("batumi_boat"):
+        out["batumi_boat"] = extra["batumi_boat"]
     return out
 
 
