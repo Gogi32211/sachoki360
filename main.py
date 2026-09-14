@@ -37,6 +37,7 @@ import hashlib
 USERS = {
     APP_USER: {"password": APP_PASSWORD, "scope": "full"},
     "LIZI": {"password": os.environ.get("LIZI_PASSWORD", "360"), "scope": "limited"},
+    "BUS": {"password": os.environ.get("BUS_PASSWORD", "360"), "scope": "limited"},
 }
 COOKIE_MAX_AGE = 86400 * 365  # 1 year
 
