@@ -19,9 +19,10 @@ menu_data._extra_dish_trigger), that one dish gets an extra portion on
 top of its usual count — everything else on the table stays as computed.
 
 A route-based or variant-based restaurant is folded into the same
-app-facing key menu_data already uses: დიარონი's two tabs key by
-(previous day's city, this day's city), exactly matching
-menu_data._DIARONI_ROUTES; ზღაპარი's "TM ტური" tab keys to
+app-facing key menu_data already uses: დიარონი's two tabs are named for
+direction relative to Mestia alone ("...მესტიიდან" / "...მესტიისკენ"),
+not any particular other city, keying to "inbound"/"outbound" exactly
+matching menu_data._DIARONI_ROUTES; ზღაპარი's "TM ტური" tab keys to
 "ზღაპარი (ტმ მენიუ)", the name TM's own balance sheet writes.
 
 A couple of rules live only in office instructions, never on this sheet at
@@ -95,14 +96,21 @@ def _restaurant_key_from_title(title: str):
     is inconsistent between tabs (one დიარონი route tab spells it
     "დიარონი: <route>" in columns B/C, the other just puts the route phrase
     straight in column B with no restaurant name at all), but every tab's
-    title itself is consistently "<restaurant> [variant]"."""
+    title itself is consistently "<restaurant> [variant]".
+
+    დიარონი's two tabs are titled by direction relative to Mestia alone
+    ("დიარონი მესტიიდან გორისკენ" — from Mestia, "დიარონი ბათუმიდან
+    მესტიისკენ" — toward Mestia) — the office's own grammar case endings
+    ("-იდან" = from, "-ისკენ" = toward) are the actual signal, not which
+    other city is named, since the outbound tab applies the same way
+    whether that trip continues to Gori, Kutaisi, or Batumi."""
     title = (title or '').strip()
     if title.startswith('დიარონი'):
         rest = title[len('დიარონი'):].strip()
-        if 'ბათუმი' in rest and 'მესტ' in rest:
-            return 'დიარონი', ('Batumi', 'Mestia')
-        if 'მესტ' in rest and 'გორ' in rest:
-            return 'დიარონი', ('Mestia', 'Gori')
+        if 'მესტიისკენ' in rest:
+            return 'დიარონი', 'inbound'
+        if 'მესტიიდან' in rest:
+            return 'დიარონი', 'outbound'
         return 'დიარონი', None
     if title.startswith('ზღაპარი'):
         if 'tm' in title.lower():
@@ -189,7 +197,7 @@ def _parse_workbook(content: bytes) -> dict:
 
 
 def fetch_menu() -> dict:
-    """Return {"restaurants": {key: [dish,...]}, "routes": {key: {(prev,cur): [dish,...]}},
+    """Return {"restaurants": {key: [dish,...]}, "routes": {key: {"inbound"|"outbound": [dish,...]}},
     "ratios": {(restaurant_or_None, dish): (num,den,note)},
     "extras": {(restaurant, dish): bool}}, or {} on failure."""
     try:
