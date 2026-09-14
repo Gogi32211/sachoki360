@@ -277,11 +277,15 @@ def menu_for_restaurant(raw_name, prev_city=None, cur_city=None):
     დიარონი is a special case: the office runs it as two separate tabs,
     one for heading into Mestia and one for heading out of it (to
     wherever — Gori, Kutaisi, Batumi, it doesn't matter), but a balance
-    sheet just calls it "დიარონი" either way — the day's own route picks
-    the right one by direction alone; otherwise it falls through to the
-    bare "დიარონი" union like any other restaurant.
+    sheet just calls it "დიარონი" either way — sometimes with the same
+    kind of descriptive suffix other restaurants get too (e.g. "დიარონი
+    ( ხაჭაპური, მწვადი)"), so the route check goes by the resolved
+    canonical key, not raw_name itself, same as everything else here.
+    The day's own route picks the right list by direction alone;
+    otherwise it falls through to the bare "დიარონი" union like any
+    other restaurant.
     """
-    if raw_name == "დიარონი":
+    if restaurant_key(raw_name) == "დიარონი":
         if cur_city == "Mestia":
             return _DIARONI_ROUTES.get("inbound")
         if prev_city == "Mestia":
