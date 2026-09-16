@@ -2194,8 +2194,12 @@ def apply_schedule_sync(active: list) -> dict:
 
     - ADD  : tours in the active list not yet in the DB.
     - REMOVE: DB tours NOT in the active list that haven't finished yet
-              (bus_end >= today).  Completed tours (bus_end < today) are kept
-              because they naturally fall off the master tab once done.
+              (bus_end > today).  A tour whose last day is today or
+              earlier is kept — it naturally falls off the master tab
+              (the office moves it to their own "done" tab) the moment
+              it wraps up, sometimes the very same day, so bus_end ==
+              today must count as already complete, not "still ongoing
+              and mysteriously vanished."
     """
     active_codes = {a["code"] for a in active}
     # Safety guard: never wipe tours on a bad/empty fetch.
@@ -2247,7 +2251,7 @@ def apply_schedule_sync(active: list) -> dict:
                 bus_end = date.fromisoformat(be_str)
             except Exception:
                 continue
-            if bus_end >= today:  # still ongoing or future → cancelled
+            if bus_end > today:  # still ongoing or future → cancelled
                 for tbl, col in [
                     ('daily_log',       'tour_code'),
                     ('tour_meals',      'tour_code'),
