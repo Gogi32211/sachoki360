@@ -130,18 +130,39 @@ SERIES["HM2"] = {
 }
 # HT — 10 დღე: აზერბაიჯანი (3 ღ.) → საქართველო → სომხეთი
 # Day 1: Baku  Day 2: Baku  Day 3: Sheki  Day 4: Tbilisi (bus_start)
+_HT_NIGHTS = {
+    0: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    1: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    2: {"city": "Gudauri",  "hotel": "Marco Polo Gudauri",             "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    3: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
+    4: {"city": "Yerevan",  "hotel": "Radisson Blu Yerevan",           "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": "GEO→ARM"},
+    5: {"city": "✈ Yerevan→Urumqi", "hotel": "—",                     "lunch": "TBD",         "dinner": "TBD",           "border": None},
+}
 SERIES["HT"] = {
     "name": "HT — 10 დღე (აზ.+საქ.+სომ.)",
     "duration": 6,
     "color": "#6366F1",
-    "nights": {
-        0: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
-        1: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
-        2: {"city": "Gudauri",  "hotel": "Marco Polo Gudauri",             "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
-        3: {"city": "Tbilisi",  "hotel": "Hualing / Pine / Pullman (TBD)", "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
-        4: {"city": "Yerevan",  "hotel": "Radisson Blu Yerevan",           "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": "GEO→ARM"},
-        5: {"city": "✈ Yerevan→Urumqi", "hotel": "—",                     "lunch": "TBD",         "dinner": "TBD",           "border": None},
-    },
+    "nights": _HT_NIGHTS,
+}
+# HT1/HT2/HT3 are separate groups of the same HT program, running the same
+# route in parallel — same reasoning as HM1/HM2 next to HM above.
+SERIES["HT1"] = {
+    "name": "HT1 — 10 დღე (ჯგუფი 1)",
+    "duration": 6,
+    "color": "#6366F1",
+    "nights": _HT_NIGHTS,
+}
+SERIES["HT2"] = {
+    "name": "HT2 — 10 დღე (ჯგუფი 2)",
+    "duration": 6,
+    "color": "#4F46E5",
+    "nights": _HT_NIGHTS,
+}
+SERIES["HT3"] = {
+    "name": "HT3 — 10 დღე (ჯგუფი 3)",
+    "duration": 6,
+    "color": "#4338CA",
+    "nights": _HT_NIGHTS,
 }
 
 # ── T* სერიები (TH / TK / TM / TV) ────────────────────────────────
@@ -274,7 +295,7 @@ SERIES_START_OFFSET = {
     # HM: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 3 → offset +2
     "HM": 2, "HM1": 2, "HM2": 2,
     # HT: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 4 → offset +3
-    "HT": 3,
+    "HT": 3, "HT1": 3, "HT2": 3, "HT3": 3,
     # TH/TK: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 4 → offset +3
     "TH": 3, "TK": 3,
     # TM/TV: code MMDD = Day 1 (Urumqi→Yerevan) — the tour starts there → offset 0

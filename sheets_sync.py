@@ -17,8 +17,10 @@ CSV_URL = (
 
 # Same series set the rest of the app recognizes — this used to omit
 # HM1/HM2/HT/TH/TK/TM/TV, so those tours' columns were never even seen and
-# their nights stayed on the seed template's placeholder hotel.
-TOUR_RE = re.compile(r'^(ZT1|ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT|TH|TK|TM|TV|MT|ST)-\d{4}$')
+# their nights stayed on the seed template's placeholder hotel. HT1/HT2/HT3
+# (separate groups of the HT program, same as HM1/HM2 are to HM) had the
+# same gap until they showed up as real balance-sheet tabs.
+TOUR_RE = re.compile(r'^(ZT1|ZT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT1|HT2|HT3|HT|TH|TK|TM|TV|MT|ST)-\d{4}$')
 
 # Hotels outside GEO/ARM — skip updating daily_log for these
 SKIP_HOTELS = {
