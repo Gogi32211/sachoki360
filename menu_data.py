@@ -90,15 +90,23 @@ def portion_label(tourists):
 
 def dish_note(restaurant, dish, tourists=None):
     """The note shown next to the dish's own name rather than mixed into
-    the portion count: a ratio dish's own wording ("2 ადამიანზე 1"), plus
-    "პორცია ემატება" whenever this exact group size actually triggered the
-    dish's "D"-marked extra portion — so it's clear at a glance why, say,
-    "შემწვარი კარტოფილი" shows 3+1 instead of the usual 2+1. Either half
-    can be absent; None if neither applies."""
+    the portion count: a ratio dish's own wording ("2 ადამიანზე 1"), or —
+    for a straight multiply ratio ("კაცზე 2", "კაცზე 3") — how many per
+    person it actually is, since the office often serves several khinkali
+    varieties side by side and only this note tells them apart at a
+    glance (this one's "კაცზე 2", that one's "კაცზე 1"). Plus "პორცია
+    ემატება" whenever this exact group size actually triggered the dish's
+    "D"-marked extra portion — so it's clear at a glance why, say,
+    "შემწვარი კარტოფილი" shows 3+1 instead of the usual 2+1. Any part
+    can be absent; None if none applies."""
     parts = []
     ratio = DISH_RATIOS.get((restaurant, dish)) or DISH_RATIOS.get((None, dish))
-    if ratio and ratio[2]:
-        parts.append(ratio[2])
+    if ratio:
+        num, den, note = ratio
+        if note:
+            parts.append(note)
+        elif den == 1:
+            parts.append(f"კაცზე {num}")
     if _dish_extra_eligible(restaurant, dish) and _extra_dish_trigger(tourists):
         parts.append("პორცია ემატება")
     return ", ".join(parts) if parts else None

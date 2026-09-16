@@ -485,6 +485,10 @@ const DISH_NOTE_EN = {
   '2 ადამიანზე 1': '1 per 2 people',
   'პორცია ემატება': 'extra portion added',
 };
+// "კაცზე N" (N per person) carries its own number, straight from the
+// office's own costing sheet -- a fixed dictionary entry can't cover
+// every N, so it's matched by pattern instead.
+const _PER_PERSON_RE = /^კაცზე\s*(\d+)$/;
 
 // Every restaurant name currently in Menu_2026.xlsx, plus "ახალი აზია"
 // (no dishes on file for it, but it's a common balance-sheet entry).
@@ -552,7 +556,12 @@ function trDish(name) { return lang === 'en' ? trOr(name, DISH_EN) : name; }
 
 function trDishNote(note) {
   if (lang !== 'en' || !note) return note;
-  return note.split(', ').map(p => DISH_NOTE_EN[p] || (hasGeorgian(p) ? translit(p) : p)).join(', ');
+  return note.split(', ').map(p => {
+    if (DISH_NOTE_EN[p]) return DISH_NOTE_EN[p];
+    const m = _PER_PERSON_RE.exec(p);
+    if (m) return m[1] + ' per person';
+    return hasGeorgian(p) ? translit(p) : p;
+  }).join(', ');
 }
 
 function trRestaurant(name) {
