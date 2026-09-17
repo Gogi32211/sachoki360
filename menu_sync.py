@@ -140,12 +140,16 @@ def _parse_tab(ws):
         if past_driver_row or _NUMERIC_ROW_RE.match(cell_b) or cell_b in seen:
             continue
         seen.add(cell_b)
-        # The ratio cell's exact column isn't consistent between tabs (one
-        # tab leaves an extra blank column before it) — scan the rest of the
-        # row for whichever cell actually matches the ratio pattern, rather
-        # than trusting a fixed position.
+        # The ratio cell's exact column isn't always column C (one tab
+        # leaves an extra blank column before it, pushing it to D) — but
+        # scanning the *whole* rest of the row is too permissive: a tab
+        # copy-pasted from another one as a starting template can leave
+        # stray leftover text much further right (a leftover dish name +
+        # its own "კაცზე N" from the tab it was copied from), which would
+        # otherwise get picked up as if it were this dish's own ratio.
+        # Column C or D covers every real case seen so far.
         ratio = None
-        for cell in row[2:]:
+        for cell in row[2:4]:
             ratio = _parse_ratio(str(cell or '').strip())
             if ratio:
                 break
