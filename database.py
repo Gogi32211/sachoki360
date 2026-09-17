@@ -497,14 +497,16 @@ def get_tours_on_date(check_date: str):
             # prefix, so strip it before matching against the phone list.
             lunch_name = _MEAL_PREFIX_RE.sub('', r["lunch"] or '')
             dinner_name = _MEAL_PREFIX_RE.sub('', r["dinner"] or '')
+            lunch_disp, lunch_phone = _resolve_meal(r["lunch"], lunch_name, r["hotel"] or '', restaurants, hotels)
+            dinner_disp, dinner_phone = _resolve_meal(r["dinner"], dinner_name, r["hotel"] or '', restaurants, hotels)
             result.append({
                 "code": r["code"], "series": r["series"],
                 "bus_start": r["bus_start"], "bus_end": r["bus_end"],
                 "city": r["city"], "hotel": r["hotel"],
                 "hotel_phone": _hotel_phone_for(r["hotel"] or '', hotels),
-                "lunch": r["lunch"], "dinner": r["dinner"],
-                "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
-                "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
+                "lunch": lunch_disp, "dinner": dinner_disp,
+                "lunch_phone": lunch_phone,
+                "dinner_phone": dinner_phone,
                 "border_crossing": r["border_crossing"],
                 "extra_contacts": _extra_contacts_for_day(
                     extra, r["city"], r["border_crossing"], r["hotel"],
@@ -589,11 +591,14 @@ def get_guide_view(code: str):
     for d in tour["days"]:
         lunch_name = _MEAL_PREFIX_RE.sub('', d["lunch"] or '')
         dinner_name = _MEAL_PREFIX_RE.sub('', d["dinner"] or '')
+        lunch_disp, lunch_phone = _resolve_meal(d["lunch"], lunch_name, d["hotel"] or '', restaurants, hotels)
+        dinner_disp, dinner_phone = _resolve_meal(d["dinner"], dinner_name, d["hotel"] or '', restaurants, hotels)
         days.append({
             **d,
+            "lunch": lunch_disp, "dinner": dinner_disp,
             "hotel_phone": _hotel_phone_for(d["hotel"] or '', hotels),
-            "lunch_phone": _match_restaurant_phone(lunch_name, restaurants),
-            "dinner_phone": _match_restaurant_phone(dinner_name, restaurants),
+            "lunch_phone": lunch_phone,
+            "dinner_phone": dinner_phone,
             "extra_contacts": _extra_contacts_for_day(
                 extra, d["city"], d["border_crossing"], d["hotel"],
                 len(mestia_dates) > 1 and mestia_dates[1] == d["date"]),
@@ -637,6 +642,22 @@ def _match_restaurant_phone(name: str, restaurant_phones: dict) -> str:
         if name.startswith(rname) and restaurant_phones[rname]:
             return restaurant_phones[rname]
     return ''
+
+
+def _resolve_meal(raw: str, stripped: str, hotel: str, restaurant_phones: dict, hotels: dict):
+    """(display text, phone) for one lunch/dinner line.
+
+    The office sometimes writes a hotel-included dinner straight onto the
+    balance sheet as that hotel's own name (e.g. "მარკო პოლო") — but that's
+    whichever hotel was booked when the line was typed, and doesn't always
+    get retyped if the actual booking later moves to a different one.
+    Guests always eat dinner wherever they are actually sleeping that
+    night, so a known hotel-dinner name is swapped for the day's own
+    resolved hotel (never Armenia's "სომხეთი", which names no hotel at
+    all and is shown as itself)."""
+    if stripped and stripped != 'სომხეთი' and stripped in _HOTEL_DINNERS:
+        return hotel, _hotel_phone_for(hotel, hotels)
+    return raw, _match_restaurant_phone(stripped, restaurant_phones)
 
 
 def _hotel_phone_for(hotel_name: str, hotels: dict) -> str:
