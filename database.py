@@ -509,7 +509,7 @@ def get_tours_on_date(check_date: str):
                 "extra_contacts": _extra_contacts_for_day(
                     extra, r["city"], r["border_crossing"], r["hotel"],
                     _mestia_is_second_day(conn, r["code"], check_date) if r["city"] == "Mestia" else False),
-                "stay_contact": match_stay_contact(r["city"], stay_entries),
+                "stay_contact": _stay_contact_for(r["city"], r["hotel"], stay_entries, hotels),
                 "day_notes": r["day_notes"],
                 "day_num": day_num, "total_days": duration,
                 "rooms": r["rooms"] or "",
@@ -597,7 +597,7 @@ def get_guide_view(code: str):
             "extra_contacts": _extra_contacts_for_day(
                 extra, d["city"], d["border_crossing"], d["hotel"],
                 len(mestia_dates) > 1 and mestia_dates[1] == d["date"]),
-            "stay_contact": match_stay_contact(d["city"], stay_entries),
+            "stay_contact": _stay_contact_for(d["city"], d["hotel"], stay_entries, hotels),
             "meals": menu_by_date.get(d["date"], {}),
         })
 
@@ -653,6 +653,45 @@ def _hotel_phone_for(hotel_name: str, hotels: dict) -> str:
                 if phone and any(k in hname for k in ka_tokens):
                     return phone
     return ''
+
+
+def _exact_hotel_phone(name_l: str, hotels: dict) -> str:
+    """Phone for one specific hotel, by its own English name (the
+    informations tab writes each hotel "English / Georgian") -- more
+    precise than _hotel_phone_for's alias table when several hotels in
+    the same city would all match the same generic city alias (Gudauri
+    Inn and Gudauri Loft both contain "gudauri"), and we need one
+    specific one, not whichever comes first."""
+    for hname, phone in hotels.items():
+        if phone and name_l in hname.lower():
+            return phone
+    return ''
+
+
+# In Gudauri specifically, the guide/driver's own overnight stay depends
+# on which hotel the guests are actually in, not one fixed answer the way
+# every other city's stay contact does: guests at Marco Polo or Gudauri
+# Inn put staff at Gudauri Inn, guests at Gudauri Loft put staff there too
+# (the bus can reach it, so no separate arrangement is needed). This
+# overrides the informations tab's own generic Gudauri stay-contact row.
+_GUDAURI_STAY_HOTEL = {
+    'marco polo': 'Gudauri Inn',
+    'gudauri inn': 'Gudauri Inn',
+    'gudauri loft': 'Gudauri Loft',
+}
+
+
+def _stay_contact_for(city: str, hotel: str, stay_entries: list, hotels: dict) -> dict:
+    """The guide/driver's own overnight-stay contact for a day — normally
+    match_stay_contact's own per-city row from the informations tab,
+    except Gudauri, which depends on the guests' own hotel instead (see
+    _GUDAURI_STAY_HOTEL)."""
+    if (city or '').strip().lower() == 'gudauri':
+        hotel_l = (hotel or '').strip().lower()
+        for key, staff_hotel in _GUDAURI_STAY_HOTEL.items():
+            if key in hotel_l:
+                return {"name": staff_hotel, "phone": _exact_hotel_phone(staff_hotel.lower(), hotels)}
+    return match_stay_contact(city, stay_entries)
 
 
 def get_tour_menu(code: str):
