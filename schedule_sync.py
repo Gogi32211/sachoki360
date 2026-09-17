@@ -136,8 +136,12 @@ def fetch_active_tours() -> list:
             if not bs:
                 continue
 
-            # Look up to 4 rows above in the same column for a rooms/pax row.
+            # Look up to 4 rows above in the same column for a rooms/pax row
+            # — the guide's own name sits exactly one row above this same
+            # anchor (see _guide_above), not some fixed distance from the
+            # tour code itself.
             rooms = ''
+            room_ri = None
             for look_back in range(1, 5):
                 ri = row_i - look_back
                 if ri < 0:
@@ -145,19 +149,24 @@ def fetch_active_tours() -> list:
                 candidate = grid[ri][col_i] if col_i < len(grid[ri]) else ''
                 if _ROOM_KEYWORD_RE.search(candidate):
                     rooms = _abbrev_rooms(candidate)
+                    room_ri = ri
                     break
 
             active.append({"code": code, "series": series, "bus_start": bs,
-                           "rooms": rooms, "guide": _guide_above(grid, row_i, col_i)})
+                           "rooms": rooms, "guide": _guide_above(grid, room_ri, col_i)})
 
     print(f"[schedule_sync] active tours parsed: {len(active)}")
     return active
 
 
-# The guide's name sits a row or two above the tour code in the same column,
-# alongside the rooms line — e.g. "IM danieli" over "10 twin/19+1" over "ZT-0803".
-# There is no marker to key on, so identify it by ruling out everything else that
-# appears there: room specs, dates, counts, tour codes and section banners.
+# The guide's name sits exactly one row above the rooms/pax line — e.g.
+# "IM danieli" over "10 twin/19+1" over "ZT-0803". Anchoring on the rooms
+# row (found by its own distinctive twin/single/... pattern) rather than
+# scanning a fixed number of rows above the tour code is what keeps this
+# from breaking whenever the office inserts an extra line somewhere in
+# between: a blind N-rows-above scan would just as happily latch onto
+# unrelated text sitting in that range (a stray "HM - 9 DAY 8 NIGHT"
+# label, say) as if it were the guide's name.
 _GUIDE_SKIP_RE = re.compile(
     r'(in process|done|cancel|for cancell|ok\b|paid|revised)', re.IGNORECASE)
 _LETTER_RE = re.compile(r'[A-Za-z\u10A0-\u10FF]')
@@ -169,7 +178,14 @@ _NUMERIC_ONLY_RE = re.compile(r'^[\d/.\-\s:+,()]+$')
 
 def _looks_like_guide(text: str) -> bool:
     s = (text or '').strip()
-    if not s or len(s) > 60:
+    # Room_ri now pins down exactly which row to look at, so this is no
+    # longer picking one plausible candidate out of several -- it's just
+    # ruling out a genuinely empty or mismarked cell. The length cap is
+    # generous rather than tight for the same reason: several guides for
+    # different date ranges in one field ("ვიკა ხაჩ. 15, ხატია
+    # მჭედლიშვილი 18 მდე,18 დან ხატია თარხნიშვილი") easily runs past 60
+    # characters and is still a perfectly real guide line.
+    if not s or len(s) > 160:
         return False
     if TOUR_CODE_RE.search(s) or _ROOM_WORD_RE.search(s):
         return False
@@ -178,16 +194,14 @@ def _looks_like_guide(text: str) -> bool:
     return bool(_LETTER_RE.search(s))
 
 
-def _guide_above(grid, row_i, col_i) -> str:
-    """Nearest plausible guide name in the rows just above a tour code."""
-    for look_back in range(1, 6):
-        ri = row_i - look_back
-        if ri < 0:
-            break
-        candidate = grid[ri][col_i] if col_i < len(grid[ri]) else ''
-        if _looks_like_guide(candidate):
-            return candidate.strip()
-    return ''
+def _guide_above(grid, room_ri, col_i) -> str:
+    """The guide's name in the row directly above the rooms/pax row found
+    at room_ri (None if no rooms row was found for this tour at all, in
+    which case there's no reliable anchor to read a guide name from)."""
+    if room_ri is None or room_ri - 1 < 0:
+        return ''
+    candidate = grid[room_ri - 1][col_i] if col_i < len(grid[room_ri - 1]) else ''
+    return candidate.strip() if _looks_like_guide(candidate) else ''
 
 
 def _driver_below(grid, row_i, col_i) -> str:
@@ -248,6 +262,7 @@ def fetch_all_tour_rooms() -> dict:
             seen.add(code)
 
             rooms = ''
+            room_ri = None
             for look_back in range(1, 5):
                 ri = row_i - look_back
                 if ri < 0:
@@ -255,9 +270,10 @@ def fetch_all_tour_rooms() -> dict:
                 candidate = grid[ri][col_i] if col_i < len(grid[ri]) else ''
                 if _ROOM_KEYWORD_RE.search(candidate):
                     rooms = _abbrev_rooms(candidate)
+                    room_ri = ri
                     break
 
-            guide = _guide_above(grid, row_i, col_i)
+            guide = _guide_above(grid, room_ri, col_i)
             driver = _driver_below(grid, row_i, col_i)
             if rooms or guide or driver:
                 rooms_map[code] = {"rooms": rooms, "guide": guide, "driver": driver}
