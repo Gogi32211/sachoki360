@@ -998,19 +998,26 @@ def seed_excel_data(parsed_tours: list):
 def get_financials_all():
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT tf.*, t.bus_start, t.bus_end, t.series
+            SELECT tf.*, t.bus_start, t.bus_end, t.series, t.guide AS t_guide
             FROM tour_financials tf
             JOIN tours t ON tf.tour_code = t.code
             ORDER BY t.bus_start
         """).fetchall()
+        guides = [dict(g) for g in conn.execute(
+            "SELECT name, phone FROM contacts_guides").fetchall()]
         result = []
         for r in rows:
             status = get_tour_status(r['bus_start'], r['bus_end'])
+            # tour_financials.guide is a one-time snapshot from the initial
+            # Excel import and never updated again -- tours.guide is the
+            # live-synced one, so it wins whenever it actually has a value.
+            guide = r['t_guide'] or r['guide']
             result.append({
                 'tour_code': r['tour_code'],
                 'series': r['series'],
                 'bus_start': r['bus_start'],
-                'guide': r['guide'],
+                'guide': guide,
+                'guide_phone': match_guide_phone(guide or '', guides),
                 'rooms': r['rooms'],
                 'spent_gel': r['spent_gel'],
                 'tour_price_gel': r['tour_price_gel'],
@@ -1810,6 +1817,8 @@ def get_tour_debts() -> list:
             days_by_tour[r['tour_code']].append(dict(r))
         model = _cost_model(conn)
         line_model = _line_model(conn)
+        guides = [dict(g) for g in conn.execute(
+            "SELECT name, phone FROM contacts_guides").fetchall()]
         shape = {}
         for r in conn.execute("SELECT t.code, t.rooms, p.pax, p.components FROM tours t "
                               "LEFT JOIN tour_profit p ON p.tour_code = t.code").fetchall():
@@ -1829,6 +1838,7 @@ def get_tour_debts() -> list:
             d['series'] = series
             d['bus_start'], d['bus_end'] = bs, be
             d['guide'] = r['t_guide'] or ''
+            d['guide_phone'] = match_guide_phone(d['guide'], guides)
             for k in ('t_series', 't_start', 't_end', 't_guide'):
                 d.pop(k, None)
             d['status'] = get_tour_status(bs, be) if (bs and be) else 'done'
