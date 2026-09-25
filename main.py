@@ -1115,6 +1115,15 @@ def sync_menu():
     except Exception as e:
         raise HTTPException(500, str(e))
 
+@app.post("/api/sync-meals")
+def sync_meals():
+    try:
+        data = fetch_all_meals()
+        updated = db.sync_meals_from_financials(data)
+        return {"ok": True, "updated": updated}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 @app.post("/api/sync-cancelled")
 def sync_cancelled():
     try:
