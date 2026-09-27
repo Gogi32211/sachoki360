@@ -337,6 +337,7 @@ function DayView({ onSelectTour }) {
                         <Badge series={t.series}/>
                         <button className="font-bold text-gray-700 hover:text-blue-600 text-sm"
                           onClick={() => onSelectTour(t.code)}>{t.code}</button>
+                        {t.pax && <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded px-1.5 py-0.5">{t.pax}</span>}
                         {t.rooms && <span className="text-xs text-gray-400 font-mono leading-none">{t.rooms}</span>}
                       </div>
                       <div className="flex-1 text-sm text-gray-700 space-y-0.5">

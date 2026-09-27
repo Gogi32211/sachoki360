@@ -471,8 +471,10 @@ def get_tours_on_date(check_date: str):
     with get_db() as conn:
         rows = conn.execute(
             "SELECT t.code, t.series, t.bus_start, t.bus_end, t.notes, t.rooms, t.guide, t.driver, "
+            "p.pax, "
             "dl.city, dl.hotel, dl.lunch, dl.dinner, dl.border_crossing, dl.notes as day_notes "
             "FROM tours t JOIN daily_log dl ON t.code=dl.tour_code "
+            "LEFT JOIN tour_profit p ON p.tour_code=t.code "
             "WHERE dl.date=? ORDER BY dl.city, t.series",
             (check_date,)
         ).fetchall()
@@ -514,6 +516,7 @@ def get_tours_on_date(check_date: str):
                 "stay_contact": _stay_contact_for(r["city"], r["hotel"], stay_entries, hotels),
                 "day_notes": r["day_notes"],
                 "day_num": day_num, "total_days": duration,
+                "pax": r["pax"] or "",
                 "rooms": r["rooms"] or "",
                 "guide": r["guide"] or "",
                 "guide_phone": match_guide_phone(r["guide"] or "", guides),
