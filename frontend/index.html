@@ -251,6 +251,28 @@ function trMealText(text, lang) {
   return trRestaurant(text, lang);
 }
 
+// Guide/driver names, and the composed "name — phone, name2 — phone2"
+// guide line. Two different scripts show up here: plain Georgian (e.g.
+// "ხატია მჭედლიშვილი"), which translit() already turns into readable
+// Latin -- and the office's own ad-hoc Latin shorthand for typing
+// Georgian without a Georgian keyboard (e.g. "qavTaraZe" for ქავთარაძე,
+// capital letters marking the harder consonants), which has no Georgian
+// characters for hasGeorgian() to catch and reads oddly as-is. Since a
+// normal word is never internally mixed-case, every alphabetic word gets
+// folded to plain Title Case too -- turning "qavTaraZe" into "Qavtaraze"
+// -- while an all-caps token (an abbreviation like "IM") and any
+// digits/dashes/phone numbers are left alone.
+function trPerson(text, lang) {
+  if (lang !== 'en' || !text) return text;
+  return text.split(/(\s+)/).map(tok => {
+    if (/\s/.test(tok) || !tok) return tok;
+    if (hasGeorgian(tok)) return translit(tok);
+    if (/^[A-Z]+$/.test(tok)) return tok;
+    if (/[a-zA-Z]/.test(tok)) return tok.charAt(0).toUpperCase() + tok.slice(1).toLowerCase();
+    return tok;
+  }).join('');
+}
+
 // SERIES[key].name for every series that has one (MT/ST are finance-only
 // and never carry one) -- hand-translated rather than parsed, since the
 // Georgian original mixes free text with abbreviations inconsistently.
@@ -570,10 +592,10 @@ function DayView({ onSelectTour }) {
                         <div>🍽️ <span className="text-gray-400">L:</span> <span className={t.lunch && t.lunch.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{trMealText(t.lunch, lang)}</span>{t.lunch_phone && ` — ${t.lunch_phone}`}</div>
                         <div>🌙 <span className="text-gray-400">V:</span> <span className={t.dinner && t.dinner.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{trMealText(t.dinner, lang)}</span>{t.dinner_phone && ` — ${t.dinner_phone}`}</div>
                         {t.guide && (
-                          <div className="text-gray-500">🧭 <span className="text-gray-400">{ui.guide}</span> {t.guide_phone || t.guide}</div>
+                          <div className="text-gray-500">🧭 <span className="text-gray-400">{ui.guide}</span> {trPerson(t.guide_phone || t.guide, lang)}</div>
                         )}
                         {t.driver && (
-                          <div className="text-gray-500">🚌 <span className="text-gray-400">{ui.driver}</span> {t.driver}</div>
+                          <div className="text-gray-500">🚌 <span className="text-gray-400">{ui.driver}</span> {trPerson(t.driver, lang)}</div>
                         )}
                         {t.border_crossing && (
                           <div className="text-orange-600 font-medium">🚧 {trBorder(t.border_crossing, lang)}</div>
@@ -815,7 +837,7 @@ function MenuView() {
                           <span className="text-xs text-gray-400 truncate">{t.city}</span>
                         </div>
                         {t.guide && (
-                          <div className="text-xs text-gray-400 pl-1">🧭 {t.guide_phone || t.guide}</div>
+                          <div className="text-xs text-gray-400 pl-1">🧭 {trPerson(t.guide_phone || t.guide, lang)}</div>
                         )}
                       </button>
                     ))}
@@ -846,10 +868,10 @@ function MenuView() {
               {menu.pax && <span className="font-mono text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 text-xs">{menu.pax}</span>}
               {menu.portion_label && <span className="text-xs text-gray-400">{ui.portionLabel} {menu.portion_label}</span>}
               {menu.guide && (
-                <span className="text-sm text-gray-500">🧭 {menu.guide_phone || menu.guide}</span>
+                <span className="text-sm text-gray-500">🧭 {trPerson(menu.guide_phone || menu.guide, lang)}</span>
               )}
               {menu.driver && (
-                <span className="text-sm text-gray-500">🚌 {menu.driver}</span>
+                <span className="text-sm text-gray-500">🚌 {trPerson(menu.driver, lang)}</span>
               )}
             </div>
           </div>
