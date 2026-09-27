@@ -12,6 +12,7 @@ from openpyxl import load_workbook
 MASTER_SHEET_ID = "13FoSFZqpi4QAm2CDc1qT3uB7AKHOFEJv"
 
 TOUR_CODE_RE = re.compile(r'\b((?:ZT1|ZT|LN|KT|DT1|DT2|LT|ST|MT|HM)-?\d{4})\b')
+_CANCEL_WORD_RE = re.compile(r'cancel', re.IGNORECASE)
 
 
 def _norm_code(code: str) -> str:
@@ -57,7 +58,20 @@ def fetch_cancelled_tour_codes() -> set:
             for cell in row:
                 if not cell:
                     continue
-                for m in TOUR_CODE_RE.finditer(str(cell)):
+                text = str(cell)
+                # This tab's real purpose is a per-tour hotel-rebooking
+                # history log -- it names EVERY tour that ever had a hotel
+                # substitution, cancelled or not, as a block header, then
+                # lists each day's hotel below (many of those marked
+                # "cancelled" too, meaning that specific hotel booking, not
+                # the tour). A tour is only actually cancelled when its own
+                # header cell says so directly (e.g. "DT2-0607 - Cancelled")
+                # -- treating every code that merely appears anywhere in the
+                # tab as cancelled was deleting dozens of live, unrelated
+                # tours on every sync.
+                if not _CANCEL_WORD_RE.search(text):
+                    continue
+                for m in TOUR_CODE_RE.finditer(text):
                     cancelled.add(_norm_code(m.group(1)))
 
         wb.close()
