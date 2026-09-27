@@ -252,6 +252,13 @@ def init_db():
                           (_wrong, _right, f"%{_wrong}%"))
             conn.execute("UPDATE daily_log SET dinner = REPLACE(dinner, ?, ?) WHERE dinner LIKE ?",
                           (_wrong, _right, f"%{_wrong}%"))
+        # The HM/HM1/HM2/HT/HT1/HT2/HT3 templates only ever named the border
+        # direction ("GEO→ARM"), missing the crossing point every other
+        # series' template already names ("GEO→ARM: სადახლო") -- fixed in
+        # seed_data.py for tours inserted from here on, but already-inserted
+        # rows need this one-time correction too.
+        conn.execute("UPDATE daily_log SET border_crossing = 'GEO→ARM: სადახლო' "
+                      "WHERE border_crossing = 'GEO→ARM'")
         # LN-0906 was already auto-added (from the master schedule) using the
         # regular LN template before TOUR_NIGHTS_OVERRIDE existed, so its
         # daily_log rows need a one-time correction to the tour's own real
