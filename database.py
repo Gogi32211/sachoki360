@@ -253,12 +253,24 @@ def init_db():
             conn.execute("UPDATE daily_log SET dinner = REPLACE(dinner, ?, ?) WHERE dinner LIKE ?",
                           (_wrong, _right, f"%{_wrong}%"))
         # The HM/HM1/HM2/HT/HT1/HT2/HT3 templates only ever named the border
-        # direction ("GEO→ARM"), missing the crossing point every other
-        # series' template already names ("GEO→ARM: სადახლო") -- fixed in
-        # seed_data.py for tours inserted from here on, but already-inserted
-        # rows need this one-time correction too.
-        conn.execute("UPDATE daily_log SET border_crossing = 'GEO→ARM: სადახლო' "
-                      "WHERE border_crossing = 'GEO→ARM'")
+        # direction ("GEO→ARM"), missing the actual crossing point -- and
+        # which one depends on which city the tour is coming from: HM
+        # arrives in Yerevan straight from Borjomi, so it crosses at Bavra,
+        # same as every other Borjomi/Akhaltsikhe-Yerevan leg in this file;
+        # HT arrives from Tbilisi, so it's Sadakhlo, same as every other
+        # Tbilisi-Yerevan leg. Fixed in seed_data.py for tours inserted from
+        # here on; already-inserted rows need this one-time correction too
+        # (also fixes an earlier pass on this that set HM to Sadakhlo too).
+        conn.execute("""
+            UPDATE daily_log SET border_crossing = 'GEO→ARM: ბავრა'
+            WHERE border_crossing IN ('GEO→ARM', 'GEO→ARM: სადახლო')
+              AND tour_code IN (SELECT code FROM tours WHERE series IN ('HM','HM1','HM2'))
+        """)
+        conn.execute("""
+            UPDATE daily_log SET border_crossing = 'GEO→ARM: სადახლო'
+            WHERE border_crossing = 'GEO→ARM'
+              AND tour_code IN (SELECT code FROM tours WHERE series IN ('HT','HT1','HT2','HT3'))
+        """)
         # LN-0906 was already auto-added (from the master schedule) using the
         # regular LN template before TOUR_NIGHTS_OVERRIDE existed, so its
         # daily_log rows need a one-time correction to the tour's own real

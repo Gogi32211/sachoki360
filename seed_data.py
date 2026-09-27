@@ -107,7 +107,7 @@ _HM_NIGHTS = {
     4: {"city": "Mestia",    "hotel": "Gistola Resort",                 "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD (უშგული)", "border": None},
     5: {"city": "Batumi",    "hotel": "Greenwood Batumi",               "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
     6: {"city": "Borjomi",   "hotel": "Borjomi Likani Health & Spa",    "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
-    7: {"city": "Yerevan",   "hotel": "Radisson Blu Yerevan",           "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": "GEO→ARM: სადახლო"},
+    7: {"city": "Yerevan",   "hotel": "Radisson Blu Yerevan",           "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": "GEO→ARM: ბავრა"},
     8: {"city": "✈ Yerevan→Urumqi", "hotel": "—",                      "lunch": "ლანჩი: TBD", "dinner": "ვახშამი: TBD", "border": None},
 }
 SERIES["HM"] = {
