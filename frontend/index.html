@@ -26,7 +26,7 @@
 <body class="bg-gray-100 min-h-screen">
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useCallback, useRef } = React;
+const { useState, useEffect, useCallback, useRef, useContext } = React;
 const API = window.location.origin + "/api";
 
 const SERIES_COLORS = {
@@ -116,8 +116,230 @@ function Spinner() {
   return <div className="flex justify-center p-10"><div className="spinner"/></div>;
 }
 
+// ── LANGUAGE TOGGLE (GE/EN) ──────────────────────────────────────
+// Shared across Timeline/Day View/Tour Detail/Menu -- same dictionaries
+// and fallback transliteration the guide-facing page (main.py's
+// GUIDE_PAGE_HTML) already uses for the same underlying data.
+const LangContext = React.createContext('ka');
+
+const GEO_LAT = {
+  'ა':'a','ბ':'b','გ':'g','დ':'d','ე':'e','ვ':'v','ზ':'z','თ':'t','ი':'i',
+  'კ':'k','ლ':'l','მ':'m','ნ':'n','ო':'o','პ':'p','ჟ':'zh','რ':'r','ს':'s',
+  'ტ':'t','უ':'u','ფ':'p','ქ':'k','ღ':'gh','ყ':'q','შ':'sh','ჩ':'ch',
+  'ც':'ts','ძ':'dz','წ':'ts','ჭ':'ch','ხ':'kh','ჯ':'j','ჰ':'h',
+};
+function hasGeorgian(s) { return /[Ⴀ-ჿ]/.test(s || ''); }
+function translit(s) {
+  return (s || '').split(/(\s+)/).map(chunk =>
+    /\s/.test(chunk) ? chunk : chunk.split('').map(ch => GEO_LAT[ch] || ch).join('')
+  ).join('').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Same tables as GUIDE_PAGE_HTML -- kept in sync by hand since this is a
+// separate single-file app with no shared module to import from.
+const DISH_EN = {
+  'აჯაფსანდალი კეცზე': 'Ajapsandali (clay pot)', 'ბერძნული სალათი': 'Greek salad',
+  'ბოსტნეული კორსიკულაად': 'Vegetables Corsican-style', 'ბოსტნეული შამფურზე': 'Grilled vegetable skewer',
+  'ბოსტნეულის პიცა': 'Vegetable pizza', 'ბოსტნეულის სალათი': 'Vegetable salad',
+  'ბოსტნეულის სუპი': 'Vegetable soup', 'ბრინჯი': 'Rice', 'ბრინჯი ბოსტნეულით': 'Rice with vegetables',
+  'თათარბერაგი': 'Tatarberagi', 'თონის პური': 'Clay-oven bread', 'იმერული': 'Imeretian cheese',
+  'კარტოფილი გლეხურად': 'Peasant-style potatoes', 'კარტოფილი ოჯახურად': 'Homestyle potatoes',
+  'კარტოფილი ფრი': 'French fries', 'კიტი პომიდვრის სალათა ნიგვზით': 'Cucumber-tomato salad with walnuts',
+  'კიტრი პომიდვრის სალათი': 'Cucumber-tomato salad', 'კიტრი პომიდორი': 'Cucumber and tomato',
+  'კიტრი- პომიდვრის სალათი': 'Cucumber-tomato salad', 'კიტრი-პომიდვრის სალათი': 'Cucumber-tomato salad',
+  'კომბოსტოს სალათი': 'Cabbage salad', 'კპ სალათი': 'Cucumber-tomato salad', 'კუბდარი': 'Kubdari',
+  'ლავაში': 'Lavash', 'ლობიანი': 'Lobiani', 'ლობიო': 'Lobio', 'ლობიო აზელილი': 'Mashed lobio',
+  'ლობიო კვაწარახით და რაჭული ლორით': 'Lobio with kvatsarakhi and Racha bacon', 'მაკარონი': 'Pasta',
+  'მეგრული ხაჭაპური': 'Megrelian khachapuri', 'მექსიკური კარტოფილი': 'Mexican-style potatoes',
+  'მოხარშული კარტოფილი': 'Boiled potatoes', 'მწვადი სუკი': 'Pork skewer', 'მწვადი ღორის': 'Pork skewer',
+  'მწვადი ხბოსი': 'Veal skewer', 'მწვანე სალათი': 'Green salad',
+  'ოჯახური სოკ. და ბოსტნეულით': 'Homestyle mushrooms and vegetables', 'ოჯახური ღორის': 'Homestyle pork',
+  'ოჯახური ხბოს ხორცით': 'Homestyle veal', 'პატარა აჭარული ხაჭაპური': 'Small Adjaruli khachapuri',
+  'პიცა ვეგეტარიანული': 'Vegetarian pizza', 'პიცა პეპერონი': 'Pepperoni pizza', 'პომიდვრით': 'with tomato',
+  'პური': 'Bread', 'პურის ასორტი': 'Bread basket', 'სალათა კ/პ': 'Cucumber-tomato salad',
+  'სალათის ფოთლები': 'Lettuce leaves', 'საფირმო დიარონი': "Diaroni's signature dish",
+  'საქონლის ოსტრი': 'Beef ostri', 'საწებელი': 'Satsebeli sauce', 'სოკო კეცზე': 'Mushrooms (clay pot)',
+  'სოკოს სუპი': 'Mushroom soup', 'სუფი': 'Soup', 'ტაფაზე შემწვარი კარტოფილი': 'Pan-fried potatoes',
+  'ფრი': 'Fries', 'ქაბაბი': 'Kebab', 'ქათამის მწვადი': 'Chicken skewer', 'ქათმის მწვადი': 'Chicken skewer',
+  'ქათმის შქმერული': 'Chicken shkmeruli', 'ქამა სოკო კეცზე': 'Forest mushrooms (clay pot)',
+  'ღორის მწვადი': 'Pork skewer', 'ღორის მწვადი ბულგარული': 'Bulgarian-style pork skewer',
+  'ღორის ოჯახური კეცზე': 'Homestyle pork (clay pot)', 'შემწვარი კარტოფილი': 'Fried potatoes',
+  'შემწვარი კარტოფილი ოჯახურად': 'Homestyle fried potatoes', 'შოთის პური': 'Shoti bread',
+  'შქმერული': 'Shkmeruli', 'ჩაშუშლი ხის სოკო მწვანილით და პიტნით': 'Sautéed wild mushrooms with herbs and mint',
+  'ჩაშუშული საქნლის ხორცით': 'Sautéed beef', 'ჩახოხბილი': 'Chakhokhbili', 'წიწაკის მჟავე': 'Pickled peppers',
+  'წყალი': 'Water', 'ჭარხალი ტყემალში': 'Beetroot in tkemali sauce', 'ხაშლამა': 'Khashlama',
+  'ხაჭაპური': 'Khachapuri', 'ხაჭაპური იმერული': 'Imeretian khachapuri',
+  'ხაჭაპური სვანური მწვანე ფეტვით': 'Svan khachapuri with green millet', 'ხბოს მწვადი': 'Veal skewer',
+  'ხბოს მწვადი კეცზე': 'Veal (clay pot)', 'ხბოს ოჯახური': 'Homestyle veal', 'ხბოს ჩაქაფული': 'Veal chakapuli',
+  'ხბოს ჩაშუშული': 'Sautéed veal', 'ხბოს ჩაშუშული ტომატში': 'Sautéed veal in tomato sauce',
+  'ხინკალი': 'Khinkali', 'ხინკალი ყველის': 'Cheese khinkali', 'ხინკალი ხორცის': 'Meat khinkali',
+  'ხის სოკო იმერულად': 'Wild mushrooms Imeretian-style',
+};
+const DISH_NOTE_EN = {
+  'გაყოფილი ორად': 'split in half', '2 ადამიანზე 1': '1 per 2 people', 'პორცია ემატება': 'extra portion added',
+};
+const _PER_PERSON_RE = /^კაცზე\s*(\d+)$/;
+const RESTAURANT_EN = {
+  'ვარძია შოთა': 'Vardzia Shota', 'დიარონი': 'Diaroni', 'ლუშნუ ქორი': 'Lushnu Qori', 'ენგური': 'Enguri',
+  'ლუიზასთან': "Luiza's", 'ლუზიასთან': "Luiza's", 'ფასანაური': 'Pasanauri', 'ოქროს საწმისი': 'Golden Fleece',
+  'ცენტრალ პაბი': 'Central Pub', 'ცენტრალ პაბ': 'Central Pub', 'ბერიძეები': 'The Beridzes',
+  'სალობიე': 'Salobie', 'ბალკონი': 'Balkoni', 'ფესვები': 'Roots', 'დარანი': 'Darani',
+  'დარანი (ახალციხე)': 'Darani (Akhaltsikhe)', 'გურამიშვილის მარანი': "Guramishvili's Wine Cellar",
+  'კტვ': 'KTV', 'კტვ პატარძეული': 'KTV', 'ზღაპარი (ტმ მენიუ)': 'Zgapari (TM menu)', 'ზღაპარი': 'Zgapari',
+  'ახალი აზია': 'New Asia',
+};
+// Guide/driver overnight-stay hotels (contacts_stay) -- Georgian-only,
+// unlike daily_log.hotel which already comes in canonical English.
+const HOTEL_ONLY_EN = {
+  'სანი': 'Sani', 'ლილეო': 'Lileo', 'სასტუმრო': 'Hotel',
+  'ასტანა პალასი': 'Astana Palace', 'ყაზბეგი ინნ': 'Kazbegi Inn', 'ალპინა': 'Alpina',
+};
+const EXTRA_LABEL_EN = {
+  border_transport: ['სატრანსპორტო', 'Border transport'],
+  kazbegi_delika: ['ყაზბეგის დელიკები', 'Kazbegi delivery'],
+  mestia_delika: ['მესტიის დელიკები', 'Mestia delivery'],
+  batumi_boat: ['გემით გასეირნება ბათუმში', 'Boat cruise'],
+};
+const BORDER_PLACE_EN = { 'სადახლო': 'Sadakhlo', 'ბავრა': 'Bavra', 'ლაგოდეხი': 'Lagodekhi' };
+
+function trOr(s, dict) {
+  if (!s) return s;
+  if (dict[s] != null) return dict[s];
+  return hasGeorgian(s) ? translit(s) : s;
+}
+function trDish(name, lang) { return lang === 'en' ? trOr(name, DISH_EN) : name; }
+function trDishNote(note, lang) {
+  if (lang !== 'en' || !note) return note;
+  return note.split(', ').map(p => {
+    if (DISH_NOTE_EN[p]) return DISH_NOTE_EN[p];
+    const m = _PER_PERSON_RE.exec(p);
+    if (m) return m[1] + ' per person';
+    return hasGeorgian(p) ? translit(p) : p;
+  }).join(', ');
+}
+function trRestaurant(name, lang) {
+  if (lang !== 'en' || !name) return name;
+  if (RESTAURANT_EN[name] != null) return RESTAURANT_EN[name];
+  const keys = Object.keys(RESTAURANT_EN).sort((a, b) => b.length - a.length);
+  for (const k of keys) { if (name.startsWith(k)) return RESTAURANT_EN[k]; }
+  return hasGeorgian(name) ? translit(name) : name;
+}
+function trHotelOnly(name, lang) { return lang === 'en' ? trOr(name, HOTEL_ONLY_EN) : name; }
+function trExtraLabel(key, fallbackName, lang) {
+  if (lang !== 'en') return fallbackName;
+  const entry = EXTRA_LABEL_EN[key];
+  if (entry && fallbackName && fallbackName.startsWith(entry[0])) {
+    const rest = fallbackName.slice(entry[0].length);
+    return entry[1] + (hasGeorgian(rest) ? translit(rest) : rest);
+  }
+  return hasGeorgian(fallbackName) ? translit(fallbackName) : fallbackName;
+}
+function trBorder(text, lang) {
+  if (lang !== 'en' || !text) return text;
+  let out = text;
+  for (const geo in BORDER_PLACE_EN) out = out.split(geo).join(BORDER_PLACE_EN[geo]);
+  return out;
+}
+// Day View / Tour Detail's lunch/dinner are plain resolved strings (a
+// restaurant name, an "own expense"/Armenia marker, or an already-English
+// hotel name for an at-hotel meal) -- not the structured dish list Menu
+// View gets, so they need their own simpler resolver.
+function trMealText(text, lang) {
+  if (lang !== 'en' || !text) return text;
+  if (text.indexOf('საკუთარი') !== -1) return UI.en.ownExpense;
+  if (text.indexOf('სომხეთ') !== -1) return UI.en.armenia;
+  return trRestaurant(text, lang);
+}
+
+// SERIES[key].name for every series that has one (MT/ST are finance-only
+// and never carry one) -- hand-translated rather than parsed, since the
+// Georgian original mixes free text with abbreviations inconsistently.
+const SERIES_NAME_EN = {
+  ZT: 'ZT — 13 days (Mestia included)', ZT1: 'ZT1 — identical to ZT (parallel group)',
+  LN: 'LN — 12 days', KT: 'KT — 10 days',
+  DT1: 'DT1 — 12 days (Kazakhstan + 3 cities)', DT2: 'DT2 — 14 days (Kazakhstan+Tashkent+3 cities)',
+  LT: 'LT — similar to ZT (11 nights)',
+  HM: 'HM — 12 days (Azerbaijan+Georgia+Armenia)', HM1: 'HM1 — 12 days (Group 1)', HM2: 'HM2 — 12 days (Group 2)',
+  HT: 'HT — 10 days (Azerbaijan+Georgia+Armenia)', HT1: 'HT1 — 10 days (Group 1)',
+  HT2: 'HT2 — 10 days (Group 2)', HT3: 'HT3 — 10 days (Group 3)',
+  TH: 'TH — 9 days (Azerbaijan+Georgia+Armenia)', TK: 'TK — 14 days (Azerbaijan+Georgia+Armenia+Svaneti)',
+  TM: 'TM — 10 days (Armenia + Georgia)', TV: 'TV — 7 days (Armenia + Georgia)',
+};
+function trSeriesName(name, series, lang) {
+  return (lang === 'en' && SERIES_NAME_EN[series]) ? SERIES_NAME_EN[series] : name;
+}
+
+const MONTH_NAMES_KA = ["იანვარი","თებერვალი","მარტი","აპრილი","მაისი","ივნისი",
+  "ივლისი","აგვისტო","სექტემბერი","ოქტომბერი","ნოემბერი","დეკემბერი"];
+const MONTH_NAMES_EN = ["January","February","March","April","May","June",
+  "July","August","September","October","November","December"];
+
+const UI = {
+  ka: {
+    tabTimeline: "📊 Timeline", tabDay: "📅 დღის ხედი", tabDetail: "🔍 ტურის დეტალი", tabMenu: "🍽️ მენიუ",
+    tabPayments: "💳 წინასწარ გადასახდელი", tabPrepaystat: "📈 წინასტატი", tabBuses: "🚌 ავტობუსები",
+    tabCashflow: "💵 ავანსი/ბალანსი", tabProfit: "💰 მოგება 2026", tabStats: "📊 სტატისტიკა 2026",
+    tabDebts: "🧾 დავალიანებები", tabProfit25: "💰 მოგება 2025", tabStats25: "📊 სტატისტიკა 2025",
+    tabSettings: "⚙️ პარამეტრები",
+    today: "📅 დღეს", refresh: "განახლება", refreshing: "განახლება...", logout: "გასვლა",
+    tour: "ტური", noToursMonth: "ამ თვეში ტურები არ არის", noToursDay: "ამ დღეს ტურები არ არის",
+    groups: "ჯგ.", otherCity: "სხვა", notActiveToday: "დღეს არ არის აქტიური", fullItinerary: "სრული itinerary →",
+    back: "← უკან", search: "ძებნა", codePlaceholder: "კოდი: ZT-0601 ...",
+    enterCode: "ჩაწერე ტურის კოდი ძებნის ველში",
+    hDay: "დღე", hDate: "თარიღი", hCity: "ქალაქი", hHotel: "სასტუმრო", hLunch: "სადილი",
+    hDinner: "ვახშამი", hBorder: "საზ.კვ.", hNotes: "შენიშვნა",
+    statusActive: "აქტიური", statusUpcoming: "მომავალი", statusDone: "დასრულებული",
+    guide: "გიდი:", driver: "მძღოლი:", staffStay: "პერსონალის ღამისთევა:", borderToday: "🚧 დღის საზ.კვ.",
+    menuNotFound: "ტური ვერ მოიძებნა", menuEnterCode: "ჩაწერე ტურის კოდი ან აირჩიე ზემოთ",
+    paxUnknown: "ტურისტების რაოდენობა ჯერ არ არის ცნობილი — პორცია ვერ დაითვლება",
+    noMenuSeries: "ამ სერიისთვის მენიუ ჯერ არ არის დამატებული", noMenuYet: "მენიუ ჯერ არ არის დამატებული",
+    portionLabel: "პორცია:", ownExpense: "საკუთარი ხარჯებით", atHotel: "სასტუმროში", armenia: "სომხეთში",
+    copyReservation: "📋 ჯავშნის ტექსტის კოპირება", copied: "✓ დაკოპირდა",
+    yesterday: "გუშინდელი", todayGroup: "დღევანდელი", tomorrow: "ხვალინდელი",
+    mealLunch: "🍽️ სადილი", mealDinner: "🌙 ვახშამი",
+  },
+  en: {
+    tabTimeline: "📊 Timeline", tabDay: "📅 Day View", tabDetail: "🔍 Tour Detail", tabMenu: "🍽️ Menu",
+    tabPayments: "💳 Prepayments", tabPrepaystat: "📈 Prepay Stats", tabBuses: "🚌 Buses",
+    tabCashflow: "💵 Advance/Balance", tabProfit: "💰 Profit 2026", tabStats: "📊 Statistics 2026",
+    tabDebts: "🧾 Debts", tabProfit25: "💰 Profit 2025", tabStats25: "📊 Statistics 2025",
+    tabSettings: "⚙️ Settings",
+    today: "📅 Today", refresh: "Refresh", refreshing: "Refreshing...", logout: "Log out",
+    tour: "Tour", noToursMonth: "No tours this month", noToursDay: "No tours today",
+    groups: "grp.", otherCity: "Other", notActiveToday: "Not active today", fullItinerary: "Full itinerary →",
+    back: "← Back", search: "Search", codePlaceholder: "Code: ZT-0601 ...",
+    enterCode: "Enter a tour code in the search box",
+    hDay: "Day", hDate: "Date", hCity: "City", hHotel: "Hotel", hLunch: "Lunch",
+    hDinner: "Dinner", hBorder: "Border", hNotes: "Notes",
+    statusActive: "Active", statusUpcoming: "Upcoming", statusDone: "Done",
+    guide: "Guide:", driver: "Driver:", staffStay: "Staff overnight stay:", borderToday: "🚧 Today's border crossings",
+    menuNotFound: "Tour not found", menuEnterCode: "Enter a tour code or pick one above",
+    paxUnknown: "Tourist count not known yet — portions can't be calculated",
+    noMenuSeries: "No menu added for this series yet", noMenuYet: "Menu not added yet",
+    portionLabel: "Portion:", ownExpense: "own expense", atHotel: "at the hotel", armenia: "in Armenia",
+    copyReservation: "📋 Copy reservation text", copied: "✓ Copied",
+    yesterday: "Yesterday", todayGroup: "Today", tomorrow: "Tomorrow",
+    mealLunch: "🍽️ Lunch", mealDinner: "🌙 Dinner",
+  },
+};
+
+function LangToggle({ lang, setLang }) {
+  return (
+    <div className="flex rounded-lg overflow-hidden border border-slate-600 text-xs font-semibold">
+      {['ka', 'en'].map(l => (
+        <button key={l} onClick={() => setLang(l)}
+          className={`px-2 py-1.5 transition-colors ${lang === l ? 'bg-amber-400 text-slate-900' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+          {l === 'ka' ? 'GE' : 'EN'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── TIMELINE VIEW ──────────────────────────────────────────────
 function TimelineView({ onSelectTour }) {
+  const lang = useContext(LangContext);
+  const ui = UI[lang];
   const [tours, setTours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewDate, setViewDate] = useState(new Date());
@@ -133,8 +355,7 @@ function TimelineView({ onSelectTour }) {
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month, daysInMonth);
 
-  const MONTH_NAMES = ["იანვარი","თებერვალი","მარტი","აპრილი","მაისი","ივნისი",
-    "ივლისი","აგვისტო","სექტემბერი","ოქტომბერი","ნოემბერი","დეკემბერი"];
+  const MONTH_NAMES = lang === 'en' ? MONTH_NAMES_EN : MONTH_NAMES_KA;
 
   useEffect(() => {
     setLoading(true);
@@ -184,7 +405,7 @@ function TimelineView({ onSelectTour }) {
         <button onClick={() => setViewDate(new Date(year, month+1, 1))}
           className="px-3 py-1.5 bg-white border rounded hover:bg-gray-50 text-sm">▶</button>
         <button onClick={scrollToToday}
-          className="px-3 py-1.5 bg-amber-400 text-white rounded text-sm font-medium hover:bg-amber-500">📅 დღეს</button>
+          className="px-3 py-1.5 bg-amber-400 text-white rounded text-sm font-medium hover:bg-amber-500">{ui.today}</button>
         <div className="flex gap-2 flex-wrap">
           {Object.keys(SERIES_COLORS).map(s => (
             <label key={s} className="flex items-center gap-1 cursor-pointer text-sm select-none">
@@ -203,7 +424,7 @@ function TimelineView({ onSelectTour }) {
             <div style={{ minWidth: LABEL_W + daysInMonth * DAY_W }}>
               <div className="flex border-b bg-gray-50 sticky top-0 z-10">
                 <div style={{width:LABEL_W,minWidth:LABEL_W}}
-                  className="text-xs font-semibold text-gray-500 p-2 border-r shrink-0">ტური</div>
+                  className="text-xs font-semibold text-gray-500 p-2 border-r shrink-0">{ui.tour}</div>
                 {Array.from({length: daysInMonth}, (_, i) => {
                   const isTd = today.getFullYear()===year && today.getMonth()===month && today.getDate()===i+1;
                   return (
@@ -215,7 +436,7 @@ function TimelineView({ onSelectTour }) {
                 })}
               </div>
               {filtered.length === 0 ? (
-                <div className="p-10 text-center text-gray-400">ამ თვეში ტურები არ არის</div>
+                <div className="p-10 text-center text-gray-400">{ui.noToursMonth}</div>
               ) : filtered.map(tour => {
                 const bp = barProps(tour);
                 return (
@@ -255,13 +476,13 @@ function TimelineView({ onSelectTour }) {
             <div className="space-y-1 text-xs">
               <div>📍 <strong>{popup.info.city}</strong></div>
               <div>🏨 {popup.info.hotel}</div>
-              <div>🍽️ {popup.info.lunch}</div>
-              <div>🌙 {popup.info.dinner}</div>
-              {popup.info.border_crossing && <div className="text-orange-600">🚧 {popup.info.border_crossing}</div>}
+              <div>🍽️ {trMealText(popup.info.lunch, lang)}</div>
+              <div>🌙 {trMealText(popup.info.dinner, lang)}</div>
+              {popup.info.border_crossing && <div className="text-orange-600">🚧 {trBorder(popup.info.border_crossing, lang)}</div>}
             </div>
-          ) : <div className="text-xs text-gray-400">დღეს არ არის აქტიური</div>}
+          ) : <div className="text-xs text-gray-400">{ui.notActiveToday}</div>}
           <button className="mt-3 text-blue-600 text-xs hover:underline"
-            onClick={() => { setPopup(null); onSelectTour(popup.tour.code); }}>სრული itinerary →</button>
+            onClick={() => { setPopup(null); onSelectTour(popup.tour.code); }}>{ui.fullItinerary}</button>
         </div>
       )}
     </div>
@@ -270,6 +491,8 @@ function TimelineView({ onSelectTour }) {
 
 // ── DAY VIEW ───────────────────────────────────────────────────
 function DayView({ onSelectTour }) {
+  const lang = useContext(LangContext);
+  const ui = UI[lang];
   const [selDate, setSelDate] = useState(toISO(new Date()));
   const [tours, setTours] = useState([]);
   const [borders, setBorders] = useState([]);
@@ -294,12 +517,12 @@ function DayView({ onSelectTour }) {
 
   const grouped = {};
   for (const t of tours) {
-    const c = t.city || "სხვა";
+    const c = t.city || ui.otherCity;
     if (!grouped[c]) grouped[c] = [];
     grouped[c].push(t);
   }
 
-  const displayDate = new Date(selDate + "T00:00:00").toLocaleDateString("ka-GE", {
+  const displayDate = new Date(selDate + "T00:00:00").toLocaleDateString(lang === 'en' ? 'en-US' : 'ka-GE', {
     weekday:"long", year:"numeric", month:"long", day:"numeric"
   });
 
@@ -311,14 +534,14 @@ function DayView({ onSelectTour }) {
           className="border rounded px-3 py-2 text-sm"/>
         <button onClick={() => changeDay(1)} className="px-3 py-2 bg-white border rounded hover:bg-gray-50">▶</button>
         <button onClick={() => setSelDate(toISO(new Date()))}
-          className="px-3 py-2 bg-amber-400 text-white rounded text-sm font-medium hover:bg-amber-500">📅 დღეს</button>
+          className="px-3 py-2 bg-amber-400 text-white rounded text-sm font-medium hover:bg-amber-500">{ui.today}</button>
         <span className="text-gray-500 text-sm">{displayDate}</span>
       </div>
 
       {loading ? <Spinner/> : tours.length === 0 ? (
         <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
           <div className="text-4xl mb-2">📭</div>
-          <div className="text-sm">ამ დღეს ტურები არ არის</div>
+          <div className="text-sm">{ui.noToursDay}</div>
         </div>
       ) : (
         <>
@@ -326,7 +549,7 @@ function DayView({ onSelectTour }) {
             <div key={city} className="mb-3 flex gap-3 items-start">
               <div className="w-28 flex-shrink-0 pt-2 text-right">
                 <div className="text-sm font-semibold text-gray-700">📍 {city}</div>
-                <div className="text-xs text-gray-400">{cts.length} ჯგ.</div>
+                <div className="text-xs text-gray-400">{cts.length} {ui.groups}</div>
               </div>
               <div className="flex-1 grid gap-1.5">
                 {cts.map(t => (
@@ -344,22 +567,22 @@ function DayView({ onSelectTour }) {
                         <div>🏨 {t.hotel && t.hotel.startsWith('? ')
                           ? <span className="text-orange-500 font-semibold">{t.hotel} ⚠</span>
                           : t.hotel}{t.hotel_phone && ` — ${t.hotel_phone}`}</div>
-                        <div>🍽️ <span className="text-gray-400">L:</span> <span className={t.lunch && t.lunch.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.lunch}</span>{t.lunch_phone && ` — ${t.lunch_phone}`}</div>
-                        <div>🌙 <span className="text-gray-400">V:</span> <span className={t.dinner && t.dinner.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{t.dinner}</span>{t.dinner_phone && ` — ${t.dinner_phone}`}</div>
+                        <div>🍽️ <span className="text-gray-400">L:</span> <span className={t.lunch && t.lunch.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{trMealText(t.lunch, lang)}</span>{t.lunch_phone && ` — ${t.lunch_phone}`}</div>
+                        <div>🌙 <span className="text-gray-400">V:</span> <span className={t.dinner && t.dinner.includes('საკუთარი') ? 'text-red-500 font-medium' : ''}>{trMealText(t.dinner, lang)}</span>{t.dinner_phone && ` — ${t.dinner_phone}`}</div>
                         {t.guide && (
-                          <div className="text-gray-500">🧭 <span className="text-gray-400">გიდი:</span> {t.guide_phone || t.guide}</div>
+                          <div className="text-gray-500">🧭 <span className="text-gray-400">{ui.guide}</span> {t.guide_phone || t.guide}</div>
                         )}
                         {t.driver && (
-                          <div className="text-gray-500">🚌 <span className="text-gray-400">მძღოლი:</span> {t.driver}</div>
+                          <div className="text-gray-500">🚌 <span className="text-gray-400">{ui.driver}</span> {t.driver}</div>
                         )}
                         {t.border_crossing && (
-                          <div className="text-orange-600 font-medium">🚧 {t.border_crossing}</div>
+                          <div className="text-orange-600 font-medium">🚧 {trBorder(t.border_crossing, lang)}</div>
                         )}
-                        {t.extra_contacts && Object.values(t.extra_contacts).map((c, i) => (
-                          <div key={i} className="text-gray-500">🚐 {c.name} — {c.phone}</div>
+                        {t.extra_contacts && Object.entries(t.extra_contacts).map(([key, c], i) => (
+                          <div key={i} className="text-gray-500">🚐 {trExtraLabel(key, c.name, lang)} — {c.phone}</div>
                         ))}
                         {t.stay_contact && t.stay_contact.name && (
-                          <div className="text-gray-500">🏠 <span className="text-gray-400">პერსონალის ღამისთევა:</span> {t.stay_contact.name} — {t.stay_contact.phone}</div>
+                          <div className="text-gray-500">🏠 <span className="text-gray-400">{ui.staffStay}</span> {trHotelOnly(t.stay_contact.name, lang)} — {t.stay_contact.phone}</div>
                         )}
                       </div>
                       <span className="text-sm text-gray-400 flex-shrink-0">Day {t.day_num}/{t.total_days}</span>
@@ -372,10 +595,10 @@ function DayView({ onSelectTour }) {
 
           {borders.length > 0 && (
             <div className="mt-4 bg-orange-50 border border-orange-200 rounded-xl p-4">
-              <h3 className="font-bold text-orange-700 mb-2 text-sm">🚧 დღის საზ.კვ.</h3>
+              <h3 className="font-bold text-orange-700 mb-2 text-sm">{ui.borderToday}</h3>
               {borders.map((b, i) => (
                 <div key={i} className="text-sm text-orange-800 mb-1">
-                  • <strong>{b.tour_code}</strong>: {b.border_crossing}
+                  • <strong>{b.tour_code}</strong>: {trBorder(b.border_crossing, lang)}
                 </div>
               ))}
             </div>
@@ -388,6 +611,8 @@ function DayView({ onSelectTour }) {
 
 // ── TOUR DETAIL VIEW ───────────────────────────────────────────
 function TourDetailView({ initialCode, onBack }) {
+  const lang = useContext(LangContext);
+  const ui = UI[lang];
   const [search, setSearch] = useState(initialCode || "");
   const [tour, setTour] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -417,25 +642,25 @@ function TourDetailView({ initialCode, onBack }) {
   };
 
   const STATUS = {active:"bg-green-100 text-green-700", upcoming:"bg-blue-100 text-blue-700", done:"bg-gray-100 text-gray-500"};
-  const STATUS_GEO = {active:"აქტიური", upcoming:"მომავალი", done:"დასრულებული"};
+  const STATUS_GEO = {active: ui.statusActive, upcoming: ui.statusUpcoming, done: ui.statusDone};
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <button onClick={onBack} className="px-3 py-2 bg-white border rounded hover:bg-gray-50 text-sm">← უკან</button>
+        <button onClick={onBack} className="px-3 py-2 bg-white border rounded hover:bg-gray-50 text-sm">{ui.back}</button>
         <form onSubmit={e => { e.preventDefault(); loadTour(search); }} className="flex gap-2">
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="კოდი: ZT-0601 ..."
+            placeholder={ui.codePlaceholder}
             className="border rounded px-3 py-2 text-sm w-44"/>
           <button type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">ძებნა</button>
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">{ui.search}</button>
         </form>
       </div>
 
       {loading ? <Spinner/> : !tour ? (
         <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
           <div className="text-5xl mb-3">🔍</div>
-          <div>ჩაწერე ტურის კოდი ძებნის ველში</div>
+          <div>{ui.enterCode}</div>
         </div>
       ) : (
         <>
@@ -447,8 +672,9 @@ function TourDetailView({ initialCode, onBack }) {
                 {STATUS_GEO[tour.status]}
               </span>
             </div>
-            <div className="text-sm text-gray-500 mt-1">{tour.series_name}</div>
+            <div className="text-sm text-gray-500 mt-1">{trSeriesName(tour.series_name, tour.series, lang)}</div>
             <div className="text-sm text-gray-600 mt-1">📅 {tour.bus_start} → {tour.bus_end}
+              {tour.pax && <span className="ml-3 text-xs font-medium text-gray-600 bg-gray-100 rounded px-1.5 py-0.5">{tour.pax}</span>}
               {tour.rooms && <span className="ml-3 font-mono text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 text-xs">{tour.rooms}</span>}
             </div>
           </div>
@@ -456,7 +682,7 @@ function TourDetailView({ initialCode, onBack }) {
           <div className="bg-white rounded-xl shadow overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
-                <tr>{["დღე","თარიღი","ქალაქი","სასტუმრო","სადილი","ვახშამი","საზ.კვ.","შენიშვნა"].map(h => (
+                <tr>{[ui.hDay,ui.hDate,ui.hCity,ui.hHotel,ui.hLunch,ui.hDinner,ui.hBorder,ui.hNotes].map(h => (
                   <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                 ))}</tr>
               </thead>
@@ -471,9 +697,9 @@ function TourDetailView({ initialCode, onBack }) {
                         ? <span className="text-orange-500 font-semibold">{day.hotel} ⚠</span>
                         : <span className="text-gray-600">{day.hotel}</span>}
                     </td>
-                    <td className="px-3 py-2 text-gray-600 text-xs">{day.lunch}</td>
-                    <td className="px-3 py-2 text-gray-600 text-xs">{day.dinner}</td>
-                    <td className="px-3 py-2 text-orange-600 text-xs whitespace-nowrap">{day.border_crossing}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{trMealText(day.lunch, lang)}</td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">{trMealText(day.dinner, lang)}</td>
+                    <td className="px-3 py-2 text-orange-600 text-xs whitespace-nowrap">{trBorder(day.border_crossing, lang)}</td>
                     <td className="px-3 py-2">
                       {editNotes[day.log_id] !== undefined ? (
                         <div className="flex gap-1">
@@ -509,6 +735,7 @@ function TourDetailView({ initialCode, onBack }) {
 
 // ── MENU VIEW (restaurant menus + portions, per tour) ───────────
 function ReservationText({ text }) {
+  const ui = UI[useContext(LangContext)];
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard.writeText(text).then(() => {
@@ -520,13 +747,15 @@ function ReservationText({ text }) {
     <div className="mt-2 pt-2 border-t">
       <button onClick={copy}
         className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600">
-        {copied ? "✓ დაკოპირდა" : "📋 ჯავშნის ტექსტის კოპირება"}
+        {copied ? ui.copied : ui.copyReservation}
       </button>
     </div>
   );
 }
 
 function MenuView() {
+  const lang = useContext(LangContext);
+  const ui = UI[lang];
   const [search, setSearch] = useState("");
   const [menu, setMenu] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -551,8 +780,8 @@ function MenuView() {
       .catch(() => { setMenu(null); setNotFound(true); setLoading(false); });
   };
 
-  const MEAL_LABEL = { lunch: "🍽️ სადილი", dinner: "🌙 ვახშამი" };
-  const GROUP_LABEL = { yesterday: "გუშინდელი", today: "დღევანდელი", tomorrow: "ხვალინდელი" };
+  const MEAL_LABEL = { lunch: ui.mealLunch, dinner: ui.mealDinner };
+  const GROUP_LABEL = { yesterday: ui.yesterday, today: ui.todayGroup, tomorrow: ui.tomorrow };
   const todayIso = toISO(new Date());
 
   return (
@@ -560,10 +789,10 @@ function MenuView() {
       <div className="flex items-center gap-3 mb-6 flex-wrap">
         <form onSubmit={e => { e.preventDefault(); loadMenu(search); }} className="flex gap-2">
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="კოდი: ZT-0817 ..."
+            placeholder={ui.codePlaceholder}
             className="border rounded px-3 py-2 text-sm w-44"/>
           <button type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">ძებნა</button>
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">{ui.search}</button>
         </form>
       </div>
 
@@ -601,12 +830,12 @@ function MenuView() {
       {loading ? <Spinner/> : notFound ? (
         <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
           <div className="text-5xl mb-3">🍽️</div>
-          <div>ტური ვერ მოიძებნა</div>
+          <div>{ui.menuNotFound}</div>
         </div>
       ) : !menu ? (
         <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
           <div className="text-5xl mb-3">🍽️</div>
-          <div>ჩაწერე ტურის კოდი ან აირჩიე ზემოთ</div>
+          <div>{ui.menuEnterCode}</div>
         </div>
       ) : (
         <>
@@ -615,7 +844,7 @@ function MenuView() {
               <Badge series={menu.series}/>
               <h2 className="text-xl font-bold">{menu.code}</h2>
               {menu.pax && <span className="font-mono text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 text-xs">{menu.pax}</span>}
-              {menu.portion_label && <span className="text-xs text-gray-400">პორცია: {menu.portion_label}</span>}
+              {menu.portion_label && <span className="text-xs text-gray-400">{ui.portionLabel} {menu.portion_label}</span>}
               {menu.guide && (
                 <span className="text-sm text-gray-500">🧭 {menu.guide_phone || menu.guide}</span>
               )}
@@ -627,18 +856,18 @@ function MenuView() {
 
           {menu.pax_unknown ? (
             <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
-              ტურისტების რაოდენობა ჯერ არ არის ცნობილი — პორცია ვერ დაითვლება
+              {ui.paxUnknown}
             </div>
           ) : menu.days.length === 0 ? (
             <div className="bg-white rounded-xl shadow p-14 text-center text-gray-400">
-              ამ სერიისთვის მენიუ ჯერ არ არის დამატებული
+              {ui.noMenuSeries}
             </div>
           ) : (
             <div className="space-y-4">
               {menu.days.map(day => (
                 <div key={day.day_num} className={`rounded-xl shadow p-5 ${day.date === todayIso ? 'bg-green-50' : 'bg-white'}`}>
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="font-bold text-gray-400">დღე {day.day_num}</span>
+                    <span className="font-bold text-gray-400">{ui.hDay} {day.day_num}</span>
                     <span className="text-sm text-gray-500">{day.date}</span>
                     <span className="font-medium text-sm">📍 {day.city}</span>
                   </div>
@@ -647,31 +876,31 @@ function MenuView() {
                       <div key={mk} className="border rounded-lg p-3 bg-white">
                         {day.meals[mk].at_hotel ? (
                           <div className="text-sm text-gray-500">
-                            {MEAL_LABEL[mk]} სასტუმროში
+                            {MEAL_LABEL[mk]} {ui.atHotel}
                             {day.meals[mk].hotel && ` — ${day.meals[mk].hotel}`}
                             {day.meals[mk].hotel_phone && ` — ${day.meals[mk].hotel_phone}`}
                           </div>
                         ) : day.meals[mk].own_expense ? (
-                          <div className="text-sm text-red-500 font-medium">{MEAL_LABEL[mk]} საკუთარი ხარჯებით</div>
+                          <div className="text-sm text-red-500 font-medium">{MEAL_LABEL[mk]} {ui.ownExpense}</div>
                         ) : day.meals[mk].armenia ? (
-                          <div className="text-sm text-gray-500">{MEAL_LABEL[mk]} სომხეთში</div>
+                          <div className="text-sm text-gray-500">{MEAL_LABEL[mk]} {ui.armenia}</div>
                         ) : (
                           <>
                             <div className="text-xs font-semibold text-gray-500 mb-1">
-                              {MEAL_LABEL[mk]} — {day.meals[mk].restaurant}
+                              {MEAL_LABEL[mk]} — {trRestaurant(day.meals[mk].restaurant, lang)}
                               {day.meals[mk].restaurant_phone && ` — ${day.meals[mk].restaurant_phone}`}
                             </div>
                             {day.meals[mk].dishes ? (
                               <ul className="text-sm space-y-0.5">
                                 {day.meals[mk].dishes.map((d,i) => (
                                   <li key={i} className="flex justify-between gap-2">
-                                    <span className="text-gray-700">{d.name}{d.note && ` (${d.note})`}</span>
+                                    <span className="text-gray-700">{trDish(d.name, lang)}{d.note && ` (${trDishNote(d.note, lang)})`}</span>
                                     <span className="text-gray-400 text-xs shrink-0">{d.portions}</span>
                                   </li>
                                 ))}
                               </ul>
                             ) : (
-                              <div className="text-xs text-gray-400">მენიუ ჯერ არ არის დამატებული</div>
+                              <div className="text-xs text-gray-400">{ui.noMenuYet}</div>
                             )}
                             <ReservationText text={day.meals[mk].reservation_text}/>
                           </>
@@ -3104,6 +3333,14 @@ function App() {
   const [selectedTour, setSelectedTour] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [scope, setScope] = useState(null);
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem('ki360_lang') || 'ka'; } catch (e) { return 'ka'; }
+  });
+  const ui = UI[lang];
+  const changeLang = l => {
+    setLang(l);
+    try { localStorage.setItem('ki360_lang', l); } catch (e) {}
+  };
 
   useEffect(() => {
     fetch(`${API}/me`).then(r => r.json()).then(d => setScope(d.scope)).catch(() => setScope("full"));
@@ -3133,26 +3370,27 @@ function App() {
   };
 
   const ALL_TABS = [
-    {id:"timeline",   label:"📊 Timeline"},
-    {id:"day",        label:"📅 დღის ხედი"},
-    {id:"detail",     label:"🔍 ტურის დეტალი"},
-    {id:"menu",       label:"🍽️ მენიუ"},
-    {id:"payments",   label:"💳 წინასწარ გადასახდელი"},
-    {id:"prepaystat", label:"📈 წინასტატი"},
-    {id:"buses",      label:"🚌 ავტობუსები"},
-    {id:"cashflow",   label:"💵 ავანსი/ბალანსი"},
-    {id:"profit",     label:"💰 მოგება 2026"},
-    {id:"stats",      label:"📊 სტატისტიკა 2026"},
-    {id:"debts",      label:"🧾 დავალიანებები"},
-    {id:"profit25",   label:"💰 მოგება 2025"},
-    {id:"stats25",    label:"📊 სტატისტიკა 2025"},
-    {id:"settings",   label:"⚙️ პარამეტრები"},
+    {id:"timeline",   label: ui.tabTimeline},
+    {id:"day",        label: ui.tabDay},
+    {id:"detail",     label: ui.tabDetail},
+    {id:"menu",       label: ui.tabMenu},
+    {id:"payments",   label: ui.tabPayments},
+    {id:"prepaystat", label: ui.tabPrepaystat},
+    {id:"buses",      label: ui.tabBuses},
+    {id:"cashflow",   label: ui.tabCashflow},
+    {id:"profit",     label: ui.tabProfit},
+    {id:"stats",      label: ui.tabStats},
+    {id:"debts",      label: ui.tabDebts},
+    {id:"profit25",   label: ui.tabProfit25},
+    {id:"stats25",    label: ui.tabStats25},
+    {id:"settings",   label: ui.tabSettings},
   ];
   const tabs = scope === "limited"
     ? ALL_TABS.filter(t => LIMITED_TAB_IDS.includes(t.id))
     : ALL_TABS;
 
   return (
+    <LangContext.Provider value={lang}>
     <div className="min-h-screen bg-gray-100">
       <header className="bg-slate-900 text-white shadow-lg">
         <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
@@ -3161,16 +3399,17 @@ function App() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-xs text-slate-400">
-              {new Date().toLocaleDateString("ka-GE",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}
+              {new Date().toLocaleDateString(lang === 'en' ? 'en-US' : 'ka-GE',{weekday:"long",year:"numeric",month:"long",day:"numeric"})}
             </div>
+            <LangToggle lang={lang} setLang={changeLang}/>
             <button onClick={handleFullSync} disabled={syncing}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-amber-400 text-slate-900 hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
               <span className={syncing ? "animate-spin inline-block" : ""}>🔄</span>
-              {syncing ? "განახლება..." : "განახლება"}
+              {syncing ? ui.refreshing : ui.refresh}
             </button>
             <a href="/logout"
               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-slate-700 text-slate-200 hover:bg-slate-600">
-              გასვლა
+              {ui.logout}
             </a>
           </div>
         </div>
@@ -3209,6 +3448,7 @@ function App() {
         {tab === "settings"   && <SettingsView/>}
       </main>
     </div>
+    </LangContext.Provider>
   );
 }
 

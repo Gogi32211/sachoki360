@@ -530,6 +530,9 @@ def get_tour_detail(code: str):
         tour = conn.execute("SELECT * FROM tours WHERE code=?", (code,)).fetchone()
         if not tour:
             return None
+        prof = conn.execute(
+            "SELECT pax FROM tour_profit WHERE tour_code=?", (code,)
+        ).fetchone()
         logs = conn.execute(
             "SELECT * FROM daily_log WHERE tour_code=? ORDER BY date", (code,)
         ).fetchall()
@@ -552,6 +555,7 @@ def get_tour_detail(code: str):
             "status": get_tour_status(tour["bus_start"], tour["bus_end"]),
             "notes": tour["notes"],
             "rooms": tour["rooms"] or "",
+            "pax": (prof["pax"] if prof else "") or "",
             "guide": tour["guide"] or "",
             "color": SERIES[tour["series"]]["color"],
             "series_name": SERIES[tour["series"]]["name"],
