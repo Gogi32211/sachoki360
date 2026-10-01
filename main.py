@@ -692,7 +692,8 @@ function render(data) {
       }
     }
     if (d.stay_contact && d.stay_contact.name) {
-      html += '<div class="top-info">🏠 <span class="muted">' + t.staffStay + '</span> ' + esc(trHotelOnly(d.stay_contact.name)) + ' — ' + esc(d.stay_contact.phone) + '</div>';
+      html += '<div class="top-info">🏠 <span class="muted">' + t.staffStay + '</span> ' + esc(trHotelOnly(d.stay_contact.name)) +
+        (d.stay_contact.phone ? ' — ' + esc(d.stay_contact.phone) : '') + '</div>';
     }
     html += '<div class="meals" style="margin-top:8px">'
       + renderMeal('lunch', d.lunch, d.meals && d.meals.lunch)

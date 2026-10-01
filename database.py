@@ -734,13 +734,14 @@ def _stay_contact_for(city: str, hotel: str, stay_entries: list, hotels: dict) -
     except Gudauri, which depends on the guests' own hotel instead (see
     _GUDAURI_STAY_HOTEL).
 
-    TEMPORARILY DISABLED for Gudauri specifically (returns nothing, same
-    as a day with no stay contact at all) while the office works out how
-    to handle staff staying at Gudauri's several different hotels -- the
-    per-hotel rule above stays in the code, ready to turn back on once
-    that's settled, rather than being deleted and rewritten from scratch."""
+    Gudauri's per-hotel rule above is PARKED, not used, while the office
+    works out how to handle staff staying at Gudauri's several different
+    hotels -- every Gudauri day shows a plain "ask Lizi" placeholder
+    instead in the meantime, so the line still makes clear there's an
+    answer to chase down rather than looking like there's nothing to
+    arrange at all. No phone of its own, so it's shown name-only."""
     if (city or '').strip().lower() == 'gudauri':
-        return {}
+        return {"name": "ლიზის კითხეთ", "phone": ""}
     return match_stay_contact(city, stay_entries)
 
 
