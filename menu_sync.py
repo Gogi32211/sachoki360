@@ -116,6 +116,14 @@ def _restaurant_key_from_title(title: str):
         if 'tm' in title.lower():
             return 'ზღაპარი (ტმ მენიუ)', None
         return 'ზღაპარი', None
+    # Same missing-trailing-"ი" typo database.py already normalizes on the
+    # balance-sheet side (daily_log/tour_meals) -- the tab title itself can
+    # carry it too, and left alone it syncs under a second, shadow key that
+    # restaurant_key() never resolves to (an exact match on the balance
+    # sheet's own correctly-spelled "ცენტრალ პაბი" wins first), silently
+    # orphaning this tab's freshly-synced ratios and D-marked extras.
+    if title == 'ცენტრალ პაბ':
+        return 'ცენტრალ პაბი', None
     return title, None
 
 
