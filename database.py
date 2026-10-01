@@ -732,12 +732,15 @@ def _stay_contact_for(city: str, hotel: str, stay_entries: list, hotels: dict) -
     """The guide/driver's own overnight-stay contact for a day — normally
     match_stay_contact's own per-city row from the informations tab,
     except Gudauri, which depends on the guests' own hotel instead (see
-    _GUDAURI_STAY_HOTEL)."""
+    _GUDAURI_STAY_HOTEL).
+
+    TEMPORARILY DISABLED for Gudauri specifically (returns nothing, same
+    as a day with no stay contact at all) while the office works out how
+    to handle staff staying at Gudauri's several different hotels -- the
+    per-hotel rule above stays in the code, ready to turn back on once
+    that's settled, rather than being deleted and rewritten from scratch."""
     if (city or '').strip().lower() == 'gudauri':
-        hotel_l = (hotel or '').strip().lower()
-        for key, staff_hotel in _GUDAURI_STAY_HOTEL.items():
-            if key in hotel_l:
-                return {"name": staff_hotel, "phone": _exact_hotel_phone(staff_hotel.lower(), hotels)}
+        return {}
     return match_stay_contact(city, stay_entries)
 
 
