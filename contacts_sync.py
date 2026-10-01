@@ -192,17 +192,46 @@ def fetch_contacts() -> dict:
         return {}
 
 
+def _simplify(word: str) -> str:
+    """The schedule is typed by hand and casually drops the "h" from a
+    digraph (confirmed real example: "marsagishvili" for "მარსაღიშვილი",
+    which this module's own GEO_LAT table transliterates to
+    "marsaghishvili") -- normalized away before comparing so that doesn't
+    read as a different surname."""
+    return word.replace('gh', 'g').replace('kh', 'k')
+
+
+def _word_overlaps(field_word: str, cand_word: str) -> bool:
+    """Same word (after the digraph normalization above), or one is an
+    abbreviation of the other ("khach" for "khachkliani", the schedule's
+    own shorthand for a surname) -- checked both directions since either
+    side can be the shorter one."""
+    a, b = _simplify(field_word), _simplify(cand_word)
+    return a == b or a.startswith(b) or b.startswith(a)
+
+
 def _best_guide_phone(text: str, guides: list) -> str:
     """Best-effort: transliterated, normalized word sets, best overlap
-    wins. Returns '' when nothing plausible matches."""
+    wins. Returns '' when nothing plausible matches.
+
+    A field naming both a given name and a surname (the normal case) must
+    match BOTH before any candidate counts as a real match -- matching on
+    the given name alone let a same-first-name, different-surname guide
+    who isn't in the informations tab yet silently borrow a DIFFERENT
+    guide's phone number, with no visible sign the surname never actually
+    matched. A one-word field (no surname given at all) still matches on
+    that word alone, since there's nothing more to check it against."""
     field_words = set(_words(text))
     if not field_words:
         return ''
     best_phone, best_score = '', 0
     for g in guides:
-        overlap = field_words & set(_words(g['name']))
-        if len(overlap) > best_score:
-            best_score, best_phone = len(overlap), g['phone']
+        cand_words = set(_words(g['name']))
+        matched = sum(1 for fw in field_words if any(_word_overlaps(fw, cw) for cw in cand_words))
+        if len(field_words) > 1 and matched < len(field_words):
+            continue
+        if matched > best_score:
+            best_score, best_phone = matched, g['phone']
     return best_phone
 
 
