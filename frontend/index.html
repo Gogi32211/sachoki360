@@ -2932,6 +2932,7 @@ function DebtsView() {
   const [syncing, setSyncing] = useState(false);
   const [phaseFilter, setPhaseFilter] = useState('open');
   const [sFilter, setSFilter] = useState('all');
+  const [orgFilter, setOrgFilter] = useState('all');
   const [expanded, setExpanded] = useState({});
   // Debt as it stood on a chosen day: a tour that hadn't finished by then had
   // not yet run up its bills, so it doesn't count towards that day's total.
@@ -2985,15 +2986,41 @@ function DebtsView() {
       partial: !full};
   };
 
+  // The organization list is read straight off the loaded invoice lines, so a
+  // tour added under a name that hasn't shown up before becomes its own
+  // filter option automatically, with nothing to keep in sync by hand.
+  const allOrgs = [...new Set(rows.flatMap(r => (r.lines || []).map(l => l.name)))]
+    .sort((a, b) => a.localeCompare(b, 'ka'));
+  // Only the invoice lines this tour has from the selected organization —
+  // "all" keeps every line, same as today.
+  const orgLinesOf = r => (r.lines || []).filter(l => orgFilter === 'all' || l.name === orgFilter);
+
   // The series buttons narrow everything on the tab — totals, phase tally and
   // table alike — so the figures always describe what is on screen.
-  const pool = rows.filter(r => sFilter === 'all' || r.series === sFilter);
+  const pool = rows.filter(r => sFilter === 'all' || r.series === sFilter)
+                   .filter(r => orgFilter === 'all' || orgLinesOf(r).length > 0);
   const shown = pool.filter(byPhaseFilter).map(asAt).filter(Boolean)
                     .filter(r => !asOf || (r.invoiced_usd || 0) > 0);
   const laterCount = pool.filter(byPhaseFilter).length - shown.length;
 
-  const sum = k => shown.reduce((a, r) => a + (r[k] || 0), 0);
-  const cnt = k => shown.reduce((a, r) => a + (r[k] || 0), 0);
+  // A tour's total/paid/estimated figures describe the whole tour, not one
+  // organization's invoices within it — once an organization is picked, only
+  // "awaited"/"due" can honestly be re-derived from its own lines (paid lines
+  // never make it into `lines` to begin with); the rest show as "—" rather
+  // than a whole-tour number next to a single organization's name.
+  const displayRows = orgFilter === 'all' ? shown : shown.map(r => {
+    const lines = orgLinesOf(r);
+    const awaited = lines.filter(l => !l.received).reduce((a, l) => a + l.usd, 0);
+    const due = lines.filter(l => l.received).reduce((a, l) => a + l.usd, 0);
+    return {...r, lines,
+      invoiced_usd: awaited + due, awaited_usd: awaited, due_usd: due,
+      awaited_count: lines.filter(l => !l.received).length,
+      due_count: lines.filter(l => l.received).length,
+      paid_usd: null, estimated_missing_usd: null};
+  });
+
+  const sum = k => displayRows.reduce((a, r) => a + (r[k] || 0), 0);
+  const cnt = k => displayRows.reduce((a, r) => a + (r[k] || 0), 0);
   const byPhase = p => pool.filter(r => r.phase === p).length;
 
   return (
@@ -3060,9 +3087,18 @@ function DebtsView() {
               className={`px-3 py-1 rounded text-xs font-bold ${sFilter===s ? 'text-white' : 'bg-white border hover:bg-gray-50'}`}
               style={sFilter===s ? {background: SERIES_COLORS[s]} : {color: SERIES_COLORS[s]}}>{s}</button>
           ))}
+          <span className="text-xs text-gray-400 ml-3 mr-1">ორგანიზაცია:</span>
+          <select value={orgFilter} onChange={e => setOrgFilter(e.target.value)}
+            className="border rounded px-2 py-1 text-xs max-w-[220px]">
+            <option value="all">ყველა</option>
+            {allOrgs.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          {orgFilter !== 'all' &&
+            <button onClick={() => setOrgFilter('all')}
+              className="px-2 py-1 rounded text-xs border bg-white hover:bg-gray-50">✕ გასუფთავება</button>}
         </div>
 
-        {shown.length === 0 ? (
+        {displayRows.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-10 text-center text-gray-400">
             <div className="text-4xl mb-2">✅</div>
             <div className="text-sm">ამ ფილტრით დავალიანება არ არის</div>
@@ -3085,8 +3121,11 @@ function DebtsView() {
               </tr>
             </thead>
             <tbody>
-              {shown.map(r => {
-                const open = !!expanded[r.tour_code];
+              {displayRows.map(r => {
+                // Picking an organization is itself a request to see its lines,
+                // so rows open by default; an explicit click still overrides it.
+                const open = expanded[r.tour_code] !== undefined
+                  ? expanded[r.tour_code] : orgFilter !== 'all';
                 const ph = PHASES[r.phase];
                 const lines = r.lines || [];
                 return (
@@ -3152,7 +3191,7 @@ function DebtsView() {
             </tbody>
             <tfoot>
               <tr className="bg-slate-50 border-t-2 border-slate-200 font-bold">
-                <td className="px-3 py-2.5 text-xs text-gray-500" colSpan="3">ჯამი ({shown.length} ტური)</td>
+                <td className="px-3 py-2.5 text-xs text-gray-500" colSpan="3">ჯამი ({displayRows.length} ტური)</td>
                 <td className="px-3 py-2.5 text-right text-gray-700">{fmtU(sum('invoiced_usd'))}</td>
                 <td className="px-3 py-2.5 text-right text-red-700">{fmtU(sum('awaited_usd'))}</td>
                 <td className="px-3 py-2.5 text-right text-violet-700">{fmtU(sum('estimated_missing_usd'))}</td>
