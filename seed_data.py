@@ -288,6 +288,42 @@ SERIES["TV"] = {
     },
 }
 
+# TN — 12 დღე: აზერბაიჯანი → საქართველო (სვანეთი ჩართულია) → სომხეთი
+# Day 1: Urumqi→Baku  Day 2: Baku  Day 3: Baku→Sheki  Day 4: Tbilisi (bus_start)
+# Confirmed from the master schedule's own TN-1005 block + its balance
+# sheet's dated meal lines — Kutaisi comes BEFORE the Mestia detour and
+# Batumi/Borjomi AFTER it, the reverse of what the route would look like
+# guessed from geography alone. Same overall family as LN-0906's own
+# one-off override (Tbilisi → Gudauri → Kutaisi → Batumi → Borjomi →
+# Armenia, crossing at Bavra) with a Mestia/Svaneti detour added between
+# Kutaisi and Batumi, and ending at Tsaghkadzor instead of Yerevan itself.
+_TN_NIGHTS = {
+    0: {"city": "Tbilisi", "hotel": "Pullman Tbilisi",
+        "lunch": "ლანჩი: ბალკონი", "dinner": "ვახშამი: კტვ (შოთი)", "border": None},
+    1: {"city": "Gudauri", "hotel": "Gudauri Loft",
+        "lunch": "ლანჩი: საკუთარი ხარჯებით", "dinner": "ვახშამი: ყაზბეგის სასტუმრო", "border": None},
+    2: {"city": "Kutaisi", "hotel": "Kutaisi Inn",
+        "lunch": "ლანჩი: ფასანაური", "dinner": "ვახშამი: ზღაპარი", "border": None},
+    3: {"city": "Mestia", "hotel": "Lilati Mestia",
+        "lunch": "ლანჩი: დიარონი", "dinner": "ვახშამი: ლუშნუ ქორი", "border": None},
+    4: {"city": "Mestia", "hotel": "Lilati Mestia",
+        "lunch": "ლანჩი: ენგური", "dinner": "ვახშამი: ლუიზასთან", "border": None},
+    5: {"city": "Batumi", "hotel": "Greenwood Batumi",
+        "lunch": "ლანჩი: დიარონი", "dinner": "ვახშამი: ბერიძეები", "border": None},
+    6: {"city": "Borjomi", "hotel": "Borjomi Likani Health & Spa",
+        "lunch": "ლანჩი: მარტვილი", "dinner": "ვახშამი: ფესვები", "border": None},
+    7: {"city": "Yerevan", "hotel": "Armenia Marriott Tsaghkadzor",
+        "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": "GEO→ARM: ბავრა"},
+    8: {"city": "✈ Yerevan→Urumqi", "hotel": "—",
+        "lunch": "ლანჩი: სომხეთი", "dinner": "ვახშამი: სომხეთი", "border": None},
+}
+SERIES["TN"] = {
+    "name": "TN — 12 დღე (აზ.+საქ.+სვანეთი+სომ.)",
+    "duration": 9,
+    "color": "#0D9488",
+    "nights": _TN_NIGHTS,
+}
+
 # Day offset from the schedule-map's first (Baku/Almaty) date to the
 # app's bus_start (the Georgia / Khareba day). Used by schedule_sync.
 SERIES_START_OFFSET = {
@@ -298,6 +334,8 @@ SERIES_START_OFFSET = {
     "HT": 3, "HT1": 3, "HT2": 3, "HT3": 3,
     # TH/TK: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 4 → offset +3
     "TH": 3, "TK": 3,
+    # TN: code MMDD = Baku arrival (Day 1), Georgia (Tbilisi) = Day 4 → offset +3
+    "TN": 3,
     # TM/TV: code MMDD = Day 1 (Urumqi→Yerevan) — the tour starts there → offset 0
     "TM": 0, "TV": 0,
 }
