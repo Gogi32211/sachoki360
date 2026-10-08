@@ -2297,8 +2297,13 @@ def apply_schedule_sync(active: list) -> dict:
               and mysteriously vanished."
     """
     active_codes = {a["code"] for a in active}
-    # Safety guard: never wipe tours on a bad/empty fetch.
-    if len(active_codes) < 20:
+    # Safety guard: never wipe tours on a bad/empty fetch. 20 was a fine floor
+    # in peak season, but the real active list now genuinely runs lower than
+    # that as the year winds down (16, confirmed real, in October) -- a floor
+    # meant to catch a broken/empty fetch must stay well under any plausible
+    # real count, not above it, or it ends up blocking every add and removal
+    # once the season naturally thins out.
+    if len(active_codes) < 5:
         return {"ok": False, "reason": f"too few active codes ({len(active_codes)}) — skipped",
                 "added": [], "removed": []}
 
