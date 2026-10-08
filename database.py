@@ -729,20 +729,15 @@ _GUDAURI_STAY_HOTEL = {
 
 
 def _stay_contact_for(city: str, hotel: str, stay_entries: list, hotels: dict) -> dict:
-    """The guide/driver's own overnight-stay contact for a day — normally
-    match_stay_contact's own per-city row from the informations tab,
-    except Gudauri, which depends on the guests' own hotel instead (see
-    _GUDAURI_STAY_HOTEL).
+    """The guide/driver's own overnight-stay contact for a day.
 
-    Gudauri's per-hotel rule above is PARKED, not used, while the office
-    works out how to handle staff staying at Gudauri's several different
-    hotels -- every Gudauri day shows a plain "ask Lizi" placeholder
-    instead in the meantime, so the line still makes clear there's an
-    answer to chase down rather than looking like there's nothing to
-    arrange at all. No phone of its own, so it's shown name-only."""
-    if (city or '').strip().lower() == 'gudauri':
-        return {"name": "ლიზის კითხეთ", "phone": ""}
-    return match_stay_contact(city, stay_entries)
+    Was match_stay_contact's own per-city row from the informations tab
+    (Gudauri excepted, see _GUDAURI_STAY_HOTEL, itself PARKED below) --
+    but the informations tab's per-city rows are wrong for some hotels,
+    so every city now shows the same plain "ask Lizi" placeholder until
+    the office sorts that tab out, same as Gudauri already did. No phone
+    of its own, so it's shown name-only."""
+    return {"name": "ლიზის კითხეთ", "phone": ""}
 
 
 def get_tour_menu(code: str):
