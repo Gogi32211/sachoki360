@@ -2291,6 +2291,13 @@ def bulk_update_rooms(meta: dict) -> int:
     return updated
 
 
+def _is_future(bus_end_iso: str, today: date) -> bool:
+    try:
+        return date.fromisoformat(bus_end_iso) > today
+    except Exception:
+        return False
+
+
 def apply_schedule_sync(active: list) -> dict:
     """Reconcile the tours table with the master schedule's active list.
 
@@ -2307,14 +2314,18 @@ def apply_schedule_sync(active: list) -> dict:
               and mysteriously vanished."
     """
     active_codes = {a["code"] for a in active}
-    # Safety guard: never wipe tours on a bad/empty fetch. 20 was a fine floor
-    # in peak season, but the real active list now genuinely runs lower than
-    # that as the year winds down (16, confirmed real, in October) -- a floor
-    # meant to catch a broken/empty fetch must stay well under any plausible
-    # real count, not above it, or it ends up blocking every add and removal
-    # once the season naturally thins out.
-    if len(active_codes) < 5:
-        return {"ok": False, "reason": f"too few active codes ({len(active_codes)}) — skipped",
+    # A fixed floor here was always going to be wrong eventually: 20, then 5,
+    # both got passed by the real active count as the season wound down (2,
+    # confirmed live, in late October) and silently blocked EVERY add and
+    # removal once the real count fell under them -- including a brand new
+    # tour that had just as much right to be added as any other. A broken or
+    # empty fetch is the only thing worth guarding against here, and it is
+    # only the REMOVAL loop below that can do real damage from one (deleting
+    # tours that are, in fact, still running); adding a tour the sheet
+    # genuinely shows is never destructive, however short that day's list is,
+    # so it no longer waits on this guard at all.
+    if not active_codes:
+        return {"ok": False, "reason": "empty active list — skipped",
                 "added": [], "removed": []}
 
     today = today_tbilisi()
@@ -2349,32 +2360,49 @@ def apply_schedule_sync(active: list) -> dict:
             _insert_tour(conn, code, series, bs, rooms, a.get("guide", ""))
             added.append(code)
 
-        # Removals: not in active list AND not yet completed
+        # Removals: not in active list AND not yet completed.
         # Tours with balance data are kept even if absent from the schedule sheet.
-        codes_with_profit = {r[0] for r in conn.execute("SELECT tour_code FROM tour_profit").fetchall()}
-        for code, be_str in existing.items():
-            if code in active_codes:
-                continue
-            if code in codes_with_profit:
-                continue  # has balance data — not cancelled, just missing from sheet
-            try:
-                bus_end = date.fromisoformat(be_str)
-            except Exception:
-                continue
-            if bus_end > today:  # still ongoing or future → cancelled
-                for tbl, col in [
-                    ('daily_log',       'tour_code'),
-                    ('tour_meals',      'tour_code'),
-                    ('tour_financials', 'tour_code'),
-                    ('tour_profit',     'tour_code'),
-                    ('payment_status',  'tour_code'),
-                ]:
-                    try:
-                        conn.execute(f"DELETE FROM {tbl} WHERE {col}=?", (code,))
-                    except Exception:
-                        pass
-                conn.execute("DELETE FROM tours WHERE code=?", (code,))
-                removed.append(code)
+        #
+        # This is the one destructive branch, so it keeps its own guard --
+        # relative to what's actually still open in the DB rather than a fixed
+        # number, so it scales down with the season instead of eventually
+        # sitting above every real count (see the comment above active_codes).
+        # A fetch that's badly broken (wrong tab picked up, response cut off
+        # mid-sheet) reads as suspiciously small NEXT TO what's already being
+        # tracked, which a fixed floor can't tell apart from "the season
+        # really is almost over."
+        still_open = [be for be in existing.values() if _is_future(be, today)]
+        # Below ~10 tracked tours, a small or shrinking active list is just
+        # the season (or this stretch of it) actually being that small --
+        # the danger case is the fetch landing on the wrong tab or getting
+        # cut off while many tours are genuinely still running, so only a
+        # comfortably large still_open count is worth comparing against.
+        removal_safe = len(still_open) < 10 or len(active_codes) >= len(still_open) * 0.3
+        if removal_safe:
+            codes_with_profit = {r[0] for r in conn.execute("SELECT tour_code FROM tour_profit").fetchall()}
+            for code, be_str in existing.items():
+                if code in active_codes:
+                    continue
+                if code in codes_with_profit:
+                    continue  # has balance data — not cancelled, just missing from sheet
+                try:
+                    bus_end = date.fromisoformat(be_str)
+                except Exception:
+                    continue
+                if bus_end > today:  # still ongoing or future → cancelled
+                    for tbl, col in [
+                        ('daily_log',       'tour_code'),
+                        ('tour_meals',      'tour_code'),
+                        ('tour_financials', 'tour_code'),
+                        ('tour_profit',     'tour_code'),
+                        ('payment_status',  'tour_code'),
+                    ]:
+                        try:
+                            conn.execute(f"DELETE FROM {tbl} WHERE {col}=?", (code,))
+                        except Exception:
+                            pass
+                    conn.execute("DELETE FROM tours WHERE code=?", (code,))
+                    removed.append(code)
 
     print(f"[schedule_sync] added={added} removed={removed}")
     return {"ok": True, "added": added, "removed": removed}
