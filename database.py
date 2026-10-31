@@ -1803,9 +1803,19 @@ def _unbilled_cost(model, series, comps, pax, rooms, days, nights):
     hotel line at all, no bus line at all — so only those are priced. Comparing
     the tour's total against the model instead would report ordinary variance
     between a tour and the average as though it were a missing invoice.
+
+    Only components THIS series has ever actually billed are considered —
+    '_all' alone (no series of its own) means some other series' tours carry
+    it but this one's never have, so it's bundled elsewhere or doesn't apply
+    here, not an invoice this series is still waiting on. A thin cross-series
+    sample (e.g. one stray "azerbaijan" line from a tour or two, pooled into
+    '_all' with no per-series minimum) was getting broadcast as a phantom few
+    thousand dollars onto every other series' phase-1 tours, inflating the
+    whole "estimated missing" total far past what any tour would plausibly
+    still owe.
     """
-    rates = {**model.get('_all', {}), **model.get(series, {})}
-    missing = [c for c in rates if not (comps or {}).get(c)]
+    series_rates = model.get(series, {})
+    missing = [c for c in series_rates if not (comps or {}).get(c)]
     if not missing:
         return 0.0
     return _expected_cost(model, series, pax, rooms, days, nights, only=set(missing)) or 0.0
