@@ -21,7 +21,7 @@ from profit_sync import TOUR_CODE_RE, _norm_code, _num, _usd_from_row, _fix_name
 
 # Same workbooks profit_sync reads (each covers more series than its key
 # suggests — KT_DT also has DT1, ZT also has LT). MT_ST is nominally the
-# finance-only MT/ST workbook (see profit_sync.FINANCE_ONLY — those two
+# finance-only MT/ST workbook (see profit_sync._is_finance_only — those two
 # series run under another desk and stay out of the schedule/timeline), but
 # the office also drops other series' tours in there sometimes (e.g.
 # LN-0906) — those still need a menu, so every tab here is scanned the same

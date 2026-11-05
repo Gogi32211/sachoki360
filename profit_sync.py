@@ -18,6 +18,7 @@ import re
 from datetime import date
 
 import requests
+from seed_data import SERIES
 from openpyxl import load_workbook
 
 # Same three financial workbooks used for meals/payments.
@@ -30,9 +31,16 @@ SHEET_IDS = {
     "HM_HT": "1HCg4JqkNgA9f1SX1gXVr_7mp-WRIu0pDz1wlgrtrgRU",
 }
 
-# Workbooks whose tours belong in the money but not in the schedule: another
-# desk runs them, so they must not turn up in the day view or the timeline.
-FINANCE_ONLY = ("MT_ST",)
+# MT_ST is a mixed workbook: MT/ST really are run by another desk and belong
+# in the money but not the schedule, but TH/TK/TN/TV/LN-0906 also file their
+# balance tab there despite being ordinary scheduled programs -- whether a
+# tour belongs in the day view and timeline is a property of its own series
+# (does SERIES know its itinerary at all?), never of which workbook its
+# balance tab happens to live in. See _is_finance_only below.
+def _is_finance_only(code: str) -> bool:
+    """True only for a series with no SERIES template of its own (MT, ST) --
+    genuinely run by another desk, not merely filed in the MT_ST workbook."""
+    return code.split('-')[0] not in SERIES
 
 TOUR_CODE_RE = re.compile(r'((?:ZT1|ZT|LNT|LN|KT|DT1|DT2|LT|HM1|HM2|HM|HT1|HT2|HT3|HT|TH|TK|TM|TN|TV|MT|ST)-?\d{4})')
 # Group size, e.g. "19+1" = 19 tourists + 1 leader.
@@ -343,7 +351,7 @@ def _parse_worksheet(ws, code_re=None, norm=None) -> tuple:
     return code, out
 
 
-def _fetch_workbook_profit(sheet_id: str, scheduled: bool = True) -> dict:
+def _fetch_workbook_profit(sheet_id: str) -> dict:
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
     results: dict = {}
     try:
@@ -353,7 +361,7 @@ def _fetch_workbook_profit(sheet_id: str, scheduled: bool = True) -> dict:
         for ws in wb.worksheets:
             code, data = _parse_worksheet(ws)
             if code and data and any(v is not None for v in data.values()):
-                data['scheduled'] = scheduled
+                data['scheduled'] = not _is_finance_only(code)
                 results[code] = data
         wb.close()
         print(f"[profit_sync] {sheet_id}: parsed profit for {len(results)} tours")
@@ -365,7 +373,7 @@ def _fetch_workbook_profit(sheet_id: str, scheduled: bool = True) -> dict:
 def fetch_tour_profit() -> dict:
     """Return {tour_code: {profit_usd, vat_usd, ...}} across all balance files."""
     results: dict = {}
-    for key, sheet_id in SHEET_IDS.items():
-        results.update(_fetch_workbook_profit(sheet_id, key not in FINANCE_ONLY))
+    for sheet_id in SHEET_IDS.values():
+        results.update(_fetch_workbook_profit(sheet_id))
     print(f"[profit_sync] Total: profit for {len(results)} tours")
     return results
