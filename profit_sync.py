@@ -133,16 +133,24 @@ def _fix_name(name: str) -> str:
     return name
 
 
-_HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', 'მარკო', 'გორი ინ',
+_HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', 'რედისონ', 'მარკო', 'გორი ინ',
                'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან', 'pullman',
-               'ლილატ', 'გუდაურ', 'best western', 'ბესთ', 'ქრაუნ',
-               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ', 'პინო', 'pino', 'ჯინო')
+               'ლილატ', 'გუდაურ', 'გუდური', 'best western', 'ბესთ', 'ბესტ', 'ქრაუნ',
+               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ', 'პინო', 'pino', 'ჯინო',
+               # Each of these is specific enough (hotel + its own city, or a
+               # one-off brand/resort name) not to risk matching anything else
+               # the sheet happens to mention — unlike a bare "მარიოტ", which
+               # would also catch "Marriot Tsakhadzor" (Armenia, see below).
+               'მარიოტი თბილისი', 'ბილტმორ', 'როიალ თულ', 'წყალტუბო',
+               'მაუნთაინ ჰაუს', 'სუათის კურორტ')
 
 # A hotel's own name sometimes names Armenia instead of the sheet saying
 # "სომხეთი" outright (e.g. "Radisson Yerevan", "caucasus hotel yerevan",
-# "Aghababayan") -- these used to sit in _HOTEL_KEYS above, which miscounted
-# them as an ordinary domestic hotel cost instead of the Armenia leg.
-_ARMENIA_HOTEL_KEYS = ('yerevan', 'ერევან', 'sevan', 'სევან', 'aghababayan', 'agababayan')
+# "Aghababayan", "Marriot Tsakhadzor") -- these used to sit in _HOTEL_KEYS
+# above, which miscounted them as an ordinary domestic hotel cost instead of
+# the Armenia leg.
+_ARMENIA_HOTEL_KEYS = ('yerevan', 'ერევან', 'sevan', 'სევან', 'aghababayan', 'agababayan',
+                       'tsakhadzor')
 
 
 def _categorize(name: str):
