@@ -150,7 +150,7 @@ _HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', '�
 # above, which miscounted them as an ordinary domestic hotel cost instead of
 # the Armenia leg.
 _ARMENIA_HOTEL_KEYS = ('yerevan', 'ერევან', 'sevan', 'სევან', 'aghababayan', 'agababayan',
-                       'tsakhadzor')
+                       'tsakhadzor', 'ararat', '88 hotel')
 
 
 def _categorize(name: str):
