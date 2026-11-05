@@ -136,8 +136,13 @@ def _fix_name(name: str) -> str:
 _HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', 'მარკო', 'გორი ინ',
                'გრინვუდ', 'ახალციხ', 'უშბა', 'გისტოლა', 'პულმან', 'pullman',
                'ლილატ', 'გუდაურ', 'best western', 'ბესთ', 'ქრაუნ',
-               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ', 'პინო', 'pino', 'ჯინო',
-               'yerevan', 'ერევან', 'aghababayan', 'agababayan', 'სევან')
+               'crown', 'ბორჯომ', 'ინნ', 'pine', 'პაინ', 'პინო', 'pino', 'ჯინო')
+
+# A hotel's own name sometimes names Armenia instead of the sheet saying
+# "სომხეთი" outright (e.g. "Radisson Yerevan", "caucasus hotel yerevan",
+# "Aghababayan") -- these used to sit in _HOTEL_KEYS above, which miscounted
+# them as an ordinary domestic hotel cost instead of the Armenia leg.
+_ARMENIA_HOTEL_KEYS = ('yerevan', 'ერევან', 'sevan', 'სევან', 'aghababayan', 'agababayan')
 
 
 def _categorize(name: str):
@@ -148,7 +153,7 @@ def _categorize(name: str):
     is_meal = any(k in n for k in ('ლანჩი', 'ვახშამ', 'ვაშამ'))
     # Wine/food tastings are an activity, not a meal → counted as an attraction.
     is_tasting = 'დეგუსტაცი' in n
-    if any(k in n for k in ('სომხეთი', 'აღაბაბაია')):
+    if any(k in n for k in ('სომხეთი', 'აღაბაბაია')) or any(k in n for k in _ARMENIA_HOTEL_KEYS):
         # Meal rows in Armenia are informational diary entries; the cost is
         # already captured in the guide and hotel line items.
         if is_meal or is_tasting:
