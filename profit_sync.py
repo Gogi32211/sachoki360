@@ -152,6 +152,11 @@ _HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', '�
 _ARMENIA_HOTEL_KEYS = ('yerevan', 'ერევან', 'sevan', 'სევან', 'aghababayan', 'agababayan',
                        'tsakhadzor', 'ararat', '88 hotel')
 
+# Same idea for Baku hotels named by their own hotel, not the word
+# "აზერბაიჯანი" -- these two are also in sheets_sync.py's own SKIP_HOTELS
+# (Baku hotels, outside GEO/ARM, so the schedule sync skips them too).
+_AZERBAIJAN_HOTEL_KEYS = ('marriott hotel boulevard', 'el resort')
+
 
 def _categorize(name: str):
     """Map a line-item description to a cost component (or None to skip)."""
@@ -167,7 +172,7 @@ def _categorize(name: str):
         if is_meal or is_tasting:
             return None
         return 'armenia'
-    if 'აზერბაიჯ' in n:
+    if 'აზერბაიჯ' in n or any(k in n for k in _AZERBAIJAN_HOTEL_KEYS):
         # Same as Armenia: a diary meal row here is already paid for in the
         # bundled guide/hotel/bus line, not a cost of its own.
         if is_meal or is_tasting:
