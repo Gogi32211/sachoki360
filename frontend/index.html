@@ -2789,7 +2789,10 @@ function VendorChart({ scope, perPax }) {
     const sd  = vals.length > 1
       ? Math.sqrt(vals.reduce((a, v) => a + (v - avg) ** 2, 0) / vals.length)
       : 0;
-    return {name, entries, avg, sd, count: entries.length};
+    // Actual money spent there, whatever perPax is showing per tour —
+    // the raw sheet amounts, not divided by anything.
+    const total = entries.reduce((a, e) => a + (e.usd || 0), 0);
+    return {name, entries, avg, sd, count: entries.length, total};
   }).filter(v => v.avg > 0).sort((a, b) => b.avg - a.avg);
 
   const maxAvg = Math.max(1, ...vendors.map(v => v.avg));
@@ -2854,7 +2857,7 @@ function VendorChart({ scope, perPax }) {
         <div className="px-4 py-8 text-center text-xs text-gray-400">მონაცემები არ არის</div>
       ) : (
         <div className="p-3 space-y-0.5">
-          {vendors.map(({name, entries, avg, sd, count}) => (
+          {vendors.map(({name, entries, avg, sd, count, total}) => (
             <div key={name}>
               {/* Vendor summary row */}
               <div
@@ -2872,6 +2875,9 @@ function VendorChart({ scope, perPax }) {
                 </span>
                 <span className="w-16 text-right text-xs text-gray-400">±{perPax ? fmtD(sd) : fmt(sd)}</span>
                 <span className="w-12 text-right text-xs text-gray-400 flex-shrink-0">{count} ტ.</span>
+                <span className="w-20 text-right text-xs text-gray-500 flex-shrink-0" title="ჯამში გადახდილი">
+                  სულ ${fmt(total)}
+                </span>
               </div>
 
               {/* Per-tour breakdown */}
@@ -2912,6 +2918,14 @@ function VendorChart({ scope, perPax }) {
                       <span className="w-16 text-right font-bold text-gray-700">
                         ${perPax ? fmtD(avg) : fmt(avg)}
                       </span>
+                      {!perPax && <span className="w-16"/>}
+                    </div>
+                    {/* Total actually paid — the raw sum, regardless of the perPax toggle */}
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="w-2 h-2 flex-shrink-0"/>
+                      <span className="w-20 text-gray-400 flex-shrink-0">სულ ({count} ტ.)</span>
+                      <div className="flex-1"/>
+                      <span className="w-16 text-right font-bold text-gray-700">${fmt(total)}</span>
                       {!perPax && <span className="w-16"/>}
                     </div>
                   </div>
