@@ -142,7 +142,7 @@ _HOTEL_KEYS = ('ჰუალინგ', 'radisson', 'რადისონ', '�
                # the sheet happens to mention — unlike a bare "მარიოტ", which
                # would also catch "Marriot Tsakhadzor" (Armenia, see below).
                'მარიოტი თბილისი', 'ბილტმორ', 'როიალ თულ', 'როიალ ტულ', 'წყალტუბო',
-               'მაუნთაინ ჰაუს', 'სუათის კურორტ')
+               'მაუნთაინ ჰაუს', 'სუათის კურორტ', 'სუატის კურორტ')
 
 # A hotel's own name sometimes names Armenia instead of the sheet saying
 # "სომხეთი" outright (e.g. "Radisson Yerevan", "caucasus hotel yerevan",
