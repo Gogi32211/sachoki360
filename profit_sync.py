@@ -186,7 +186,7 @@ def _categorize(name: str):
         return 'restaurant'
     if is_guide_ref:
         return 'guide'
-    if any(k in n for k in ('ვარძი', 'სტალინ', 'უფლისციხ', 'უფლიციხ', 'საბაგირ',
+    if any(k in n for k in ('ვარძი', 'სტალინ', 'უფლისციხ', 'უფლიციხ', 'საბაგირ', 'ჰაერგირ',
                             'გემზე', 'მოზეომ', 'დელიკ', 'ბილეთ', 'მუზეუმ', 'ცაგვ',
                             'მარტვილ', 'ბორჯომის პარკ')):
         return 'attraction'
